@@ -15,8 +15,10 @@ import {
   OVERHEAD_TEXT,
   UNITS,
 } from "../lib/content";
+import type { PriceMasterItem } from "../lib/db/types";
 import { isValidNumberInput } from "../lib/estimateLineValidation";
 import { EstimateLineRow, type EditableLine } from "./EstimateLineRow";
+import { PriceMasterPicker } from "./PriceMasterPicker";
 
 let nextKey = 0;
 function newKey(): string {
@@ -63,6 +65,19 @@ function emptyLine(): EditableLine {
   };
 }
 
+function lineFromMasterItem(item: PriceMasterItem): EditableLine {
+  return {
+    key: newKey(),
+    kind: "item",
+    name: item.name,
+    spec: item.spec,
+    quantity: "1",
+    unit: item.unit,
+    unitPrice: String(item.unitPrice),
+    taxCategory: item.taxCategory,
+  };
+}
+
 const TOTALS_ROWS: {
   label: keyof typeof ESTIMATE_TOTALS_TEXT;
   amount: (totals: EstimateTotals) => number;
@@ -82,6 +97,8 @@ type Props = {
   projectId: string;
   initialLines: EstimateLine[];
   initialOverheadRatePercent: number;
+  /** 呼び出せる単価マスタの一覧（この案件の持ち主のもの）。 */
+  priceMasterItems: PriceMasterItem[];
 };
 
 /** 見積エディタ。明細の追加・編集・削除と、合計のリアルタイム表示を行う。 */
@@ -89,6 +106,7 @@ export function EstimateEditor({
   projectId,
   initialLines,
   initialOverheadRatePercent,
+  priceMasterItems,
 }: Props) {
   const [lines, setLines] = useState<EditableLine[]>(() =>
     initialLines.map(toEditableLine),
@@ -117,6 +135,11 @@ export function EstimateEditor({
   function addLine(): void {
     setSaved(false);
     setLines((prev) => [...prev, emptyLine()]);
+  }
+
+  function addLineFromMaster(item: PriceMasterItem): void {
+    setSaved(false);
+    setLines((prev) => [...prev, lineFromMasterItem(item)]);
   }
 
   const invalidQuantityKeys = new Set(
@@ -192,6 +215,8 @@ export function EstimateEditor({
       >
         {ESTIMATE_EDITOR_TEXT.addLine}
       </button>
+
+      <PriceMasterPicker items={priceMasterItems} onAdd={addLineFromMaster} />
 
       <div className="rounded border-2 border-gray-400 p-4">
         <label className="font-bold" htmlFor="overheadRate">

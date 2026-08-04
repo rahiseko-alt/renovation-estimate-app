@@ -5,6 +5,7 @@ import { getCurrentUser } from "../../../../lib/auth/server";
 import { ESTIMATE_EDITOR_TEXT } from "../../../../lib/content";
 import { getOrCreateEstimate } from "../../../../lib/db/estimates";
 import { getProjectForOwner } from "../../../../lib/db/projects";
+import { listPriceMasterForOwner } from "../../../../lib/db/priceMaster";
 
 export default async function EstimatePage({
   params,
@@ -19,6 +20,7 @@ export default async function EstimatePage({
   if (!project) notFound();
 
   const estimate = await getOrCreateEstimate(id);
+  const priceMasterItems = await listPriceMasterForOwner(user);
 
   return (
     <main className="mx-auto w-full max-w-md px-5 py-8">
@@ -29,6 +31,7 @@ export default async function EstimatePage({
         projectId={project.id}
         initialLines={estimate.lines}
         initialOverheadRatePercent={estimate.overheadRatePercent}
+        priceMasterItems={priceMasterItems}
       />
     </main>
   );
