@@ -19,11 +19,17 @@ export function createNonce(): string {
  *
  * style-src だけは 'unsafe-inline' を許している。Next.js が最初の描画をちらつかせない
  * ために style 属性を使うため。スタイルの注入は script の注入より被害が小さい。
+ *
+ * 開発時（`pnpm dev`）だけ 'unsafe-eval' を許す。React が開発時に、ブラウザ上で
+ * サーバ側のエラースタックを再構築するため eval を使うという Next.js 公式の仕様
+ * （本番ビルドでは React も Next.js も eval を使わない）。本番の値はこれで変わらない。
  */
 export function buildContentSecurityPolicy(nonce: string): string {
+  const isDev = process.env.NODE_ENV !== "production";
+
   const directives = [
     "default-src 'self'",
-    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`,
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDev ? " 'unsafe-eval'" : ""}`,
     "style-src 'self' 'unsafe-inline'",
     // 写真は端末で作った blob と data URL から読む
     "img-src 'self' data: blob:",

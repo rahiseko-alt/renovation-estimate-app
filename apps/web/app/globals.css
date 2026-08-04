@@ -15,9 +15,8 @@
     "BIZ UDPGothic", "Hiragino Sans", "Noto Sans JP", "Yu Gothic UI", "Meiryo",
     system-ui, sans-serif;
 
-  /* 押せるものの最小サイズ。現場で手袋をして押す操作はさらに大きくする */
+  /* 押せるものの最小サイズ。 */
   --spacing-tap: 48px;
-  --spacing-tap-field: 64px;
 }
 
 /* 常に白ベース（OSのダークモード設定に関係なく）。 */

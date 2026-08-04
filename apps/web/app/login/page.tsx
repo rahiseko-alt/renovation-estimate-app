@@ -1,12 +1,14 @@
 import { AUTH_TEXT, HOME_HEADING } from "../../lib/content";
+import { sanitizeNextPath } from "../../lib/auth/next-path";
 import { login } from "./actions";
 
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ failed?: string }>;
+  searchParams: Promise<{ failed?: string; next?: string }>;
 }) {
-  const { failed } = await searchParams;
+  const { failed, next } = await searchParams;
+  const safeNext = sanitizeNextPath(next);
 
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-between px-5 py-8">
@@ -25,6 +27,7 @@ export default async function LoginPage({
 
         {/* 1カラム・ラベルは入力欄の上（NN/g：最速・最少エラー） */}
         <form action={login} className="mt-6 flex flex-col gap-6">
+          <input type="hidden" name="next" value={safeNext} />
           <div className="flex flex-col gap-2">
             <label htmlFor="email" className="font-bold">
               {AUTH_TEXT.emailLabel}

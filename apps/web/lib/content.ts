@@ -18,6 +18,12 @@ export const HOME_HEADING = "リフォーム見積";
 export const HOME_DESCRIPTION =
   "現場で撮る、明細を作る、下請に頼む、見積を出す。";
 
+/** オフライン画面の文言。ログイン状態を問わない共通の文言のみ置く。 */
+export const OFFLINE_TEXT = {
+  heading: "オフラインです",
+  body: "電波の届く場所で開き直してください。",
+} as const;
+
 /** 案件一覧の文言。 */
 export const PROJECTS_TEXT = {
   heading: "案件",

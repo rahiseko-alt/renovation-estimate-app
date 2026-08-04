@@ -1,3 +1,4 @@
+import { createHmac } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
@@ -52,19 +53,21 @@ describe("createSessionValue と readSessionValue", () => {
     expect(await readSessionValue(value)).toBeNull();
   });
 
-  it("期限が切れていれば受け付けない", async () => {
-    const expired = Buffer.from(
+  it("期限が切れていれば受け付けない（署名は正しいものを付ける）", async () => {
+    // 別の（期限内の）セッションの署名を流用すると、署名の不一致で弾かれてしまい、
+    // 期限切れの判定そのものは通っていないのに緑になる。期限切れの本体に
+    // 同じ鍵で正しく署名し直してから確かめる。
+    const expiredBody = Buffer.from(
       JSON.stringify({
         sub: "oyakata@example.com",
         exp: Math.floor(Date.now() / 1000) - 1,
       }),
     ).toString("base64url");
-    // 期限切れの本体に正しい署名を付けても通らないことを確かめる
-    const value = await createSessionValue("oyakata@example.com");
-    const separator = value.lastIndexOf(".");
-    const validBody = value.slice(0, separator);
-    expect(validBody).not.toBe(expired);
-    expect(await readSessionValue(`${expired}.${value.slice(separator + 1)}`)).toBeNull();
+    const signature = createHmac("sha256", SECRET)
+      .update(expiredBody)
+      .digest("base64url");
+
+    expect(await readSessionValue(`${expiredBody}.${signature}`)).toBeNull();
   });
 
   it("形が違う値を渡しても落ちない", async () => {

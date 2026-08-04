@@ -93,11 +93,23 @@ const TAX_CATEGORY_ORDER: readonly TaxCategory[] = [
  * 値引き行で -1.5 を -2 にしてしまうと値引き額が勝手に増えるため、
  * Math.floor ではなく Math.trunc を使う。
  */
+/**
+ * 掛け算の結果に含まれる浮動小数点の表現誤差を吸収する幅。
+ * 例えば 1.4 * 1400 は真値 1960 のはずが JS では 1959.9999999999998 になり、
+ * そのまま切り捨てると 1959 円（1円少ない）になる。逆に真値より大きく出る
+ * 誤差（1.1 * 1000 = 1100.0000000000002）もある。どちらの向きの誤差も、
+ * 円単位より遥かに細かい 1/1,000,000 円の精度で丸めてから切り捨てれば消える。
+ * 見積の金額桁（円〜千万円程度）でこの丸めが本物の端数を壊すことはない。
+ */
+const FLOAT_ERROR_MARGIN = 1_000_000;
+
 function yen(value: number): number {
   if (!Number.isFinite(value)) {
     throw new RangeError(`金額が数値になりません: ${value}`);
   }
-  return Math.trunc(value);
+  const roundedToMicroYen =
+    Math.round(value * FLOAT_ERROR_MARGIN) / FLOAT_ERROR_MARGIN;
+  return Math.trunc(roundedToMicroYen);
 }
 
 function assertFiniteNumber(value: number, label: string): void {

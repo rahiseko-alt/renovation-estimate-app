@@ -3,7 +3,7 @@ import Link from "next/link";
 import { PROJECTS_TEXT } from "../../lib/content";
 
 /**
- * 案件一覧。middleware がログインを要求する。
+ * 案件一覧。proxy.ts がログインを要求する。
  * 中身はこれから作る。入口から出口までを1回通すため、行き先だけ先に置いている
  * （AGENTS.md「実装の進め方」：途中の各段は空の返事でよい）。
  */

@@ -110,7 +110,15 @@ export async function readSessionValue(
     return null;
   }
 
-  if (typeof payload.sub !== "string" || typeof payload.exp !== "number") {
+  // JSON.parse は "null" や配列も例外を投げずに通す。プロパティを読む前に
+  // オブジェクトであることを確かめないと、ここで例外が漏れて 500 になる。
+  if (
+    payload === null ||
+    typeof payload !== "object" ||
+    Array.isArray(payload) ||
+    typeof payload.sub !== "string" ||
+    typeof payload.exp !== "number"
+  ) {
     return null;
   }
   if (payload.exp <= Math.floor(Date.now() / 1000)) return null;

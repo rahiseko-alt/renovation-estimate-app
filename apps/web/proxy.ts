@@ -38,9 +38,12 @@ export async function proxy(request: NextRequest) {
   if (requiresLogin(request.nextUrl.pathname)) {
     const session = request.cookies.get(SESSION_COOKIE_NAME)?.value;
     if (!(await readSessionValue(session))) {
+      // 元の行き先を覚えておき、ログイン後にそこへ戻す。
+      const next = `${request.nextUrl.pathname}${request.nextUrl.search}`;
       const url = request.nextUrl.clone();
       url.pathname = "/login";
       url.search = "";
+      url.searchParams.set("next", next);
       const redirect = NextResponse.redirect(url);
       redirect.headers.set("content-security-policy", csp);
       return redirect;

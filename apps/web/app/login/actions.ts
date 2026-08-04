@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { verifyCredentials } from "../../lib/auth/credentials";
+import { sanitizeNextPath } from "../../lib/auth/next-path";
 import {
   SESSION_COOKIE_NAME,
   SESSION_TTL_SECONDS,
@@ -14,9 +15,12 @@ import {
 export async function login(formData: FormData): Promise<void> {
   const email = String(formData.get("email") ?? "");
   const password = String(formData.get("password") ?? "");
+  const next = sanitizeNextPath(formData.get("next"));
 
   const userId = await verifyCredentials(email, password);
-  if (!userId) redirect("/login?failed=1");
+  if (!userId) {
+    redirect(`/login?failed=1&next=${encodeURIComponent(next)}`);
+  }
 
   const store = await cookies();
   store.set(
@@ -25,7 +29,7 @@ export async function login(formData: FormData): Promise<void> {
     sessionCookieOptions(SESSION_TTL_SECONDS),
   );
 
-  redirect("/");
+  redirect(next);
 }
 
 export async function logout(): Promise<void> {

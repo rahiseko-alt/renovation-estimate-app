@@ -12,7 +12,10 @@
 set -uo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-cd "${REPO_ROOT}"
+cd "${REPO_ROOT}" || {
+  echo "FAIL: リポジトリルートへ移動できない: ${REPO_ROOT}"
+  exit 1
+}
 
 PORT="${SMOKE_PORT:-3123}"
 BASE="http://localhost:${PORT}"
@@ -93,6 +96,7 @@ check "GET /" 200 "$(curl -s -o /dev/null -w '%{http_code}' "${BASE}/")"
 expect_contains "本文にマーカー '${MARKER}'" "${MARKER}" "${WORK}/home.html"
 check "GET /login" 200 "$(curl -s -o /dev/null -w '%{http_code}' "${BASE}/login")"
 check "GET /api/health" 200 "$(curl -s -o /dev/null -w '%{http_code}' "${BASE}/api/health")"
+check "GET /offline" 200 "$(curl -s -o /dev/null -w '%{http_code}' "${BASE}/offline")"
 
 echo "== PWA として入れられる =="
 check "GET /manifest.webmanifest" 200 "$(curl -s -o "${WORK}/manifest.json" -w '%{http_code}' "${BASE}/manifest.webmanifest")"
@@ -113,34 +117,68 @@ for header in "strict-transport-security" "x-frame-options" "x-content-type-opti
   fi
 done
 
-CSP=$(printf '%s' "${HEADERS}" | grep -i '^content-security-policy:' | tr -d '\r')
-case "${CSP}" in
-  *"'nonce-"*) echo "  OK   CSP が nonce を使っている" ;;
-  *) echo "  FAIL CSP に nonce が無い"; FAILURES=$((FAILURES + 1)) ;;
-esac
-SCRIPT_SRC=$(printf '%s' "${CSP}" | tr ';' '\n' | grep 'script-src')
-case "${SCRIPT_SRC}" in
-  *unsafe-inline*) echo "  FAIL script-src に 'unsafe-inline' がある"; FAILURES=$((FAILURES + 1)) ;;
-  *) echo "  OK   script-src に 'unsafe-inline' が無い" ;;
-esac
-case "${CSP}" in
-  *"frame-ancestors 'none'"*) echo "  OK   frame-ancestors 'none'" ;;
-  *) echo "  FAIL frame-ancestors が無い"; FAILURES=$((FAILURES + 1)) ;;
-esac
-# nonce が実際に script タグに付いていないと、ブラウザ側で全スクリプトが止まる
-if grep -qE '<script[^>]*nonce="' "${WORK}/home.html"; then
-  echo "  OK   HTML の script に nonce が付いている"
-else
-  echo "  FAIL script に nonce が付いていない（ブラウザで JS が動かなくなる）"
-  FAILURES=$((FAILURES + 1))
-fi
+# CSP は route ごとに proxy が nonce を作って返す。ヘッダに nonce が「ある」ことと
+# HTML の script タグに「その nonce と同じ値」が付いていることの両方を確かめる。
+# 値を突き合わせない検査だと、値が食い違って本番で全スクリプトが止まる状態でも
+# 両方「ある」なので緑になってしまう。
+check_csp_and_nonce() {
+  local label="$1" headers="$2" html_file="$3"
+  local csp
+  csp=$(printf '%s' "${headers}" | grep -i '^content-security-policy:' | tr -d '\r')
+
+  if [ -z "${csp}" ]; then
+    echo "  FAIL ${label}: content-security-policy が無い"
+    FAILURES=$((FAILURES + 1))
+    return
+  fi
+
+  local nonce
+  nonce=$(printf '%s\n' "${csp}" | sed -nE "s/.*'nonce-([^']+)'.*/\1/p" | head -n 1)
+  if [ -z "${nonce}" ]; then
+    echo "  FAIL ${label}: CSP に nonce が無い"
+    FAILURES=$((FAILURES + 1))
+  else
+    echo "  OK   ${label}: CSP が nonce を使っている"
+  fi
+
+  local script_src
+  script_src=$(printf '%s' "${csp}" | tr ';' '\n' | grep 'script-src')
+  case "${script_src}" in
+    *unsafe-inline*)
+      echo "  FAIL ${label}: script-src に 'unsafe-inline' がある"
+      FAILURES=$((FAILURES + 1))
+      ;;
+    *) echo "  OK   ${label}: script-src に 'unsafe-inline' が無い" ;;
+  esac
+
+  case "${csp}" in
+    *"frame-ancestors 'none'"*) echo "  OK   ${label}: frame-ancestors 'none'" ;;
+    *) echo "  FAIL ${label}: frame-ancestors が無い"; FAILURES=$((FAILURES + 1)) ;;
+  esac
+
+  # 「nonce が何か付いている」だけでは、CSP の nonce と値が違っていても通る。
+  # 値そのものが一致していることまで見る。
+  if [ -n "${nonce}" ] && grep -qF "nonce=\"${nonce}\"" "${html_file}"; then
+    echo "  OK   ${label}: HTML の script が CSP の nonce と一致している"
+  else
+    echo "  FAIL ${label}: CSP の nonce と一致する script が無い（ブラウザで JS が動かなくなる）"
+    FAILURES=$((FAILURES + 1))
+  fi
+}
+
+check_csp_and_nonce "/" "${HEADERS}" "${WORK}/home.html"
 
 echo "== ログインしていなければ中に入れない =="
 check "GET /projects（Cookie 無し）" 307 "$(curl -s -o /dev/null -w '%{http_code}' "${BASE}/projects")"
 LOCATION=$(curl -s -D - -o /dev/null "${BASE}/projects" | grep -i '^location:' | tr -d '\r' | awk '{print $2}')
 case "${LOCATION}" in
-  */login) echo "  OK   ログイン画面へ誘導 (${LOCATION})" ;;
+  */login|*/login\?*) echo "  OK   ログイン画面へ誘導 (${LOCATION})" ;;
   *) echo "  FAIL 誘導先が違う: ${LOCATION}"; FAILURES=$((FAILURES + 1)) ;;
+esac
+# ログイン後に元のページへ戻すため、行き先を覚えていることも確かめる。
+case "${LOCATION}" in
+  *"next=%2Fprojects"*) echo "  OK   ログイン後の戻り先 (/projects) を覚えている" ;;
+  *) echo "  FAIL ログイン後の戻り先を覚えていない: ${LOCATION}"; FAILURES=$((FAILURES + 1)) ;;
 esac
 
 # セッションはアプリの外で組み立てる。アプリの実装を借りずに検査する。
@@ -163,6 +201,11 @@ make_session() {
 echo "== 正しいセッションなら通す =="
 VALID=$(make_session "${DEMO_USER_EMAIL}" 600)
 check "GET /projects（正しいセッション）" 200 "$(curl -s -o /dev/null -w '%{http_code}' -H "Cookie: rea_session=${VALID}" "${BASE}/projects")"
+
+# ログイン後の画面こそ CSP を確かめる価値がある。ここが nonce を受け取れないと、
+# ログインした利用者の画面で JS が一切動かない。
+PROJECTS_HEADERS=$(curl -s -D - -o "${WORK}/projects.html" -H "Cookie: rea_session=${VALID}" "${BASE}/projects")
+check_csp_and_nonce "/projects" "${PROJECTS_HEADERS}" "${WORK}/projects.html"
 
 echo "== 偽物・期限切れは弾く =="
 FORGED=$(node -e '

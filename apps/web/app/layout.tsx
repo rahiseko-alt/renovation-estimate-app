@@ -27,6 +27,18 @@ export const viewport: Viewport = {
   themeColor: "#1e40af",
 };
 
+/**
+ * 全ページをリクエストごとに動的レンダリングする。
+ *
+ * proxy.ts はリクエストごとに CSP の nonce を作り、x-nonce ヘッダで渡している。
+ * Next.js はこの nonce を、実際にリクエストごとにレンダリングされたページの
+ * script タグにしか付けない。静的に事前生成されたページ（動的APIを使わない
+ * ページは既定でこうなる）には nonce が付かず、CSP の script-src が
+ * 自分自身のスクリプトを丸ごとブロックする。
+ * ここで固定しておけば、後から追加する画面がこの穴を踏まない。
+ */
+export const dynamic = "force-dynamic";
+
 export default function RootLayout({
   children,
 }: {
