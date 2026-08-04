@@ -213,6 +213,27 @@ export const OVERHEAD_TEXT = {
   noDefaultNote: "率は案件ごとに入力してください（業界標準の率はありません）。",
 } as const;
 
+/** 単価マスタ画面の文言。 */
+export const PRICE_MASTER_TEXT = {
+  heading: "単価マスタ",
+  empty: "単価マスタはまだありません。",
+  newItem: "新しい単価を登録",
+  back: "もどる",
+  nameLabel: "工事項目",
+  specLabel: "摘要（仕様）",
+  unitLabel: "単位",
+  unitPriceLabel: "単価（材工共・円）",
+  taxCategoryLabel: "税区分",
+  submit: "登録する",
+  delete: "削除",
+  failed: "工事項目と単価（整数）を入力してください。",
+  /** 見積エディタ側で、単価マスタから明細を追加するときの文言。 */
+  addFromMasterLabel: "単価マスタから追加",
+  addFromMasterPlaceholder: "選んでください",
+  addFromMasterButton: "追加",
+  addFromMasterEmpty: "単価マスタが空です。先に登録してください。",
+} as const;
+
 /** 写真を撮るときに選ぶ箇所。これが無いと明細への自動紐づけができない。 */
 export const PHOTO_AREAS = [
   "キッチン",

@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 
 import { getCurrentUser } from "../../lib/auth/server";
 import { listProjectsForOwner } from "../../lib/db/projects";
-import { PROJECTS_TEXT } from "../../lib/content";
+import { PRICE_MASTER_TEXT, PROJECTS_TEXT } from "../../lib/content";
 
 /** 案件一覧。proxy.ts がログインを要求する。 */
 export default async function ProjectsPage() {
@@ -43,6 +43,13 @@ export default async function ProjectsPage() {
         className="tap mt-8 flex items-center justify-center rounded bg-blue-800 px-6 py-4 text-lg font-bold text-white"
       >
         {PROJECTS_TEXT.newProject}
+      </Link>
+
+      <Link
+        href="/price-master"
+        className="tap mt-4 flex items-center justify-center rounded border-2 border-gray-500 px-5 py-3 font-bold"
+      >
+        {PRICE_MASTER_TEXT.heading}
       </Link>
 
       <Link

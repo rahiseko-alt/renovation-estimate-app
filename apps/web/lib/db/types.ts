@@ -28,3 +28,31 @@ export type Estimate = {
   overheadTaxCategory: TaxCategory;
   updatedAt: string;
 };
+
+/**
+ * 単価マスタの1件。よく使う工事項目を、材工共の複合単価として登録しておき、
+ * 見積の明細を都度手入力せず呼び出せるようにする。
+ */
+export type PriceMasterItem = {
+  id: string;
+  /** 登録した利用者の識別子。他人の単価マスタを推測 ID で読み書きさせないための境界に使う。 */
+  ownerId: string;
+  /** 工事項目。 */
+  name: string;
+  /** 摘要（仕様）。 */
+  spec: string;
+  /** 単位。 */
+  unit: string;
+  /** 単価（円・整数）。材工共の複合単価。 */
+  unitPrice: number;
+  taxCategory: TaxCategory;
+  createdAt: string;
+};
+
+export type NewPriceMasterItemInput = {
+  name: string;
+  spec: string;
+  unit: string;
+  unitPrice: number;
+  taxCategory: TaxCategory;
+};

@@ -5,81 +5,62 @@
 
 ## ①今回実施
 
-**フェーズ1（見積が作れる）に着手し、案件登録と見積エディタを PR #7 に追加した。**
-Supabase がまだ無いため `lib/db/` に仮の永続化層を置き、DB接続の差し替えに備えた設計にしている。
+**PR #7（フェーズ0＋フェーズ1の案件登録・見積エディタ）をユーザーの明示的な指示のもと
+`main` にマージした。** Vercel・Supabase の接続もユーザー側の作業として完了し、
+公開URL（`https://renovation-estimate-app-web.vercel.app`）が確定した。
 
-- 「まずは仮で良い」の了承のもと、諸経費率デフォルト・有効期限日数・既存見積書様式の
-  3つの未確定事項をブロッカーにせず、既存の設計（諸経費率は既定値なし・協議会様式）のまま
-  フェーズ1の実装を進めた。
-- 追加した画面：`/projects/new`（案件登録）、`/projects/[id]`（詳細）、
-  `/projects/[id]/estimate`（見積エディタ本体）。エディタは `calc.ts` をそのまま呼んで
-  工事価格・消費税・合計をリアルタイム表示する。既定行として「解体・廃棄物処理費」を
-  協議会様式どおり自動で立てる。
-- `lib/db/`（仮のメモリ実装。サーバープロセス再起動で消える。Supabase 接続時はこの配下だけ
-  差し替えれば済む構造）と、その単体テストを追加。
-- Playwright（`/opt/pw-browsers` の Chromium、リポジトリには未導入・スクラッチ実行のみ）で
-  実ブラウザ操作を都度確認しながら実装した。
+- `main` へのマージ後、`.github/workflows/prod-smoke.yml` の `PROD_URL` を実際の
+  割当ドメインに更新し、`on:` トリガーを `workflow_dispatch` のみから
+  `push: branches: ["**"]` に復元した（PR #9・マージ済み）。4項目（200・本文マーカー・
+  HSTS・`/api/health`）は本番URLに対して実際に確認してから push した。
+- **今後のPRのdraft解除（＝本番への自動マージ）について、ユーザーから明示的に
+  「CIが緑なら自動でマージしてよい」という指示を得た。** これ以降、CIが全緑になった
+  draft PRは、都度の確認なしでdraftを解除して auto-merge.yml に委ねてよい
+  （ただしDB設計・セキュリティに関わる大きな判断は引き続き別途確認する）。
+- **単価マスタ（フェーズ1の残りの1つ）を実装した：**
+  - `lib/db/types.ts` に `PriceMasterItem` / `NewPriceMasterItemInput` を追加。
+  - `lib/db/priceMaster.ts` を新設。`lib/db/projects.ts` と同じ境界（ownerId で
+    絞り込まない取得関数は置かない）で `listPriceMasterForOwner` /
+    `getPriceMasterItemForOwner` / `createPriceMasterItem` /
+    `deletePriceMasterItemForOwner` を実装。IDOR対策のテストも同じ形で追加
+    （`tests/db.test.ts` に `describe("priceMaster")` を追加、他人の単価マスタは
+    取得も削除もできないことを検証）。
+  - 画面：`/price-master`（一覧・削除）、`/price-master/new`（登録）。
+    `/projects` からリンクを張った。
+  - 見積エディタに単価マスタからの追加を統合。`EstimateLineRow` 側は変更せず、
+    新規の明細行として1行追加する方式にした（既存の行を書き換えない）。
+    UI部分は行数制限（max-lines 300）に触れたため、`components/PriceMasterPicker.tsx`
+    に「単価マスタから選んで追加する」という単独の塊として切り出した
+    （行数で機械的に割ったのではなく、後から単独で直したくなる単位で分けた）。
+  - typecheck / lint / test（99件全部緑）/ `pnpm -r build` / `scripts/smoke.sh` を
+    全部通した上で、実際にdevサーバを立てて Playwright で
+    「単価マスタ登録 → 見積エディタで選んで追加 → 明細に反映 → 保存できる」を
+    実機相当のブラウザ操作で確認した（ローカル専用の `.env.local` を使用。
+    `.gitignore` で除外済みであることも確認済み。コミットはしていない）。
 
-**CodeRabbit のレビューを複数ラウンド受け、すべて対応した：**
-
-1. `saveEstimateAction()` がログイン状態・案件の存在・入力の妥当性を検証していなかった点
-   （`fb7c6c3`）。
-2. 数量・単価・諸経費率の非数値入力を計算・保存から無言で除外していた点。該当欄を
-   赤枠＋インラインエラーで示し、保存ボタンを無効化するように直した（`cff422f`）。
-3. 上記2の自動回帰テストが無い（Low）指摘。判定ロジックを `lib/estimateLineValidation.ts`
-   に切り出して Vitest で単体テストした。DOM配線までの自動テストはPlaywright/Testing Library
-   基盤の導入が要る規模と判断し、1件のLow指摘のために場当たり的に入れないと決めた
-   （`133e38b`。CodeRabbitも同意し学習として記録）。
-4. **IDOR（Major・CWE-639）**：`saveEstimateAction()` がログイン確認だけで案件の所有者を
-   確認しておらず、ログイン済みの別人が他人の projectId を指定すると見積を上書きできた。
-   `Project` に `ownerId` を追加し、案件の作成・一覧・取得を `getProjectForOwner()` /
-   `listProjectsForOwner()` に統一（絞り込まない取得関数は残していない）。他人の案件IDを
-   知っていても取得できないことを db.test.ts で回帰テスト化。
-5. **アクセシビリティ（Major）**：`EstimateLineRow` の全フィールドに `htmlFor`/`id` が無く
-   支援技術で読み上げられなかった。`line.key` から一意なidを作って紐づけ、エラーは
-   `aria-describedby` で結んだ。
-6. 表記・テストの軽微な指摘5件（ラベルのcontent.ts集約、`docs/handoff.md`のマシン固有パス
-   除去、`docs/failures.md`の口語表現修正、境界値テスト追加）は全て反映。
-   （`debcae5`）
-7. うち2件は検証の結果そのままでは反映しなかった：`docs/failures.md`の算数の指摘は
-   `node -e`で再検証したところ数値自体は正しく（バグの結果と真値という意図的に別の
-   2値の対比）、誤読されない書き方に整えるに留めた。`EstimateEditor.tsx`のTypeScript
-   null絞り込み指摘は、実際のJSXの入れ子構造をこのリポジトリ内で再現して
-   `tsc --strict --noEmit`にかけたところ型エラーは出ず、実害無しと判断（無償の改善として
-   `const resolvedTotals`は導入した）。CodeRabbitは両方とも説明に同意し学習として記録した。
-
-**現在の状態**：CI（`quality`/`smoke`/`ci-green`、CodeQL）は最新コミット `debcae5` で全部緑。
-PR #7 の全15スレッドが解決済み。CodeRabbit の指摘は残っていない。PR はまだドラフトのまま
-（マージ・公開のPR化は指示されていないので手を付けていない）。
-
-**このリポジトリには `auto-merge.yml` があり、非draft・CI全緑のsame-repo PRを人間の承認
-無しで自動squashマージする。** PR #7が今安全なのはdraftのままだから。ready for reviewに
-切り替えるのはユーザーから明示的に指示されたときだけにする。
+**現在の状態**：この単価マスタの変更はまだコミット・push前（このメモの直後に
+commit → push → PR化 → CI確認 の順で進める）。
 
 ## ②今回トラブル
 
-新規の失敗は無し（今回の2件の「指摘への反証」は、検証した上での正しい判断であり、
-自分のミスではない）。
+新規の失敗は無し。
 
 ## ③次回やる事
 
-**フェーズ1の残り**（`/projects/new` → 見積エディタまでは動く状態。まだ無いもの）：
+**フェーズ1の残り**：
 
-- 単価マスタ（材工共の複合単価。今は明細を都度手入力する形のみ）
 - pdfme での協議会様式 PDF 出力。日本語フォントのサブセット化
 - Supabase 接続後、`lib/db/` の仮のメモリ実装を実DBに差し替え
+  **（ブロッカーあり。下記参照）**
 
-**こちらの作業待ちが2つ、DB差し替え前に必要**（変わらず）：
-
-1. Supabase プロジェクトを作り、URL と anon key を渡してもらう（service role key は別途
-   サーバー専用の環境変数として）。
-2. Vercel に接続してもらう。接続後、`.github/workflows/prod-smoke.yml` の `PROD_URL` と
-   `on:` の `push` トリガーを戻す（今は `workflow_dispatch` のみ）。
-
-**検討事項**：アプリ全体のE2E/対話コンポーネントテスト基盤（Playwright or Testing Library）の
-導入。今回2回とも意図的に見送ったが、フェーズ4「UXの実機確認」で正式に扱うか、もっと早い
-段階で入れるかは要判断（インタラクティブなクライアント部品が増えるほど、静的レンダリング
-のみの既存テスト作法では検証できない範囲が広がる）。
+**Supabase実DB移行のブロッカー**：このセッションには Supabase・Vercel の MCP接続が
+無く、あなたのSupabaseプロジェクトに直接アクセスする手段が無い。実DBへの
+スキーマ移行（テーブル作成・RLS設定）は、こちらがSQLを書いても、ユーザーが
+SupabaseのSQL Editorに貼って実行するという手作業が必ず挟まる。また、
+Vercelの環境変数（`AUTH_SECRET` / `DEMO_USER_EMAIL` / `DEMO_USER_PASSWORD`）も
+ユーザーがVercelの画面で設定する必要がある（今はおそらく未設定で、本番の
+ログイン画面はエラーになる）。この2つはユーザー側の作業として案内済みだが、
+まだ完了の確認はできていない。
 
 その後の想定（元の実装計画より。計画書自体はこのリポジトリには無い）：
 
@@ -89,6 +70,10 @@ PR #7 の全15スレッドが解決済み。CodeRabbit の指摘は残ってい�
   単価だけ入力できる回答画面から回答。取り込むと原価→掛率→売価に反映される。
 - **フェーズ4（UX仕上げ）**：50代の現場作業者が実機・実ブラウザで一連の流れを通しで
   操作できることを確認する（対話系の自動テスト基盤の導入もここで検討）。
+
+**検討事項**：アプリ全体のE2E/対話コンポーネントテスト基盤（Playwright or Testing Library）の
+導入。今回もPlaywrightはスクラッチ実行のみ（リポジトリ未導入）で確認した。
+フェーズ4「UXの実機確認」で正式に扱うか、もっと早い段階で入れるかは要判断。
 
 **まだ埋まっていない前提**（顧客に聞く必要がある、変わらず）:
 

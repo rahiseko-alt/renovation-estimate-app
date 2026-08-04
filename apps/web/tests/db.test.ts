@@ -3,6 +3,12 @@ import { describe, expect, it } from "vitest";
 import { DEFAULT_DISPOSAL_ITEM_NAME } from "../lib/content";
 import { getOrCreateEstimate, saveEstimate } from "../lib/db/estimates";
 import {
+  createPriceMasterItem,
+  deletePriceMasterItemForOwner,
+  getPriceMasterItemForOwner,
+  listPriceMasterForOwner,
+} from "../lib/db/priceMaster";
+import {
   createProject,
   getProjectForOwner,
   listProjectsForOwner,
@@ -97,5 +103,63 @@ describe("estimates", () => {
     const reloaded = await getOrCreateEstimate(project.id);
     expect(reloaded.lines[0]?.name).toBe("クロス張替え");
     expect(reloaded.overheadRatePercent).toBe(10);
+  });
+});
+
+describe("priceMaster", () => {
+  function newItemInput() {
+    return {
+      name: "クロス張替え",
+      spec: "量産品",
+      unit: "㎡",
+      unitPrice: 1200,
+      taxCategory: "standard" as const,
+    };
+  }
+
+  it("登録した単価マスタを、登録した本人は取得できる", async () => {
+    const item = await createPriceMasterItem(newItemInput(), OWNER_A);
+    expect(await getPriceMasterItemForOwner(item.id, OWNER_A)).toEqual(item);
+  });
+
+  it("存在しないIDはnull", async () => {
+    expect(await getPriceMasterItemForOwner("no-such-id", OWNER_A)).toBeNull();
+  });
+
+  it("他人が登録した単価マスタはIDを知っていても取得できない（IDOR対策）", async () => {
+    const item = await createPriceMasterItem(
+      { ...newItemInput(), name: "秘密の単価" },
+      OWNER_A,
+    );
+    expect(await getPriceMasterItemForOwner(item.id, OWNER_B)).toBeNull();
+  });
+
+  it("一覧には自分が登録した単価マスタだけが含まれる", async () => {
+    const mine = await createPriceMasterItem(
+      { ...newItemInput(), name: "自分の単価" },
+      OWNER_A,
+    );
+    const others = await createPriceMasterItem(
+      { ...newItemInput(), name: "他人の単価" },
+      OWNER_B,
+    );
+    const list = await listPriceMasterForOwner(OWNER_A);
+    expect(list.some((i) => i.id === mine.id)).toBe(true);
+    expect(list.some((i) => i.id === others.id)).toBe(false);
+  });
+
+  it("自分の単価マスタは削除できる", async () => {
+    const item = await createPriceMasterItem(newItemInput(), OWNER_A);
+    expect(await deletePriceMasterItemForOwner(item.id, OWNER_A)).toBe(true);
+    expect(await getPriceMasterItemForOwner(item.id, OWNER_A)).toBeNull();
+  });
+
+  it("他人の単価マスタは削除できない（IDOR対策）", async () => {
+    const item = await createPriceMasterItem(
+      { ...newItemInput(), name: "他人の単価2" },
+      OWNER_A,
+    );
+    expect(await deletePriceMasterItemForOwner(item.id, OWNER_B)).toBe(false);
+    expect(await getPriceMasterItemForOwner(item.id, OWNER_A)).not.toBeNull();
   });
 });
