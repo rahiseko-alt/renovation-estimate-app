@@ -145,6 +145,23 @@ function assertIntegerAmount(value: number, label: string): void {
 }
 
 /**
+ * 計算結果が安全整数（Number.isSafeInteger）に収まっているかを確かめる。
+ *
+ * BigInt で正確に計算しても、最後に number へ戻す時点で
+ * Number.MAX_SAFE_INTEGER（約 900兆）を超えていれば、その number 自体が
+ * 別の整数に化ける。個々の入力（数量・単価など）に上限を設けていても、
+ * 何行分も積み上げた小計・税額・合計はその上限だけでは超えない保証が
+ * 無いため、集計のたびにここで確かめる。
+ */
+function assertSafeAmount(value: number, label: string): void {
+  if (!Number.isSafeInteger(value)) {
+    throw new RangeError(
+      `${label}が扱える範囲を超えました: ${value}。入力を見直してください。`,
+    );
+  }
+}
+
+/**
  * 数量として扱う最大の大きさ。exactMultiplyTrunc が数量を固定精度の整数
  * （quantity × QUANTITY_SCALE）に変換する処理が、浮動小数点の精度内で
  * 正確に行える前提にしている。㎡・m・人工といった実務の数量がこの上限を
@@ -176,6 +193,24 @@ const MARKUP_RATE_SCALE = 10_000;
 /** 消費税率の最小刻み。TAX_RATES は自分たちで決めた定数なので上限検証は不要。 */
 const TAX_RATE_SCALE = 100_000;
 
+/**
+ * 単価として扱う最大の大きさ。
+ * これと MAX_QUANTITY_MAGNITUDE を掛けた最大値（10^15）が
+ * Number.MAX_SAFE_INTEGER（約900兆）の1割程度に収まるよう選んでいる。
+ * 輸入石材や特注一式のような高額品でも、この上限（10億円/単位）を
+ * 超える単価は実務で無い。
+ */
+const MAX_UNIT_PRICE = 1_000_000_000;
+
+function assertValidUnitPrice(value: number, label: string): void {
+  assertIntegerAmount(value, label);
+  if (Math.abs(value) > MAX_UNIT_PRICE) {
+    throw new RangeError(
+      `${label}が大きすぎます: ${value}（上限 ${MAX_UNIT_PRICE}）`,
+    );
+  }
+}
+
 function assertValidLine(line: EstimateLine, index: number): void {
   const at = `${index + 1}行目`;
 
@@ -188,7 +223,7 @@ function assertValidLine(line: EstimateLine, index: number): void {
   }
 
   assertValidQuantity(line.quantity, `${at}の数量`);
-  assertIntegerAmount(line.unitPrice, `${at}の単価`);
+  assertValidUnitPrice(line.unitPrice, `${at}の単価`);
   if (!(line.taxCategory in TAX_RATES)) {
     throw new RangeError(`${at}の税区分が不正です: ${line.taxCategory}`);
   }
@@ -209,8 +244,10 @@ function assertValidLine(line: EstimateLine, index: number): void {
  */
 export function lineAmount(line: EstimateLine): number {
   assertValidQuantity(line.quantity, "数量");
-  assertIntegerAmount(line.unitPrice, "単価");
-  return exactMultiplyTrunc(line.unitPrice, line.quantity, QUANTITY_SCALE);
+  assertValidUnitPrice(line.unitPrice, "単価");
+  const amount = exactMultiplyTrunc(line.unitPrice, line.quantity, QUANTITY_SCALE);
+  assertSafeAmount(amount, "明細の金額");
+  return amount;
 }
 
 /** 税区分ごとに対価の額を積む入れ物を作る。 */
@@ -256,6 +293,8 @@ export function calcEstimate(input: EstimateInput): EstimateTotals {
     directCostSubtotal += amount;
     taxable[line.taxCategory] += amount;
   }
+  // 行ごとの金額は安全整数でも、何行も積み上げた小計はその保証が無い。
+  assertSafeAmount(directCostSubtotal, "直接工事費 小計");
 
   // 2. 諸経費（直接工事費 小計に対する率）
   const overheadAmount = exactPercentTrunc(
@@ -263,9 +302,11 @@ export function calcEstimate(input: EstimateInput): EstimateTotals {
     input.overheadRatePercent,
     OVERHEAD_RATE_SCALE,
   );
+  assertSafeAmount(overheadAmount, "諸経費");
   taxable[overheadTaxCategory] += overheadAmount;
 
   const subtotalBeforeDiscount = directCostSubtotal + overheadAmount;
+  assertSafeAmount(subtotalBeforeDiscount, "値引き前の小計");
 
   // 3. 値引き（税抜きの段階で引く）
   let discountAmount = 0;
@@ -275,9 +316,11 @@ export function calcEstimate(input: EstimateInput): EstimateTotals {
     discountAmount += amount;
     taxable[line.taxCategory] += amount;
   }
+  assertSafeAmount(discountAmount, "値引き合計");
 
   // 4. 工事価格（税抜き）
   const netAmount = subtotalBeforeDiscount + discountAmount;
+  assertSafeAmount(netAmount, "工事価格（税抜き）");
 
   // 5. 取引に係る消費税等（税区分ごとに1回だけ端数処理）
   const taxBreakdown: TaxBreakdown[] = [];
@@ -285,14 +328,18 @@ export function calcEstimate(input: EstimateInput): EstimateTotals {
   for (const category of TAX_CATEGORY_ORDER) {
     const taxableAmount = taxable[category];
     if (taxableAmount === 0) continue;
+    assertSafeAmount(taxableAmount, `${category}税率の対価の額`);
     const rate = TAX_RATES[category];
     const categoryTax = exactMultiplyTrunc(taxableAmount, rate, TAX_RATE_SCALE);
+    assertSafeAmount(categoryTax, `${category}税率の消費税額`);
     taxBreakdown.push({ category, rate, taxableAmount, taxAmount: categoryTax });
     taxAmount += categoryTax;
   }
+  assertSafeAmount(taxAmount, "取引に係る消費税等");
 
   // 6. 合計（税込）
   const grandTotal = netAmount + taxAmount;
+  assertSafeAmount(grandTotal, "合計（税込）");
 
   return {
     directCostSubtotal,
@@ -315,7 +362,7 @@ export function sellingUnitPrice(
   costUnitPrice: number,
   markupRate: number,
 ): number {
-  assertIntegerAmount(costUnitPrice, "原価単価");
+  assertValidUnitPrice(costUnitPrice, "原価単価");
   assertFiniteNumber(markupRate, "掛率");
   if (markupRate < 0) {
     throw new RangeError(`掛率が負の数です: ${markupRate}`);
@@ -325,7 +372,9 @@ export function sellingUnitPrice(
       `掛率が大きすぎます: ${markupRate}（上限 ${MAX_MARKUP_RATE}）`,
     );
   }
-  return exactMultiplyTrunc(costUnitPrice, markupRate, MARKUP_RATE_SCALE);
+  const amount = exactMultiplyTrunc(costUnitPrice, markupRate, MARKUP_RATE_SCALE);
+  assertSafeAmount(amount, "売価単価");
+  return amount;
 }
 
 /** 金額を画面・PDF に出すときの表記（3桁区切り）。 */

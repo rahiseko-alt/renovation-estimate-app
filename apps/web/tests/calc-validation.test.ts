@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { calcEstimate, type EstimateLine } from "../lib/calc";
+import { calcEstimate, lineAmount, sellingUnitPrice, type EstimateLine } from "../lib/calc";
 
 function line(partial: Partial<EstimateLine> = {}): EstimateLine {
   return {
@@ -151,5 +151,43 @@ describe("calcEstimate の入力検証", () => {
         overheadRatePercent: 0,
       }),
     ).toThrow(/3行目/);
+  });
+});
+
+describe("安全整数の範囲を超える金額を弾く", () => {
+  it("単価が大きすぎると例外を投げる", () => {
+    expect(() =>
+      lineAmount(line({ quantity: 1, unitPrice: Number.MAX_SAFE_INTEGER })),
+    ).toThrow(/単価が大きすぎます/);
+  });
+
+  it("上限ぎりぎりの単価×数量でも安全整数に収まる", () => {
+    // 単価の上限（10億）と数量の上限（100万）を掛けても
+    // Number.MAX_SAFE_INTEGER（約900兆）の1割程度に収まる。
+    const amount = lineAmount(
+      line({ quantity: 1_000_000, unitPrice: 1_000_000_000 }),
+    );
+    expect(Number.isSafeInteger(amount)).toBe(true);
+    expect(amount).toBe(1_000_000_000_000_000);
+  });
+
+  it("原価単価が大きすぎると例外を投げる", () => {
+    expect(() => sellingUnitPrice(Number.MAX_SAFE_INTEGER, 1)).toThrow(
+      /原価単価が大きすぎます/,
+    );
+  });
+
+  it("上限ぎりぎりの原価単価×掛率でも安全整数に収まる", () => {
+    const price = sellingUnitPrice(1_000_000_000, 1_000_000);
+    expect(Number.isSafeInteger(price)).toBe(true);
+  });
+
+  it("諸経費率が大きすぎると例外を投げる", () => {
+    expect(() =>
+      calcEstimate({
+        lines: [line()],
+        overheadRatePercent: Number.MAX_SAFE_INTEGER,
+      }),
+    ).toThrow(/諸経費率が大きすぎます/);
   });
 });

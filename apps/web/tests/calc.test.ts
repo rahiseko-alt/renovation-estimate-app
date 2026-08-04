@@ -63,6 +63,16 @@ describe("lineAmount", () => {
     ).toThrow(/数量が大きすぎます/);
   });
 
+  it("単価が安全整数ぎりぎりでも、単価自体の上限で弾かれる", () => {
+    // quantity=3, unitPrice=Number.MAX_SAFE_INTEGER は、素の計算だと
+    // 27_021_597_764_222_973円になり Number で正確に表現できない
+    // （実際に指摘された境界値）。単価に上限を設けたことで、この組み合わせに
+    // 入る前の時点で弾かれる。
+    expect(() =>
+      lineAmount(line({ quantity: 3, unitPrice: Number.MAX_SAFE_INTEGER })),
+    ).toThrow(/単価が大きすぎます/);
+  });
+
   it("負の金額は0方向に切り捨てる（値引き額を勝手に増やさない）", () => {
     expect(
       lineAmount(line({ kind: "discount", quantity: 0.5, unitPrice: -333 })),
