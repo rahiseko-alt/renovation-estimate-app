@@ -247,6 +247,31 @@ function assertValidUnitPrice(value: number, label: string): void {
   }
 }
 
+/**
+ * 工事項目・摘要として扱う最大の文字数。
+ * Server Action は型に守られない外部入力の境界なので、上限が無いと
+ * 極端に長い文字列を保存できてしまい、PDF生成時の文字幅計測
+ * （lib/pdf/layout.ts の fitText）に負荷をかけられる（CWE-400）。
+ * 実務の工事項目・摘要はこの上限よりずっと短い。
+ */
+const MAX_TEXT_LENGTH = 200;
+
+function assertValidText(value: string, label: string): void {
+  if (value.length > MAX_TEXT_LENGTH) {
+    throw new RangeError(
+      `${label}が長すぎます（上限 ${MAX_TEXT_LENGTH}文字）`,
+    );
+  }
+}
+
+/**
+ * 見積の明細行数として扱う最大の件数。
+ * 上限が無いと、1件の保存で無制限にPDFのページを作らせて
+ * 生成・base64化のコストを膨らませられる（CWE-400）。
+ * 実務の見積で数百行を超えることは無い。
+ */
+const MAX_LINE_COUNT = 500;
+
 function assertValidLine(line: EstimateLine, index: number): void {
   const at = `${index + 1}行目`;
 
@@ -258,6 +283,8 @@ function assertValidLine(line: EstimateLine, index: number): void {
     );
   }
 
+  assertValidText(line.name, `${at}の工事項目`);
+  assertValidText(line.spec, `${at}の摘要`);
   assertValidQuantity(line.quantity, `${at}の数量`);
   assertValidUnitPrice(line.unitPrice, `${at}の単価`);
   if (!isValidTaxCategory(line.taxCategory)) {
@@ -313,6 +340,11 @@ export function calcEstimate(input: EstimateInput): EstimateTotals {
   if (input.overheadRatePercent > MAX_OVERHEAD_RATE_PERCENT) {
     throw new RangeError(
       `諸経費率が大きすぎます: ${input.overheadRatePercent}（上限 ${MAX_OVERHEAD_RATE_PERCENT}）`,
+    );
+  }
+  if (input.lines.length > MAX_LINE_COUNT) {
+    throw new RangeError(
+      `明細の行数が多すぎます: ${input.lines.length}行（上限 ${MAX_LINE_COUNT}行）`,
     );
   }
   input.lines.forEach(assertValidLine);
