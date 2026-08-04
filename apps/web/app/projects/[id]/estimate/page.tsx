@@ -1,9 +1,10 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { EstimateEditor } from "../../../../components/EstimateEditor";
+import { getCurrentUser } from "../../../../lib/auth/server";
 import { ESTIMATE_EDITOR_TEXT } from "../../../../lib/content";
 import { getOrCreateEstimate } from "../../../../lib/db/estimates";
-import { getProject } from "../../../../lib/db/projects";
+import { getProjectForOwner } from "../../../../lib/db/projects";
 
 export default async function EstimatePage({
   params,
@@ -11,7 +12,10 @@ export default async function EstimatePage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const project = await getProject(id);
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+
+  const project = await getProjectForOwner(id, user);
   if (!project) notFound();
 
   const estimate = await getOrCreateEstimate(id);

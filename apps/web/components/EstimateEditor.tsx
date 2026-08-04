@@ -166,6 +166,10 @@ export function EstimateEditor({
     }
   }
 
+  // totals は let で持つため、JSX 内のコールバックに渡す前に const へ写して
+  // null の絞り込みを固定する（クロージャ内で絞り込みが失われる場合がある）。
+  const resolvedTotals = totals;
+
   return (
     <div className="mt-6 flex flex-col gap-6">
       <ul className="flex flex-col gap-4">
@@ -226,13 +230,13 @@ export function EstimateEditor({
         >
           {calcErrorMessage}
         </p>
-      ) : totals ? (
+      ) : resolvedTotals !== null ? (
         <dl className="rounded border-2 border-gray-400 p-4">
           {TOTALS_ROWS.map((row) => (
             <div key={row.label} className="flex justify-between py-1">
               <dt>{ESTIMATE_TOTALS_TEXT[row.label]}</dt>
               <dd className="tabular font-bold">
-                {formatYen(row.amount(totals))}円
+                {formatYen(row.amount(resolvedTotals))}円
               </dd>
             </div>
           ))}

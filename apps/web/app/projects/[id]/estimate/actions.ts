@@ -3,7 +3,7 @@
 import { calcEstimate, type EstimateLine } from "../../../../lib/calc";
 import { getCurrentUser } from "../../../../lib/auth/server";
 import { saveEstimate } from "../../../../lib/db/estimates";
-import { getProject } from "../../../../lib/db/projects";
+import { getProjectForOwner } from "../../../../lib/db/projects";
 import type { Estimate } from "../../../../lib/db/types";
 
 /**
@@ -12,8 +12,10 @@ import type { Estimate } from "../../../../lib/db/types";
  *
  * Server Action はページ表示とは別の更新入口。proxy.ts の matcher は
  * このパスへの POST も守るが、それだけに頼らずここでもログイン状態・案件の
- * 存在・明細の妥当性（calcEstimate が通るか）を確かめてから保存する。
- * 検証済み・ここを通った入力だけが lib/db/ に届く形にする。
+ * 所有者・明細の妥当性（calcEstimate が通るか）を確かめてから保存する。
+ * ログイン確認だけでは、ログイン済みの別人が他人の projectId を指定して
+ * 保存できてしまう（IDOR）。getProjectForOwner で自分の持ち物であることまで
+ * 確かめる。検証済み・ここを通った入力だけが lib/db/ に届く形にする。
  */
 export async function saveEstimateAction(
   projectId: string,
@@ -25,7 +27,7 @@ export async function saveEstimateAction(
     throw new Error("ログインしていません。");
   }
 
-  const project = await getProject(projectId);
+  const project = await getProjectForOwner(projectId, user);
   if (!project) {
     throw new Error("案件が見つかりません。");
   }

@@ -34,4 +34,10 @@ describe("isValidNumberInput", () => {
   it("数字と文字が混ざった文字列はNG", () => {
     expect(isValidNumberInput("12abc")).toBe(false);
   });
+
+  it("Infinity・-Infinity・NaN の文字列はNG（Number.isFiniteの契約どおり）", () => {
+    expect(isValidNumberInput("Infinity")).toBe(false);
+    expect(isValidNumberInput("-Infinity")).toBe(false);
+    expect(isValidNumberInput("NaN")).toBe(false);
+  });
 });

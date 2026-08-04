@@ -180,6 +180,7 @@ describe("安全整数の範囲を超える金額を弾く", () => {
   it("上限ぎりぎりの原価単価×掛率でも安全整数に収まる", () => {
     const price = sellingUnitPrice(1_000_000_000, 1_000_000);
     expect(Number.isSafeInteger(price)).toBe(true);
+    expect(price).toBe(1_000_000_000_000_000);
   });
 
   it("諸経費率が大きすぎると例外を投げる", () => {

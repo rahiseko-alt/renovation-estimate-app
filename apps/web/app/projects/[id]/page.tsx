@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
-import { getProject } from "../../../lib/db/projects";
+import { getCurrentUser } from "../../../lib/auth/server";
+import { getProjectForOwner } from "../../../lib/db/projects";
 import { PROJECT_DETAIL_TEXT, PROJECTS_TEXT } from "../../../lib/content";
 
 export default async function ProjectDetailPage({
@@ -10,7 +11,10 @@ export default async function ProjectDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const project = await getProject(id);
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+
+  const project = await getProjectForOwner(id, user);
   if (!project) notFound();
 
   return (

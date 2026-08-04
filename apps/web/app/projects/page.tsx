@@ -1,11 +1,16 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
-import { listProjects } from "../../lib/db/projects";
+import { getCurrentUser } from "../../lib/auth/server";
+import { listProjectsForOwner } from "../../lib/db/projects";
 import { PROJECTS_TEXT } from "../../lib/content";
 
 /** 案件一覧。proxy.ts がログインを要求する。 */
 export default async function ProjectsPage() {
-  const projects = await listProjects();
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+
+  const projects = await listProjectsForOwner(user);
 
   return (
     <main className="mx-auto w-full max-w-md px-5 py-8">

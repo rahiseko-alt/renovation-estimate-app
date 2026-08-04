@@ -7,6 +7,7 @@ export default async function NewProjectPage({
   searchParams: Promise<{ failed?: string }>;
 }) {
   const { failed } = await searchParams;
+  const errorId = "new-project-error";
 
   return (
     <main className="mx-auto w-full max-w-md px-5 py-8">
@@ -14,6 +15,7 @@ export default async function NewProjectPage({
 
       {failed ? (
         <p
+          id={errorId}
           role="alert"
           className="mt-4 rounded border-2 border-red-700 bg-red-50 px-4 py-3 text-red-900"
         >
@@ -35,6 +37,7 @@ export default async function NewProjectPage({
             name="customerName"
             type="text"
             required
+            aria-describedby={failed ? errorId : undefined}
             className="rounded border-2 border-gray-500 px-4 py-3"
           />
         </div>
@@ -48,6 +51,7 @@ export default async function NewProjectPage({
             name="siteAddress"
             type="text"
             required
+            aria-describedby={failed ? errorId : undefined}
             className="rounded border-2 border-gray-500 px-4 py-3"
           />
         </div>

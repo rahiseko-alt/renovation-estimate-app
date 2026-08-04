@@ -145,11 +145,14 @@ export const ESTIMATE_TOTALS_TEXT = {
  * 金額を計算可能にするため 3列目を 数量／単位／単価 に分解している。
  */
 export const ESTIMATE_COLUMNS = {
+  /** 見積エディタの明細行だけが持つ列（協議会様式の4列には無い）。 */
+  kind: "種別",
   name: "工事項目",
   spec: "摘要（仕様）",
   quantity: "数量",
   unit: "単位",
   unitPrice: "単価",
+  taxCategory: "税区分",
   amount: "金額",
 } as const;
 

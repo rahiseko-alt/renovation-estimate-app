@@ -6,6 +6,8 @@ import type { EstimateLine, TaxCategory } from "../calc";
 
 export type Project = {
   id: string;
+  /** 作成した利用者の識別子。他人の案件を推測 ID で読み書きさせないための境界に使う。 */
+  ownerId: string;
   /** 施主名。 */
   customerName: string;
   /** 現場住所。 */

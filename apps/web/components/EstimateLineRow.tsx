@@ -35,7 +35,11 @@ const NUMBER_FIELD_BASE = "tabular rounded border-2 px-3 py-3";
 const NUMBER_FIELD_VALID = `${NUMBER_FIELD_BASE} border-gray-500`;
 const NUMBER_FIELD_INVALID = `${NUMBER_FIELD_BASE} border-red-700 bg-red-50`;
 
-/** 見積エディタの明細1行。入力の見た目だけを持ち、状態は親（EstimateEditor）が持つ。 */
+/**
+ * 見積エディタの明細1行。入力の見た目だけを持ち、状態は親（EstimateEditor）が持つ。
+ * すべての入力欄の id は line.key から作る（行が増減しても他の行と衝突しない）。
+ * ラベルは htmlFor で対応する入力欄と結び付け、支援技術が読み上げられるようにする。
+ */
 export function EstimateLineRow({
   line,
   quantityInvalid,
@@ -43,11 +47,24 @@ export function EstimateLineRow({
   onChange,
   onRemove,
 }: Props) {
+  const kindId = `${line.key}-kind`;
+  const nameId = `${line.key}-name`;
+  const specId = `${line.key}-spec`;
+  const quantityId = `${line.key}-quantity`;
+  const quantityErrorId = `${quantityId}-error`;
+  const unitId = `${line.key}-unit`;
+  const unitPriceId = `${line.key}-unitPrice`;
+  const unitPriceErrorId = `${unitPriceId}-error`;
+  const taxCategoryId = `${line.key}-taxCategory`;
+
   return (
     <li className="flex flex-col gap-3 rounded border-2 border-gray-400 p-4">
       <div className="flex flex-col gap-2">
-        <label className="text-sm font-bold">種別</label>
+        <label htmlFor={kindId} className="text-sm font-bold">
+          {ESTIMATE_COLUMNS.kind}
+        </label>
         <select
+          id={kindId}
           value={line.kind}
           onChange={(e) => onChange({ kind: e.target.value as LineKind })}
           className="rounded border-2 border-gray-500 px-2 py-3"
@@ -58,8 +75,11 @@ export function EstimateLineRow({
       </div>
 
       <div className="flex flex-col gap-2">
-        <label className="text-sm font-bold">{ESTIMATE_COLUMNS.name}</label>
+        <label htmlFor={nameId} className="text-sm font-bold">
+          {ESTIMATE_COLUMNS.name}
+        </label>
         <input
+          id={nameId}
           type="text"
           value={line.name}
           onChange={(e) => onChange({ name: e.target.value })}
@@ -68,8 +88,11 @@ export function EstimateLineRow({
       </div>
 
       <div className="flex flex-col gap-2">
-        <label className="text-sm font-bold">{ESTIMATE_COLUMNS.spec}</label>
+        <label htmlFor={specId} className="text-sm font-bold">
+          {ESTIMATE_COLUMNS.spec}
+        </label>
         <input
+          id={specId}
           type="text"
           value={line.spec}
           onChange={(e) => onChange({ spec: e.target.value })}
@@ -82,29 +105,34 @@ export function EstimateLineRow({
 
       <div className="grid grid-cols-3 gap-2">
         <div className="flex flex-col gap-2">
-          <label className="text-sm font-bold">
+          <label htmlFor={quantityId} className="text-sm font-bold">
             {ESTIMATE_COLUMNS.quantity}
           </label>
           <input
+            id={quantityId}
             type="text"
             inputMode="decimal"
             value={line.quantity}
             onChange={(e) => onChange({ quantity: e.target.value })}
             aria-invalid={quantityInvalid}
+            aria-describedby={quantityInvalid ? quantityErrorId : undefined}
             className={
               quantityInvalid ? NUMBER_FIELD_INVALID : NUMBER_FIELD_VALID
             }
           />
           {quantityInvalid ? (
-            <p role="alert" className="text-sm text-red-900">
+            <p id={quantityErrorId} role="alert" className="text-sm text-red-900">
               {ESTIMATE_EDITOR_TEXT.invalidNumberField}
             </p>
           ) : null}
         </div>
 
         <div className="flex flex-col gap-2">
-          <label className="text-sm font-bold">{ESTIMATE_COLUMNS.unit}</label>
+          <label htmlFor={unitId} className="text-sm font-bold">
+            {ESTIMATE_COLUMNS.unit}
+          </label>
           <select
+            id={unitId}
             value={line.unit}
             onChange={(e) => onChange({ unit: e.target.value })}
             className="rounded border-2 border-gray-500 px-2 py-3"
@@ -118,21 +146,23 @@ export function EstimateLineRow({
         </div>
 
         <div className="flex flex-col gap-2">
-          <label className="text-sm font-bold">
+          <label htmlFor={unitPriceId} className="text-sm font-bold">
             {ESTIMATE_COLUMNS.unitPrice}
           </label>
           <input
+            id={unitPriceId}
             type="text"
             inputMode="decimal"
             value={line.unitPrice}
             onChange={(e) => onChange({ unitPrice: e.target.value })}
             aria-invalid={unitPriceInvalid}
+            aria-describedby={unitPriceInvalid ? unitPriceErrorId : undefined}
             className={
               unitPriceInvalid ? NUMBER_FIELD_INVALID : NUMBER_FIELD_VALID
             }
           />
           {unitPriceInvalid ? (
-            <p role="alert" className="text-sm text-red-900">
+            <p id={unitPriceErrorId} role="alert" className="text-sm text-red-900">
               {ESTIMATE_EDITOR_TEXT.invalidNumberField}
             </p>
           ) : null}
@@ -140,8 +170,11 @@ export function EstimateLineRow({
       </div>
 
       <div className="flex flex-col gap-2">
-        <label className="text-sm font-bold">税区分</label>
+        <label htmlFor={taxCategoryId} className="text-sm font-bold">
+          {ESTIMATE_COLUMNS.taxCategory}
+        </label>
         <select
+          id={taxCategoryId}
           value={line.taxCategory}
           onChange={(e) =>
             onChange({ taxCategory: e.target.value as TaxCategory })
