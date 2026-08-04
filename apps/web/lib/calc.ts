@@ -12,11 +12,18 @@ import { TAX_RATES } from "./content";
 export type TaxCategory = keyof typeof TAX_RATES;
 
 /**
- * 明細行の種別。
- * 値引きは専用の欄を作らず、負の金額を持つ行として表す。
- * 直接工事費の小計には入れず、諸経費を足した後に引く。
+ * 明細行の種別。金額を減らす行が2種類あり、引く段階が違うので取り違えない。
+ *
+ * - `item`   … 直接工事費。負の金額も許す。支給材の控除のように
+ *              「工事そのものが減る」場合はこちら。諸経費の算定基礎も一緒に減る。
+ * - `discount` … 出精値引きなど、諸経費まで含めた総額から引くもの。
+ *              直接工事費の小計には入れず、諸経費を足した後に引く。
+ *              専用の欄は作らず、負の金額を持つ行として表す。
  */
 export type LineKind = "item" | "discount";
+
+/** 種別の一覧。実行時の検証にも使うので1箇所に持つ。 */
+const LINE_KINDS: readonly LineKind[] = ["item", "discount"];
 
 export type EstimateLine = {
   kind: LineKind;
@@ -101,6 +108,15 @@ function assertFiniteNumber(value: number, label: string): void {
 
 function assertValidLine(line: EstimateLine, index: number): void {
   const at = `${index + 1}行目`;
+
+  // 種別を先に見る。知らない種別を黙って無視すると、その行が合計から
+  // 静かに消えて、誰も気付けないまま金額が狂う。
+  if (!LINE_KINDS.includes(line.kind)) {
+    throw new RangeError(
+      `${at}の種別が不正です: ${line.kind}（${LINE_KINDS.join(" / ")} のどちらか）`,
+    );
+  }
+
   assertFiniteNumber(line.quantity, `${at}の数量`);
   assertFiniteNumber(line.unitPrice, `${at}の単価`);
   if (!Number.isInteger(line.unitPrice)) {
@@ -110,6 +126,15 @@ function assertValidLine(line: EstimateLine, index: number): void {
   }
   if (!(line.taxCategory in TAX_RATES)) {
     throw new RangeError(`${at}の税区分が不正です: ${line.taxCategory}`);
+  }
+
+  // 値引き行が正の金額だと、値引きなのに工事価格が増える。
+  // 数量と単価の両方が負でも金額は正になるので、掛けた後の金額で見る。
+  if (line.kind === "discount" && lineAmount(line) > 0) {
+    throw new RangeError(
+      `${at}は値引き行なのに金額が正です: ${lineAmount(line)}円。` +
+        `金額を増やすなら種別を item にしてください。`,
+    );
   }
 }
 
