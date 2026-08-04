@@ -9,80 +9,94 @@
 
 - PR #7 が commit `6f0cbab` として `main` にマージ済み（フェーズ0＋案件登録・見積エディタ）。
 - PR #9 が commit `2111094` として `main` にマージ済み（`prod-smoke.yml` を実URLに接続）。
-  マージ前に本番URL `https://renovation-estimate-app-web.vercel.app` に対して
-  200・本文マーカー・HSTS・`/api/health` の4項目を実際に確認済み。
 - PR #10 が commit `bc4d84c` として `main` にマージ済み（単価マスタ）。
-  CI run: https://github.com/rahiseko-alt/renovation-estimate-app/actions/runs/30922900730
-  （typecheck/lint/test/build 成功）。本番反映後の prod-smoke run:
-  https://github.com/rahiseko-alt/renovation-estimate-app/actions/runs/30922885648
+- PR #11 が commit `c875b24` として `main` にマージ済み（PR #10 の CodeRabbit 指摘4件の修正）。
+  CI run: https://github.com/rahiseko-alt/renovation-estimate-app/actions/runs/30924247255
+  （typecheck/lint/test/build 成功）。prod-smoke run:
+  https://github.com/rahiseko-alt/renovation-estimate-app/actions/runs/30924224378
   （`prod 200 + marker` 成功＝本番URLへの反映を確認）。
 
-**未確認のまま（自己申告のみで外部事実の裏が無い項目）：**
+**未確認のまま（自己申告のみで外部事実の裏が無い項目。変わらず）：**
 
 - Vercel の環境変数（`AUTH_SECRET` / `DEMO_USER_EMAIL` / `DEMO_USER_PASSWORD`）が設定済みかどうか。
-- 本番URLでの実際のログイン成功。上記の prod-smoke はトップページ・ヘルスチェックのみを見ており、
-  ログインまでは検証していない。
+- 本番URLでの実際のログイン成功（prod-smoke はトップページ・ヘルスチェックのみ）。
 - Supabase 側のスキーマ移行（まだ未着手。下記「ブロッカー」参照）。
 
-**今回さらに、PR #10 の CodeRabbit レビューで見つかった4件を修正した
-（この修正は auto-merge が先に完走したため PR #10 には未反映で、`main` に対する
-新しい commit として別PRで出す。typecheck/lint/test/build/smoke はローカルで確認済みだが、
-この commit 自体の CI 結果は次回セッション開始時に PR を見て確認すること）：**
+**フェーズ1の残りだった「pdfme での協議会様式 PDF 出力」を実装した。**
+ユーザーから「GO」の指示を受けて着手。実装方針は当初計画の pdfme から変更している：
 
-1. **`taxCategory` の検証が `in` 演算子を使っていて `"toString"` 等の
-   `Object.prototype` 由来の値まで通してしまう不具合（Major）。**
-   `apps/web/app/price-master/new/actions.ts` だけでなく、**同じ不具合が
-   `lib/calc.ts`（金額計算の唯一の入口）にも2箇所あった**ことに気付き、
-   一緒に直した：`assertValidLine` の `line.taxCategory` 検証、
-   `calcEstimate` の `overheadTaxCategory` 検証。`saveEstimateAction` は
-   Server Action で型に守られない外部入力の境界なので、細工した
-   `taxCategory: "toString"` を送ると税額計算から静かに漏れる実害があった。
-   `lib/calc.ts` に `isValidTaxCategory()`（`hasOwnProperty` で own property
-   だけを見る）を新設し、3箇所すべてで統一。`__proto__`・`toString`・
-   `constructor`・`hasOwnProperty` を税区分に指定すると `calcEstimate` が
-   例外を投げることをテストで固定した（`tests/calc-validation.test.ts`）。
-2. **`app/price-master/page.tsx` と `app/price-master/new/page.tsx` に
-   実装（一覧・削除フォーム、登録フォーム）が直書きされていた点（Major）。**
-   AGENTS.md「全体を組み立てるファイルには実装を書かず、部品を呼ぶだけにする」に
-   反していた。`components/PriceMasterList.tsx` と
-   `components/NewPriceMasterItemForm.tsx` に切り出し、両方のページを
-   データ取得と組み立てだけにした。
-3. `docs/handoff.md` が「Vercel・Supabase接続が完了した」という自己申告の
-   ままで、外部事実と未確認事項を分けていなかった指摘（Major）。この節が
-   その修正版。
+- **pdfme ではなく `@cantoo/pdf-lib`（pdf-libのフォーク）+ `fontkit`（本家パッケージ、
+  `@pdf-lib/fontkit` ではない）を採用した。** 理由は2つ。①pdfme の
+  `@pdfme/schemas` は本見積書に不要な依存（バーコード・日付ピッカー・
+  署名パッド等）を大量に引き込む。②本家 `pdf-lib` + `@pdf-lib/fontkit` の
+  組み合わせは、日本語フォントのサブセット化で**一部の文字を無言で欠落させる
+  実害のあるバグ**を実機検証で確認した（`docs/failures.md` 2026-08-04
+  参照）。`@cantoo/pdf-lib` + 本家 `fontkit` の組み合わせで、実ブラウザ
+  （Chromium/PDFium）とPyMuPDFの両方で文字欠落が無いことを確認してから実装した。
+- **フォントは BIZ UDPGothic（OFLライセンス、Google Fonts配布の静的TrueType）
+  を採用**（`apps/web/lib/pdf/assets/`。ライセンス全文は同ディレクトリの
+  `OFL.txt`）。AGENTS.md の元計画が挙げていたUI側の第一候補フォントと揃えている。
+  Regular/Bold 合わせて約9.3MB。`next.config.ts` に `outputFileTracingIncludes`
+  を追加し、Vercel のデプロイに含める設定をした（fs.readFileSyncで読むだけの
+  ファイルはデフォルトのトレースに含まれないため）。
+- **`app/**/route.ts`（Route Handler）ではなく Server Action で実装した。**
+  最初 Route Handler で実装したところ、同じ案件がページでは見つかるのに
+  Route Handler からは常に404になる不具合に遭遇し、実機デバッグの結果
+  「Route Handler は Server Component/Server Action と別のモジュールグラフに
+  バンドルされ、仮のメモリDB（`lib/db/` のモジュールスコープ `Map`）を
+  共有しない」ことが根本原因と判明した（`docs/failures.md` 2026-08-04 参照）。
+  `app/projects/[id]/pdf-actions.ts` の Server Action
+  （`generateEstimatePdfAction`）に作り直し、結果をbase64にしてクライアント
+  コンポーネント（`components/DownloadPdfButton.tsx`）に返し、ブラウザ側で
+  Blobダウンロードする形にしたところ解消した。**Supabase接続後（`lib/db/` を
+  実DBに差し替えた後）はこの制約自体が無くなるが、それまでは新しい呼び出し
+  入口を Route Handler で作らないこと。**
+- レイアウトは住宅リフォーム推進協議会の様式（工事項目／摘要／数量／単位／単価／
+  金額の6列＋集計欄＋添付書類・保管の注記）。会社情報（請負者名・代表者・住所・印）
+  を入力する画面がまだ無いため、その欄は省略している（未確認事項として残す）。
+  明細が1ページに収まらない場合は表の見出し行を繰り返して自動改ページする。
+  金額列は省略記号で詰めず、収まらなければ文字サイズを縮めて必ず全桁を表示する
+  （`lib/pdf/layout.ts` の `drawNumericCell`。金額を黙って削らない設計）。
 
-**現在の状態**：上記の修正はローカルで typecheck・lint・test（103件全部緑）・
-`pnpm -r build`・`scripts/smoke.sh` を確認済み。単価マスタの画面はコンポーネント
-分割後も Playwright（スクラッチ実行）で「登録→見積エディタで選んで追加→保存」を
-再確認済み。まだ push・PR化はこのメモの直後に行う。
+**現在の状態**：typecheck・lint・test（111件全部緑。PDF関連8件を追加）・
+`pnpm -r build`・`pnpm audit`・`scripts/smoke.sh` をローカルで確認済み。
+実際に本番相当ビルド（`next build && next start`）を起動し、Playwright
+（スクラッチ実行）で「案件作成→見積エディタに複数行（値引き含む）入力→保存→
+PDFダウンロード→ダウンロードしたPDFの内容をpdf-libで読み直して検証、
+PyMuPDFで画像化して目視確認」まで実施し、金額・値引きの▲表記・税額・合計が
+すべて正しく反映されることを確認済み。未ログインでは案件詳細ページ自体が
+ログイン画面に飛ぶこと（≒PDFも出せないこと）も確認済み。まだ push・PR化は
+このメモの直後に行う。
 
 ## ②今回トラブル
 
-**新規の失敗**：PR #10 の draft を解除した直後、CodeRabbit のレビューが
-「Actionable comments posted: 4」で完了する前に、auto-merge がPRをマージして
-しまった。CodeRabbit のコミットステータスはレビュー完了時点で成功として立つらしく、
-指摘の有無に関わらず auto-merge の判定条件（コミットステータスが成功）を満たして
-しまう。**「CIが緑なら自動でマージしてよい」という指示は「CodeRabbitの指摘が0件」を
-保証しない**ことが分かった。指摘が見つかった場合は、マージ後でも次のPRで拾って直す
-運用で対応した（今回がそれ）。次回以降も同様に、マージ後に指摘が来たら別PRで
-フォローアップする。
+`docs/failures.md` に2026-08-04付けで2件追記した（要約）：
+
+1. **pdf-lib + @pdf-lib/fontkit の日本語サブセット化バグ**：保存は例外なく
+   成功するのに、一部の文字が無言で欠落する。`@cantoo/pdf-lib` + 本家
+   `fontkit` に差し替えて解消。教訓：PDF生成の「保存成功」は「正しく描画
+   される」の証明にならない。生成後に別のレンダラで実際に開いて確認する。
+2. **Route Handler と Server Action/ページで仮メモリDBのインスタンスが
+   共有されない**：教訓・回避策は上の①に記載のとおり。Supabase移行までは
+   新しい呼び出し入口を Route Handler で作らない。
 
 ## ③次回やる事
 
-**フェーズ1の残り**：
+**フェーズ1は今回でほぼ完了**（単価マスタ・PDF出力まで実装済み）。残るのは：
 
-- pdfme での協議会様式 PDF 出力。日本語フォントのサブセット化
 - Supabase 接続後、`lib/db/` の仮のメモリ実装を実DBに差し替え
   **（ブロッカーあり。下記参照）**
+- （任意・優先度低）会社情報（請負者名・代表者・住所・印）の設定画面。
+  無いと見積書PDFのその欄が空のまま。
 
-**Supabase実DB移行のブロッカー**：このセッションには Supabase・Vercel の MCP接続が
-無く、あなたのSupabaseプロジェクトに直接アクセスする手段が無い。実DBへの
-スキーマ移行（テーブル作成・RLS設定）は、こちらがSQLを書いても、ユーザーが
-SupabaseのSQL Editorに貼って実行するという手作業が必ず挟まる。また、
-Vercelの環境変数（`AUTH_SECRET` / `DEMO_USER_EMAIL` / `DEMO_USER_PASSWORD`）も
-ユーザーがVercelの画面で設定する必要がある。**上の「未確認のまま」に書いたとおり、
-これが完了しているかどうかは外部事実で確認できていない。** 次回セッションの
-最初に、本番URLで実際にログインできるかを確認すること。
+**Supabase実DB移行のブロッカー**（変わらず）：このセッションには
+Supabase・Vercel の MCP接続が無く、あなたのSupabaseプロジェクトに直接
+アクセスする手段が無い。実DBへのスキーマ移行（テーブル作成・RLS設定）は、
+こちらがSQLを書いても、ユーザーがSupabaseのSQL Editorに貼って実行する
+という手作業が必ず挟まる。また、Vercelの環境変数（`AUTH_SECRET` /
+`DEMO_USER_EMAIL` / `DEMO_USER_PASSWORD`）もユーザーがVercelの画面で
+設定する必要がある。次回セッションの最初に、本番URLで実際にログイン
+できるかを確認すること。
 
 その後の想定（元の実装計画より。計画書自体はこのリポジトリには無い）：
 
