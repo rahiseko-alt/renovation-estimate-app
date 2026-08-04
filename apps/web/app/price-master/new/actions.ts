@@ -2,9 +2,8 @@
 
 import { redirect } from "next/navigation";
 
-import type { TaxCategory } from "../../../lib/calc";
+import { isValidTaxCategory, type TaxCategory } from "../../../lib/calc";
 import { getCurrentUser } from "../../../lib/auth/server";
-import { TAX_RATES } from "../../../lib/content";
 import { createPriceMasterItem } from "../../../lib/db/priceMaster";
 
 export async function createPriceMasterItemAction(
@@ -29,7 +28,7 @@ export async function createPriceMasterItemAction(
     unitPriceRaw !== "" &&
     Number.isFinite(unitPrice) &&
     Number.isInteger(unitPrice) &&
-    taxCategoryRaw in TAX_RATES;
+    isValidTaxCategory(taxCategoryRaw);
 
   if (!valid) {
     redirect("/price-master/new?failed=1");

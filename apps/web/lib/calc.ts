@@ -12,6 +12,18 @@ import { TAX_RATES } from "./content";
 export type TaxCategory = keyof typeof TAX_RATES;
 
 /**
+ * 税区分として妥当かどうかを判定する。
+ *
+ * `value in TAX_RATES` は使わない。in 演算子はプロトタイプチェーンも見るため、
+ * "toString" のような Object.prototype 由来の値まで税区分として通ってしまう
+ * （Server Action は型で守られない外部入力の境界なので、実際に届きうる）。
+ * own property だけを見る hasOwnProperty に統一する。
+ */
+export function isValidTaxCategory(value: string): value is TaxCategory {
+  return Object.prototype.hasOwnProperty.call(TAX_RATES, value);
+}
+
+/**
  * 明細行の種別。金額を減らす行が2種類あり、引く段階が違うので取り違えない。
  *
  * - `item`   … 直接工事費。負の金額も許す。支給材の控除のように
@@ -248,7 +260,7 @@ function assertValidLine(line: EstimateLine, index: number): void {
 
   assertValidQuantity(line.quantity, `${at}の数量`);
   assertValidUnitPrice(line.unitPrice, `${at}の単価`);
-  if (!(line.taxCategory in TAX_RATES)) {
+  if (!isValidTaxCategory(line.taxCategory)) {
     throw new RangeError(`${at}の税区分が不正です: ${line.taxCategory}`);
   }
 
@@ -306,7 +318,7 @@ export function calcEstimate(input: EstimateInput): EstimateTotals {
   input.lines.forEach(assertValidLine);
 
   const overheadTaxCategory = input.overheadTaxCategory ?? "standard";
-  if (!(overheadTaxCategory in TAX_RATES)) {
+  if (!isValidTaxCategory(overheadTaxCategory)) {
     throw new RangeError(`諸経費の税区分が不正です: ${overheadTaxCategory}`);
   }
 
