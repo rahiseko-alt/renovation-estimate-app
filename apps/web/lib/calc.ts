@@ -89,44 +89,44 @@ const TAX_CATEGORY_ORDER: readonly TaxCategory[] = [
 ];
 
 /**
- * 浮動小数点の表現誤差だけを飲み込むための許容幅（ULP＝最小単位の個数）。
+ * 整数の金額に小数の係数（数量・掛率など）を掛けて、円未満を切り捨てる（0方向）。
  *
- * 例えば 1.4 * 1400 は真値 1960 のはずが JS では 1959.9999999999998 になる。
- * この手のノイズは真値から 1 ULP（Number.EPSILON × 値の大きさ）程度しか
- * 離れない。8 ULP という余裕を持たせても、本物の小数の端数
- * （例えば 1.9999996 円のように、実際にその値である場合）は 1 の位から見て
- * 桁違いに離れているので誤って動かさない。固定の桁数で丸める方式
- * （1/1,000,000 円で丸める等）だと、本物の細かい端数まで動かしてしまう
- * ことが指摘されたため、値の大きさに比例する許容幅に直した。
+ * 桁数に決まりの無い小数を浮動小数点のまま掛けると、真値からのズレが
+ * 値の大きさに比例して大きくなる。単純な丸め誤差の吸収（許容幅を設けて
+ * 近い整数に寄せる方式）では、この「ズレ」と「本物の細かい端数」が
+ * 原理的に区別できない。実際に、数量が大きいときに本物の端数を誤って
+ * 動かす例が見つかった（1円だけの違いだが、金額計算で「だいたい合ってる」は
+ * 許されない）。
+ *
+ * 係数を固定精度の整数（factorScale 倍）に丸めてから BigInt の整数演算で
+ * 正確に計算することで、この種の誤差を構造的に無くす。
+ *
+ * @param integerAmount 円の整数金額
+ * @param decimalFactor 掛ける小数
+ * @param factorScale 係数をこの倍数で固定精度の整数にする（例: 1000 なら 1/1000 単位まで）
  */
-const FLOAT_NOISE_TOLERANCE_ULPS = 8;
-
-/**
- * 浮動小数点の掛け算が生んだノイズで、値がすぐ隣の整数から
- * 許容幅の範囲内にずれているだけなら、その整数に寄せる。
- * 本物の端数（許容幅より大きく離れている）はそのまま返す。
- */
-function snapToIntegerIfFloatNoise(value: number): number {
-  const nearestInteger = Math.round(value);
-  const tolerance =
-    FLOAT_NOISE_TOLERANCE_ULPS *
-    Number.EPSILON *
-    Math.max(Math.abs(value), 1);
-  return Math.abs(value - nearestInteger) <= tolerance
-    ? nearestInteger
-    : value;
+function exactMultiplyTrunc(
+  integerAmount: number,
+  decimalFactor: number,
+  factorScale: number,
+): number {
+  const scaledFactor = Math.round(decimalFactor * factorScale);
+  const exact = BigInt(integerAmount) * BigInt(scaledFactor);
+  return Number(exact / BigInt(factorScale));
 }
 
 /**
- * 円未満を切り捨てる。負の値は絶対値で切り捨てる（0 方向）。
- * 値引き行で -1.5 を -2 にしてしまうと値引き額が勝手に増えるため、
- * Math.floor ではなく Math.trunc を使う。
+ * 整数の金額にパーセントの率を掛けて、円未満を切り捨てる（0方向）。
+ * exactMultiplyTrunc と同じ理由で BigInt を使う。÷100 も一緒に畳み込む。
  */
-function yen(value: number): number {
-  if (!Number.isFinite(value)) {
-    throw new RangeError(`金額が数値になりません: ${value}`);
-  }
-  return Math.trunc(snapToIntegerIfFloatNoise(value));
+function exactPercentTrunc(
+  integerAmount: number,
+  ratePercent: number,
+  precisionScale: number,
+): number {
+  const scaledRate = Math.round(ratePercent * precisionScale);
+  const exact = BigInt(integerAmount) * BigInt(scaledRate);
+  return Number(exact / (100n * BigInt(precisionScale)));
 }
 
 function assertFiniteNumber(value: number, label: string): void {
@@ -134,6 +134,47 @@ function assertFiniteNumber(value: number, label: string): void {
     throw new RangeError(`${label}が数値ではありません: ${value}`);
   }
 }
+
+function assertIntegerAmount(value: number, label: string): void {
+  assertFiniteNumber(value, label);
+  if (!Number.isInteger(value)) {
+    throw new RangeError(
+      `${label}が整数ではありません（金額は円単位の整数で持つ）: ${value}`,
+    );
+  }
+}
+
+/**
+ * 数量として扱う最大の大きさ。exactMultiplyTrunc が数量を固定精度の整数
+ * （quantity × QUANTITY_SCALE）に変換する処理が、浮動小数点の精度内で
+ * 正確に行える前提にしている。㎡・m・人工といった実務の数量がこの上限を
+ * 超えることは無い。
+ */
+const MAX_QUANTITY_MAGNITUDE = 1_000_000;
+/** 数量の最小刻み（1/1000）。㎡・m・人工の実務でこれより細かい数量は無い。 */
+const QUANTITY_SCALE = 1_000;
+
+function assertValidQuantity(quantity: number, label: string): void {
+  assertFiniteNumber(quantity, label);
+  if (Math.abs(quantity) > MAX_QUANTITY_MAGNITUDE) {
+    throw new RangeError(
+      `${label}が大きすぎます: ${quantity}（上限 ${MAX_QUANTITY_MAGNITUDE}）`,
+    );
+  }
+}
+
+/** 諸経費率として扱う最大の大きさ。理由は MAX_QUANTITY_MAGNITUDE と同じ。 */
+const MAX_OVERHEAD_RATE_PERCENT = 100_000;
+/** 諸経費率の最小刻み（1/1000 パーセントポイント）。 */
+const OVERHEAD_RATE_SCALE = 1_000;
+
+/** 掛率として扱う最大の大きさ。理由は MAX_QUANTITY_MAGNITUDE と同じ。 */
+const MAX_MARKUP_RATE = 1_000_000;
+/** 掛率の最小刻み（1/10,000）。 */
+const MARKUP_RATE_SCALE = 10_000;
+
+/** 消費税率の最小刻み。TAX_RATES は自分たちで決めた定数なので上限検証は不要。 */
+const TAX_RATE_SCALE = 100_000;
 
 function assertValidLine(line: EstimateLine, index: number): void {
   const at = `${index + 1}行目`;
@@ -146,13 +187,8 @@ function assertValidLine(line: EstimateLine, index: number): void {
     );
   }
 
-  assertFiniteNumber(line.quantity, `${at}の数量`);
-  assertFiniteNumber(line.unitPrice, `${at}の単価`);
-  if (!Number.isInteger(line.unitPrice)) {
-    throw new RangeError(
-      `${at}の単価が整数ではありません（金額は円単位の整数で持つ）: ${line.unitPrice}`,
-    );
-  }
+  assertValidQuantity(line.quantity, `${at}の数量`);
+  assertIntegerAmount(line.unitPrice, `${at}の単価`);
   if (!(line.taxCategory in TAX_RATES)) {
     throw new RangeError(`${at}の税区分が不正です: ${line.taxCategory}`);
   }
@@ -172,9 +208,9 @@ function assertValidLine(line: EstimateLine, index: number): void {
  * 画面もPDFもこの関数を通す。行の金額を各所で掛け算し直さない。
  */
 export function lineAmount(line: EstimateLine): number {
-  assertFiniteNumber(line.quantity, "数量");
-  assertFiniteNumber(line.unitPrice, "単価");
-  return yen(line.quantity * line.unitPrice);
+  assertValidQuantity(line.quantity, "数量");
+  assertIntegerAmount(line.unitPrice, "単価");
+  return exactMultiplyTrunc(line.unitPrice, line.quantity, QUANTITY_SCALE);
 }
 
 /** 税区分ごとに対価の額を積む入れ物を作る。 */
@@ -198,6 +234,11 @@ export function calcEstimate(input: EstimateInput): EstimateTotals {
       `諸経費率が負の数です: ${input.overheadRatePercent}。値引きは値引き行で表してください。`,
     );
   }
+  if (input.overheadRatePercent > MAX_OVERHEAD_RATE_PERCENT) {
+    throw new RangeError(
+      `諸経費率が大きすぎます: ${input.overheadRatePercent}（上限 ${MAX_OVERHEAD_RATE_PERCENT}）`,
+    );
+  }
   input.lines.forEach(assertValidLine);
 
   const overheadTaxCategory = input.overheadTaxCategory ?? "standard";
@@ -217,8 +258,10 @@ export function calcEstimate(input: EstimateInput): EstimateTotals {
   }
 
   // 2. 諸経費（直接工事費 小計に対する率）
-  const overheadAmount = yen(
-    (directCostSubtotal * input.overheadRatePercent) / 100,
+  const overheadAmount = exactPercentTrunc(
+    directCostSubtotal,
+    input.overheadRatePercent,
+    OVERHEAD_RATE_SCALE,
   );
   taxable[overheadTaxCategory] += overheadAmount;
 
@@ -243,7 +286,7 @@ export function calcEstimate(input: EstimateInput): EstimateTotals {
     const taxableAmount = taxable[category];
     if (taxableAmount === 0) continue;
     const rate = TAX_RATES[category];
-    const categoryTax = yen(taxableAmount * rate);
+    const categoryTax = exactMultiplyTrunc(taxableAmount, rate, TAX_RATE_SCALE);
     taxBreakdown.push({ category, rate, taxableAmount, taxAmount: categoryTax });
     taxAmount += categoryTax;
   }
@@ -272,12 +315,17 @@ export function sellingUnitPrice(
   costUnitPrice: number,
   markupRate: number,
 ): number {
-  assertFiniteNumber(costUnitPrice, "原価単価");
+  assertIntegerAmount(costUnitPrice, "原価単価");
   assertFiniteNumber(markupRate, "掛率");
   if (markupRate < 0) {
     throw new RangeError(`掛率が負の数です: ${markupRate}`);
   }
-  return yen(costUnitPrice * markupRate);
+  if (markupRate > MAX_MARKUP_RATE) {
+    throw new RangeError(
+      `掛率が大きすぎます: ${markupRate}（上限 ${MAX_MARKUP_RATE}）`,
+    );
+  }
+  return exactMultiplyTrunc(costUnitPrice, markupRate, MARKUP_RATE_SCALE);
 }
 
 /** 金額を画面・PDF に出すときの表記（3桁区切り）。 */
