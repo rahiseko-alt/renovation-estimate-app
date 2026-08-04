@@ -4,20 +4,14 @@ name: prod-smoke
 # 実行環境(サンドボックス)は *.vercel.app への外向きが遮断されるため、
 # プロキシ外の実機である GitHub Actions に本番URLを curl させて機械判定する。
 # この run が緑＝「公開URLが 200 かつ本文に 'リフォーム見積'」の evidence。
-#
-# 現状：このアプリはまだ Vercel に接続していないため、検査する本番URLが存在しない。
-# 存在しないURLを push のたびに叩いても、分かるのは「まだ公開していない」ことだけなので、
-# 手動実行だけに絞っている。チェックを緩めたのではなく、対象がまだ無い。
-#
-# Vercel 接続後にやること（2つとも必要。片方だけだと意味が無い）:
-#   1. 下の PROD_URL を実際の割当ドメインに変える
-#   2. on: に push: branches: ["**"] を戻す
 on:
   workflow_dispatch:
+  push:
+    branches: ["**"]
 
-# 本番URL（Vercel production alias）。Vercel 接続後、実際の割当ドメインに合わせて更新する。
+# 本番URL（Vercel production alias）。
 env:
-  PROD_URL: "https://example.invalid"
+  PROD_URL: "https://renovation-estimate-app-web.vercel.app"
 
 jobs:
   reachable:
