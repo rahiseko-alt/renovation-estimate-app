@@ -5,45 +5,67 @@
 
 ## ①今回実施
 
-**PR #7（フェーズ0＋フェーズ1の案件登録・見積エディタ）をユーザーの明示的な指示のもと
-`main` にマージした。** Vercel・Supabase の接続もユーザー側の作業として完了し、
-公開URL（`https://renovation-estimate-app-web.vercel.app`）が確定した。
+**確認済みの外部事実（このメモの自己申告ではなく、CI run・commit・公開URLで裏が取れているもの）：**
 
-- `main` へのマージ後、`.github/workflows/prod-smoke.yml` の `PROD_URL` を実際の
-  割当ドメインに更新し、`on:` トリガーを `workflow_dispatch` のみから
-  `push: branches: ["**"]` に復元した（PR #9・マージ済み）。4項目（200・本文マーカー・
-  HSTS・`/api/health`）は本番URLに対して実際に確認してから push した。
-- **今後のPRのdraft解除（＝本番への自動マージ）について、ユーザーから明示的に
-  「CIが緑なら自動でマージしてよい」という指示を得た。** これ以降、CIが全緑になった
-  draft PRは、都度の確認なしでdraftを解除して auto-merge.yml に委ねてよい
-  （ただしDB設計・セキュリティに関わる大きな判断は引き続き別途確認する）。
-- **単価マスタ（フェーズ1の残りの1つ）を実装した：**
-  - `lib/db/types.ts` に `PriceMasterItem` / `NewPriceMasterItemInput` を追加。
-  - `lib/db/priceMaster.ts` を新設。`lib/db/projects.ts` と同じ境界（ownerId で
-    絞り込まない取得関数は置かない）で `listPriceMasterForOwner` /
-    `getPriceMasterItemForOwner` / `createPriceMasterItem` /
-    `deletePriceMasterItemForOwner` を実装。IDOR対策のテストも同じ形で追加
-    （`tests/db.test.ts` に `describe("priceMaster")` を追加、他人の単価マスタは
-    取得も削除もできないことを検証）。
-  - 画面：`/price-master`（一覧・削除）、`/price-master/new`（登録）。
-    `/projects` からリンクを張った。
-  - 見積エディタに単価マスタからの追加を統合。`EstimateLineRow` 側は変更せず、
-    新規の明細行として1行追加する方式にした（既存の行を書き換えない）。
-    UI部分は行数制限（max-lines 300）に触れたため、`components/PriceMasterPicker.tsx`
-    に「単価マスタから選んで追加する」という単独の塊として切り出した
-    （行数で機械的に割ったのではなく、後から単独で直したくなる単位で分けた）。
-  - typecheck / lint / test（99件全部緑）/ `pnpm -r build` / `scripts/smoke.sh` を
-    全部通した上で、実際にdevサーバを立てて Playwright で
-    「単価マスタ登録 → 見積エディタで選んで追加 → 明細に反映 → 保存できる」を
-    実機相当のブラウザ操作で確認した（ローカル専用の `.env.local` を使用。
-    `.gitignore` で除外済みであることも確認済み。コミットはしていない）。
+- PR #7 が commit `6f0cbab` として `main` にマージ済み（フェーズ0＋案件登録・見積エディタ）。
+- PR #9 が commit `2111094` として `main` にマージ済み（`prod-smoke.yml` を実URLに接続）。
+  マージ前に本番URL `https://renovation-estimate-app-web.vercel.app` に対して
+  200・本文マーカー・HSTS・`/api/health` の4項目を実際に確認済み。
+- PR #10 が commit `bc4d84c` として `main` にマージ済み（単価マスタ）。
+  CI run: https://github.com/rahiseko-alt/renovation-estimate-app/actions/runs/30922900730
+  （typecheck/lint/test/build 成功）。本番反映後の prod-smoke run:
+  https://github.com/rahiseko-alt/renovation-estimate-app/actions/runs/30922885648
+  （`prod 200 + marker` 成功＝本番URLへの反映を確認）。
 
-**現在の状態**：この単価マスタの変更はまだコミット・push前（このメモの直後に
-commit → push → PR化 → CI確認 の順で進める）。
+**未確認のまま（自己申告のみで外部事実の裏が無い項目）：**
+
+- Vercel の環境変数（`AUTH_SECRET` / `DEMO_USER_EMAIL` / `DEMO_USER_PASSWORD`）が設定済みかどうか。
+- 本番URLでの実際のログイン成功。上記の prod-smoke はトップページ・ヘルスチェックのみを見ており、
+  ログインまでは検証していない。
+- Supabase 側のスキーマ移行（まだ未着手。下記「ブロッカー」参照）。
+
+**今回さらに、PR #10 の CodeRabbit レビューで見つかった4件を修正した
+（この修正は auto-merge が先に完走したため PR #10 には未反映で、`main` に対する
+新しい commit として別PRで出す。typecheck/lint/test/build/smoke はローカルで確認済みだが、
+この commit 自体の CI 結果は次回セッション開始時に PR を見て確認すること）：**
+
+1. **`taxCategory` の検証が `in` 演算子を使っていて `"toString"` 等の
+   `Object.prototype` 由来の値まで通してしまう不具合（Major）。**
+   `apps/web/app/price-master/new/actions.ts` だけでなく、**同じ不具合が
+   `lib/calc.ts`（金額計算の唯一の入口）にも2箇所あった**ことに気付き、
+   一緒に直した：`assertValidLine` の `line.taxCategory` 検証、
+   `calcEstimate` の `overheadTaxCategory` 検証。`saveEstimateAction` は
+   Server Action で型に守られない外部入力の境界なので、細工した
+   `taxCategory: "toString"` を送ると税額計算から静かに漏れる実害があった。
+   `lib/calc.ts` に `isValidTaxCategory()`（`hasOwnProperty` で own property
+   だけを見る）を新設し、3箇所すべてで統一。`__proto__`・`toString`・
+   `constructor`・`hasOwnProperty` を税区分に指定すると `calcEstimate` が
+   例外を投げることをテストで固定した（`tests/calc-validation.test.ts`）。
+2. **`app/price-master/page.tsx` と `app/price-master/new/page.tsx` に
+   実装（一覧・削除フォーム、登録フォーム）が直書きされていた点（Major）。**
+   AGENTS.md「全体を組み立てるファイルには実装を書かず、部品を呼ぶだけにする」に
+   反していた。`components/PriceMasterList.tsx` と
+   `components/NewPriceMasterItemForm.tsx` に切り出し、両方のページを
+   データ取得と組み立てだけにした。
+3. `docs/handoff.md` が「Vercel・Supabase接続が完了した」という自己申告の
+   ままで、外部事実と未確認事項を分けていなかった指摘（Major）。この節が
+   その修正版。
+
+**現在の状態**：上記の修正はローカルで typecheck・lint・test（103件全部緑）・
+`pnpm -r build`・`scripts/smoke.sh` を確認済み。単価マスタの画面はコンポーネント
+分割後も Playwright（スクラッチ実行）で「登録→見積エディタで選んで追加→保存」を
+再確認済み。まだ push・PR化はこのメモの直後に行う。
 
 ## ②今回トラブル
 
-新規の失敗は無し。
+**新規の失敗**：PR #10 の draft を解除した直後、CodeRabbit のレビューが
+「Actionable comments posted: 4」で完了する前に、auto-merge がPRをマージして
+しまった。CodeRabbit のコミットステータスはレビュー完了時点で成功として立つらしく、
+指摘の有無に関わらず auto-merge の判定条件（コミットステータスが成功）を満たして
+しまう。**「CIが緑なら自動でマージしてよい」という指示は「CodeRabbitの指摘が0件」を
+保証しない**ことが分かった。指摘が見つかった場合は、マージ後でも次のPRで拾って直す
+運用で対応した（今回がそれ）。次回以降も同様に、マージ後に指摘が来たら別PRで
+フォローアップする。
 
 ## ③次回やる事
 
@@ -58,9 +80,9 @@ commit → push → PR化 → CI確認 の順で進める）。
 スキーマ移行（テーブル作成・RLS設定）は、こちらがSQLを書いても、ユーザーが
 SupabaseのSQL Editorに貼って実行するという手作業が必ず挟まる。また、
 Vercelの環境変数（`AUTH_SECRET` / `DEMO_USER_EMAIL` / `DEMO_USER_PASSWORD`）も
-ユーザーがVercelの画面で設定する必要がある（今はおそらく未設定で、本番の
-ログイン画面はエラーになる）。この2つはユーザー側の作業として案内済みだが、
-まだ完了の確認はできていない。
+ユーザーがVercelの画面で設定する必要がある。**上の「未確認のまま」に書いたとおり、
+これが完了しているかどうかは外部事実で確認できていない。** 次回セッションの
+最初に、本番URLで実際にログインできるかを確認すること。
 
 その後の想定（元の実装計画より。計画書自体はこのリポジトリには無い）：
 

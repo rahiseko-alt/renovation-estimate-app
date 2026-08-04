@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { calcEstimate, lineAmount, sellingUnitPrice, type EstimateLine } from "../lib/calc";
+import {
+  calcEstimate,
+  isValidTaxCategory,
+  lineAmount,
+  sellingUnitPrice,
+  type EstimateLine,
+} from "../lib/calc";
 
 function line(partial: Partial<EstimateLine> = {}): EstimateLine {
   return {
@@ -151,6 +157,39 @@ describe("calcEstimate の入力検証", () => {
         overheadRatePercent: 0,
       }),
     ).toThrow(/3行目/);
+  });
+});
+
+describe("isValidTaxCategory", () => {
+  it("standard・reduced・exempt はOK", () => {
+    expect(isValidTaxCategory("standard")).toBe(true);
+    expect(isValidTaxCategory("reduced")).toBe(true);
+    expect(isValidTaxCategory("exempt")).toBe(true);
+  });
+
+  it("知らない文字列はNG", () => {
+    expect(isValidTaxCategory("unknown")).toBe(false);
+    expect(isValidTaxCategory("")).toBe(false);
+  });
+
+  it("Object.prototype 由来の値は in なら通ってしまうが、ここでは弾く（TAX_RATES の own property ではないため）", () => {
+    expect(isValidTaxCategory("toString")).toBe(false);
+    expect(isValidTaxCategory("__proto__")).toBe(false);
+    expect(isValidTaxCategory("hasOwnProperty")).toBe(false);
+    expect(isValidTaxCategory("constructor")).toBe(false);
+  });
+
+  it("__proto__ を税区分にした行は calcEstimate が例外を投げる（税額計算からの静かな脱落を防ぐ）", () => {
+    expect(() =>
+      calcEstimate({
+        lines: [
+          line({
+            taxCategory: "__proto__" as unknown as EstimateLine["taxCategory"],
+          }),
+        ],
+        overheadRatePercent: 0,
+      }),
+    ).toThrow(/税区分が不正です/);
   });
 });
 
