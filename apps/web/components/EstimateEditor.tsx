@@ -15,6 +15,7 @@ import {
   OVERHEAD_TEXT,
   UNITS,
 } from "../lib/content";
+import { isValidNumberInput } from "../lib/estimateLineValidation";
 import { EstimateLineRow, type EditableLine } from "./EstimateLineRow";
 
 let nextKey = 0;
@@ -36,17 +37,7 @@ function toEditableLine(line: EstimateLine): EditableLine {
   };
 }
 
-/**
- * 数字として読めるか（空欄・"abc" 等を弾く）。
- * ここで弾いた行を黙って集計・保存から外すと、利用者が気付かないまま
- * その行が消えるので、呼び出し側は必ず結果を画面に出す
- * （CodeRabbit の指摘：無言で消さない）。
- */
-function isValidNumberInput(value: string): boolean {
-  return value.trim() !== "" && Number.isFinite(Number(value));
-}
-
-/** isValidNumberInput で確かめた後にだけ呼ぶ。数値化できる前提で変換する。 */
+/** isValidNumberInput（lib/estimateLineValidation）で確かめた後にだけ呼ぶ。数値化できる前提で変換する。 */
 function parseEstimateLine(line: EditableLine): EstimateLine {
   return {
     kind: line.kind,
