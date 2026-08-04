@@ -58,15 +58,46 @@
   金額列は省略記号で詰めず、収まらなければ文字サイズを縮めて必ず全桁を表示する
   （`lib/pdf/layout.ts` の `drawNumericCell`。金額を黙って削らない設計）。
 
-**現在の状態**：typecheck・lint・test（111件全部緑。PDF関連8件を追加）・
-`pnpm -r build`・`pnpm audit`・`scripts/smoke.sh` をローカルで確認済み。
-実際に本番相当ビルド（`next build && next start`）を起動し、Playwright
-（スクラッチ実行）で「案件作成→見積エディタに複数行（値引き含む）入力→保存→
-PDFダウンロード→ダウンロードしたPDFの内容をpdf-libで読み直して検証、
-PyMuPDFで画像化して目視確認」まで実施し、金額・値引きの▲表記・税額・合計が
-すべて正しく反映されることを確認済み。未ログインでは案件詳細ページ自体が
-ログイン画面に飛ぶこと（≒PDFも出せないこと）も確認済み。まだ push・PR化は
-このメモの直後に行う。
+**確認済みの外部事実（PDF機能・PR #12）**：draft PR #12 として push 済み
+（commit `c25537f`）。CI run（typecheck/lint/test/build）：
+https://github.com/rahiseko-alt/renovation-estimate-app/actions/runs/30937470344
+（成功）。prod-smoke run：
+https://github.com/rahiseko-alt/renovation-estimate-app/actions/runs/30937464342
+（`prod 200 + marker` 成功）。
+
+**ローカルでの観測（外部事実の裏はまだ無い。上の commit `c25537f` 時点の話）**：
+typecheck・lint・test・`pnpm -r build`・`pnpm audit`・`scripts/smoke.sh` を
+ローカルで実行し、いずれも通った。本番相当ビルド（`next build && next start`）を
+起動し、Playwright（スクラッチ実行）で「案件作成→見積エディタに複数行
+（値引き含む）入力→保存→PDFダウンロード→ダウンロードしたPDFの内容を
+pdf-libで読み直して検証、PyMuPDFで画像化して目視確認」を行い、金額・値引きの
+▲表記・税額・合計が正しく反映されることと、未ログインでは案件詳細ページ自体が
+ログイン画面に飛ぶことを、この場では確認した。これらはローカル観測であり、
+CI run や公開URLでの裏は取れていない（別途 CI の結果自体が外部事実）。
+
+**PR #12 への CodeRabbit レビューで4件の指摘を受け、3件を修正・1件は
+検証のうえ反証してこのメモの直後に別 commit として push する：**
+
+1. **`EstimateLine.name`／`spec` に文字数上限が無く、`lib/pdf/layout.ts` の
+   `fitText`（1文字ずつ削って幅を測る実装）と組み合わせると、長大な文字列を
+   保存してPDF生成時にCPUを浪費させられる（CWE-400・Major）。** 修正：
+   `lib/calc.ts` に `MAX_TEXT_LENGTH`（200文字）を追加し `assertValidLine` で
+   検証。`fitText` 自体も二分探索に書き換え、幅の再計測回数を線形に抑えた。
+2. **見積の明細行数に上限が無く、`generateEstimatePdfAction` が全行を
+   無制限にPDF化してbase64にする（CWE-400・Major）。** 修正：
+   `lib/calc.ts` に `MAX_LINE_COUNT`（500行）を追加し `calcEstimate` で検証
+   （`saveEstimateAction` は `calcEstimate` を通すので保存時点で弾かれる）。
+3. `docs/handoff.md` のPDF機能の節が、CI run・commit の裏が無い自己申告の
+   ままだった指摘。この節がその修正版（上の「確認済みの外部事実」参照）。
+4. **反証した1件**：`apps/web/lib/pdf/assets/OFL.txt` が埋め込んでいる
+   BIZUDPGothicではなくBIZ UDMinchoのライセンスに見える、という指摘。
+   `diff <(curl 実際の Google Fonts 公式リポジトリの ofl/bizudpgothic/OFL.txt)
+   apps/web/lib/pdf/assets/OFL.txt` で差分が無いことを確認済み（`bizudgothic`
+   側のOFL.txtとも一致し、Morisawaの複数バリアントを1つの上流リポジトリで
+   まとめているための表記と判断）。PR上でCodeRabbitに根拠付きで返信済み。
+
+上記1・2の修正は typecheck・lint・test（120件全部緑。9件追加）を
+ローカルで確認済み。まだ push していない（このメモの直後に行う）。
 
 ## ②今回トラブル
 

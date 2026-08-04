@@ -31,8 +31,16 @@ export function ensureSpace(doc: PDFDocument, cursor: Cursor, height: number): v
   }
 }
 
-/** 幅に収まるまで末尾を削って「…」を付ける。工事項目・摘要など自由記述の列専用。
- * 金額の列には使わない（金額を黙って削ると額面が変わって見えるため）。 */
+/**
+ * 幅に収まるまで末尾を削って「…」を付ける。工事項目・摘要など自由記述の列専用。
+ * 金額の列には使わない（金額を黙って削ると額面が変わって見えるため）。
+ *
+ * 収まる最長の切り詰め位置を二分探索で求める（1文字ずつ削る実装は、
+ * 幅の再計測が文字数に対して線形回数になり、長い入力ほど遅くなる）。
+ * lib/calc.ts の assertValidText が保存前に文字数の上限を課しているため
+ * 実際の入力はここまで長くならないが、この関数自体は再利用される
+ * 汎用部品なので、上限の有無に依存しない実装にしている。
+ */
 export function fitText(
   font: PDFFont,
   text: string,
@@ -40,15 +48,21 @@ export function fitText(
   maxWidth: number,
 ): string {
   if (font.widthOfTextAtSize(text, size) <= maxWidth) return text;
+
   const ellipsis = "…";
-  let result = text;
-  while (
-    result.length > 0 &&
-    font.widthOfTextAtSize(result + ellipsis, size) > maxWidth
-  ) {
-    result = result.slice(0, -1);
+  let low = 0;
+  let high = text.length;
+  while (low < high) {
+    const mid = Math.ceil((low + high) / 2);
+    const candidate = text.slice(0, mid) + ellipsis;
+    if (font.widthOfTextAtSize(candidate, size) <= maxWidth) {
+      low = mid;
+    } else {
+      high = mid - 1;
+    }
   }
-  return result.length > 0 ? result + ellipsis : ellipsis;
+
+  return low > 0 ? text.slice(0, low) + ellipsis : ellipsis;
 }
 
 /** ページ全体を基準にした1行の文字列（タイトル・宛名など）。 */

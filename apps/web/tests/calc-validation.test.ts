@@ -63,6 +63,47 @@ describe("calcEstimate の入力検証", () => {
     ).toThrow(/税区分が不正です/);
   });
 
+  it("工事項目が長すぎると例外を投げる（PDF生成の文字幅計測に負荷をかけられるのを防ぐ）", () => {
+    expect(() =>
+      calcEstimate({
+        lines: [line({ name: "あ".repeat(201) })],
+        overheadRatePercent: 0,
+      }),
+    ).toThrow(/工事項目が長すぎます/);
+  });
+
+  it("摘要が長すぎると例外を投げる", () => {
+    expect(() =>
+      calcEstimate({
+        lines: [line({ spec: "あ".repeat(201) })],
+        overheadRatePercent: 0,
+      }),
+    ).toThrow(/摘要が長すぎます/);
+  });
+
+  it("上限ちょうどの文字数は通す", () => {
+    expect(() =>
+      calcEstimate({
+        lines: [line({ name: "あ".repeat(200), spec: "あ".repeat(200) })],
+        overheadRatePercent: 0,
+      }),
+    ).not.toThrow();
+  });
+
+  it("明細行数が多すぎると例外を投げる（無制限にPDFのページを作らせないため）", () => {
+    const lines = Array.from({ length: 501 }, () => line());
+    expect(() =>
+      calcEstimate({ lines, overheadRatePercent: 0 }),
+    ).toThrow(/明細の行数が多すぎます/);
+  });
+
+  it("上限ちょうどの行数は通す", () => {
+    const lines = Array.from({ length: 500 }, () => line());
+    expect(() =>
+      calcEstimate({ lines, overheadRatePercent: 0 }),
+    ).not.toThrow();
+  });
+
   it("知らない種別を黙って無視せず例外を投げる（行が合計から静かに消えるのを防ぐ）", () => {
     expect(() =>
       calcEstimate({
