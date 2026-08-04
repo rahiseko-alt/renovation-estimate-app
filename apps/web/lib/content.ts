@@ -44,6 +44,8 @@ export const NEW_PROJECT_TEXT = {
 /** 案件詳細画面の文言。 */
 export const PROJECT_DETAIL_TEXT = {
   estimateLink: "見積をつくる",
+  pdfLink: "見積書PDFを出力",
+  pdfGenerating: "作成中…",
 } as const;
 
 /** 見積エディタの文言。 */

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
+import { DownloadPdfButton } from "../../../components/DownloadPdfButton";
 import { getCurrentUser } from "../../../lib/auth/server";
 import { getProjectForOwner } from "../../../lib/db/projects";
 import { PROJECT_DETAIL_TEXT, PROJECTS_TEXT } from "../../../lib/content";
@@ -28,6 +29,8 @@ export default async function ProjectDetailPage({
       >
         {PROJECT_DETAIL_TEXT.estimateLink}
       </Link>
+
+      <DownloadPdfButton projectId={project.id} />
 
       <Link
         href="/projects"
