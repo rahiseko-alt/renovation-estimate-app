@@ -99,6 +99,9 @@ export function EstimateEditor({
     String(initialOverheadRatePercent),
   );
   const [saved, setSaved] = useState(false);
+  const [saveErrorMessage, setSaveErrorMessage] = useState<string | null>(
+    null,
+  );
   const [isSaving, startSaving] = useTransition();
 
   function updateLine(key: string, patch: Partial<EditableLine>): void {
@@ -123,13 +126,20 @@ export function EstimateEditor({
       .map(toEstimateLine)
       .filter((line): line is EstimateLine => line !== null);
     const rate = Number(overheadRatePercent);
+    setSaveErrorMessage(null);
     startSaving(async () => {
-      await saveEstimateAction(
-        projectId,
-        validLines,
-        Number.isFinite(rate) ? rate : 0,
-      );
-      setSaved(true);
+      try {
+        await saveEstimateAction(
+          projectId,
+          validLines,
+          Number.isFinite(rate) ? rate : 0,
+        );
+        setSaved(true);
+      } catch (error) {
+        setSaveErrorMessage(
+          error instanceof Error ? error.message : String(error),
+        );
+      }
     });
   }
 
@@ -214,11 +224,20 @@ export function EstimateEditor({
       <button
         type="button"
         onClick={handleSave}
-        disabled={isSaving}
+        disabled={isSaving || calcErrorMessage !== null}
         className="tap rounded bg-blue-800 px-6 py-4 text-lg font-bold text-white disabled:opacity-50"
       >
         {ESTIMATE_EDITOR_TEXT.save}
       </button>
+
+      {saveErrorMessage ? (
+        <p
+          role="alert"
+          className="rounded border-2 border-red-700 bg-red-50 px-4 py-3 text-red-900"
+        >
+          {saveErrorMessage}
+        </p>
+      ) : null}
 
       {saved ? (
         <p role="status" className="text-green-800">
