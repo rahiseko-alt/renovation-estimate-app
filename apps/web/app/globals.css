@@ -1,0 +1,7 @@
+@import "tailwindcss";
+
+/* 常に白ベース（OSのダークモード設定に関係なく）。制約1「白ベースのUI」を固定する。 */
+html {
+  background-color: #fff;
+  color-scheme: light;
+}
