@@ -3,22 +3,28 @@ name: prod-smoke
 # 本番到達の外部事実チェック。
 # 実行環境(サンドボックス)は *.vercel.app への外向きが遮断されるため、
 # プロキシ外の実機である GitHub Actions に本番URLを curl させて機械判定する。
-# この run が緑＝「公開URLが 200 かつ本文に '家計簿くん'」の evidence。
+# この run が緑＝「公開URLが 200 かつ本文に 'リフォーム見積'」の evidence。
+#
+# 現状：このアプリはまだ Vercel に接続していないため、検査する本番URLが存在しない。
+# 存在しないURLを push のたびに叩いても、分かるのは「まだ公開していない」ことだけなので、
+# 手動実行だけに絞っている。チェックを緩めたのではなく、対象がまだ無い。
+#
+# Vercel 接続後にやること（2つとも必要。片方だけだと意味が無い）:
+#   1. 下の PROD_URL を実際の割当ドメインに変える
+#   2. on: に push: branches: ["**"] を戻す
 on:
-  push:
-    branches: ["**"]
   workflow_dispatch:
 
 # 本番URL（Vercel production alias）。Vercel 接続後、実際の割当ドメインに合わせて更新する。
 env:
-  PROD_URL: "https://free-template-1-web.vercel.app"
+  PROD_URL: "https://example.invalid"
 
 jobs:
   reachable:
     name: prod 200 + marker
     runs-on: ubuntu-latest
     steps:
-      - name: curl production (200 かつ '家計簿くん')
+      - name: curl production (200 かつ 'リフォーム見積')
         run: |
           echo "Checking ${PROD_URL}"
           code=$(curl -sS -o body.html -w '%{http_code}' --max-time 30 "${PROD_URL}")
@@ -27,11 +33,11 @@ jobs:
             echo "FAIL: 期待 200 に対し ${code}"
             exit 1
           fi
-          if ! grep -q '家計簿くん' body.html; then
-            echo "FAIL: 本文にマーカー '家計簿くん' が無い"
+          if ! grep -q 'リフォーム見積' body.html; then
+            echo "FAIL: 本文にマーカー 'リフォーム見積' が無い"
             exit 1
           fi
-          echo "PROD OK: 200 かつ '家計簿くん' を ${PROD_URL} で確認"
+          echo "PROD OK: 200 かつ 'リフォーム見積' を ${PROD_URL} で確認"
 
       - name: HSTS ヘッダを確認
         run: |

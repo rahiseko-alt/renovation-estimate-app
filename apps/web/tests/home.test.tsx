@@ -1,16 +1,36 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import Home from "../app/page";
-import { HOME_HEADING } from "../lib/content";
+import { HomeScreen } from "../components/HomeScreen";
+import { AUTH_TEXT, HOME_HEADING, HOME_STEPS } from "../lib/content";
 
-// Home はクライアントコンポーネント。データは useEffect 内でブラウザの
-// localStorage から読むため、サーバー側の初回レンダリング（このテストが検証する範囲）
-// では見出しのみが出る。この見出しは CI スモーク（ci.yml / prod-smoke.yml）が
-// 到達性確認に使うマーカーでもある。
-describe("Home page (initial server render)", () => {
-  it("renders the heading before client data loads", () => {
-    const html = renderToStaticMarkup(<Home />);
+async function noop(): Promise<void> {}
+
+describe("HomeScreen", () => {
+  it("見出しを出す（CI スモークが本文で探すマーカー）", () => {
+    const html = renderToStaticMarkup(
+      <HomeScreen loggedIn={false} onLogout={noop} />,
+    );
     expect(html).toContain(HOME_HEADING);
+  });
+
+  it("未ログインなら作業の流れを見せず、ログインへ誘導する", () => {
+    const html = renderToStaticMarkup(
+      <HomeScreen loggedIn={false} onLogout={noop} />,
+    );
+    expect(html).toContain('href="/login"');
+    for (const step of HOME_STEPS) {
+      expect(html).not.toContain(step.label);
+    }
+  });
+
+  it("ログイン済みなら作業の流れとログアウトを出す", () => {
+    const html = renderToStaticMarkup(
+      <HomeScreen loggedIn onLogout={noop} />,
+    );
+    for (const step of HOME_STEPS) {
+      expect(html).toContain(step.label);
+    }
+    expect(html).toContain(AUTH_TEXT.logout);
   });
 });

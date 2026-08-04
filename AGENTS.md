@@ -25,12 +25,19 @@
 ## コマンド
 
 - 開発サーバ: `pnpm --filter web dev`（初回のみ `pnpm install`）
-- テスト（全件 / 1件だけ）: `pnpm --filter web test` / `pnpm --filter web test -- tests/format.test.ts`
+- テスト（全件 / 1件だけ）: `pnpm --filter web test` / `pnpm --filter web test -- tests/calc.test.ts`
 - lint / 型チェック: `pnpm --filter web lint` / `pnpm --filter web typecheck`
-- 必須の環境変数（名前だけ。値は書かない）: なし（`apps/web/.env.example` 参照）
+- 起動スモーク（受け入れ条件を HTTP で機械判定）: `bash scripts/smoke.sh`（先に `pnpm -r build`）
+- 必須の環境変数（名前だけ。値は書かない）: `AUTH_SECRET` / `DEMO_USER_EMAIL` / `DEMO_USER_PASSWORD`
+  （`apps/web/.env.example` 参照）
 - 共通の文言・値の置き場所: `apps/web/lib/content.ts`
+- 金額計算の置き場所: `apps/web/lib/calc.ts`（画面・PDF・API は必ずここを通す）
 
 補足（CI が回すもの）: ビルドは `pnpm -r build`、依存監査は `pnpm audit --audit-level moderate`。
+
+注意（値が結合している箇所）: トップページの見出し `HOME_HEADING` は、CI の起動スモークが
+本文から探すマーカーでもある。`apps/web/lib/content.ts` と `scripts/smoke.sh` の `MARKER`、
+`.github/workflows/prod-smoke.yml` の3箇所を同時に直す。
 
 ## 実装の進め方
 

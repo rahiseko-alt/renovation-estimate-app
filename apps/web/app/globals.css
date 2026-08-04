@@ -1,7 +1,61 @@
 @import "tailwindcss";
 
-/* 常に白ベース（OSのダークモード設定に関係なく）。制約1「白ベースのUI」を固定する。 */
+/*
+ * UX の土台。調査で根拠のある数値だけをここに置き、画面ごとに書き直さない
+ * （AGENTS.md「結合を増やさない」1：同じ値を2箇所以上に書かない）。
+ *
+ * - 本文 16px 以上。入力欄が 16px 未満だと iOS Safari が勝手にズームする
+ * - line-height 1.5 以上（WCAG 1.4.12）
+ * - タップ対象 48px 以上（Material Design / WCAG 2.5.5 AAA）
+ * - フォントは UD 系を優先。可読性の実測エビデンスがあるのは UD フォント
+ */
+
+@theme {
+  --font-sans:
+    "BIZ UDPGothic", "Hiragino Sans", "Noto Sans JP", "Yu Gothic UI", "Meiryo",
+    system-ui, sans-serif;
+
+  /* 押せるものの最小サイズ。 */
+  --spacing-tap: 48px;
+}
+
+/* 常に白ベース（OSのダークモード設定に関係なく）。 */
 html {
   background-color: #fff;
   color-scheme: light;
+  /* ブラウザの既定 16px を基準にする。px 直書きで縮めない */
+  font-size: 100%;
+}
+
+body {
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+/* 金額と数量は等幅数字で右寄せにする。桁がずれると比較できない */
+.tabular {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+button,
+[role="button"],
+a.tap,
+label.tap {
+  min-height: var(--spacing-tap);
+}
+
+input,
+select,
+textarea {
+  /* 16px 未満にすると iOS Safari が自動ズームする。ここを下回らせない */
+  font-size: 1rem;
+  min-height: var(--spacing-tap);
+}
+
+/* キーボード操作でどこにいるか必ず分かるようにする */
+:focus-visible {
+  outline: 3px solid #1d4ed8;
+  outline-offset: 2px;
 }
