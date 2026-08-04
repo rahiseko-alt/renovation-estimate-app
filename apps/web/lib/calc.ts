@@ -89,27 +89,44 @@ const TAX_CATEGORY_ORDER: readonly TaxCategory[] = [
 ];
 
 /**
+ * 浮動小数点の表現誤差だけを飲み込むための許容幅（ULP＝最小単位の個数）。
+ *
+ * 例えば 1.4 * 1400 は真値 1960 のはずが JS では 1959.9999999999998 になる。
+ * この手のノイズは真値から 1 ULP（Number.EPSILON × 値の大きさ）程度しか
+ * 離れない。8 ULP という余裕を持たせても、本物の小数の端数
+ * （例えば 1.9999996 円のように、実際にその値である場合）は 1 の位から見て
+ * 桁違いに離れているので誤って動かさない。固定の桁数で丸める方式
+ * （1/1,000,000 円で丸める等）だと、本物の細かい端数まで動かしてしまう
+ * ことが指摘されたため、値の大きさに比例する許容幅に直した。
+ */
+const FLOAT_NOISE_TOLERANCE_ULPS = 8;
+
+/**
+ * 浮動小数点の掛け算が生んだノイズで、値がすぐ隣の整数から
+ * 許容幅の範囲内にずれているだけなら、その整数に寄せる。
+ * 本物の端数（許容幅より大きく離れている）はそのまま返す。
+ */
+function snapToIntegerIfFloatNoise(value: number): number {
+  const nearestInteger = Math.round(value);
+  const tolerance =
+    FLOAT_NOISE_TOLERANCE_ULPS *
+    Number.EPSILON *
+    Math.max(Math.abs(value), 1);
+  return Math.abs(value - nearestInteger) <= tolerance
+    ? nearestInteger
+    : value;
+}
+
+/**
  * 円未満を切り捨てる。負の値は絶対値で切り捨てる（0 方向）。
  * 値引き行で -1.5 を -2 にしてしまうと値引き額が勝手に増えるため、
  * Math.floor ではなく Math.trunc を使う。
  */
-/**
- * 掛け算の結果に含まれる浮動小数点の表現誤差を吸収する幅。
- * 例えば 1.4 * 1400 は真値 1960 のはずが JS では 1959.9999999999998 になり、
- * そのまま切り捨てると 1959 円（1円少ない）になる。逆に真値より大きく出る
- * 誤差（1.1 * 1000 = 1100.0000000000002）もある。どちらの向きの誤差も、
- * 円単位より遥かに細かい 1/1,000,000 円の精度で丸めてから切り捨てれば消える。
- * 見積の金額桁（円〜千万円程度）でこの丸めが本物の端数を壊すことはない。
- */
-const FLOAT_ERROR_MARGIN = 1_000_000;
-
 function yen(value: number): number {
   if (!Number.isFinite(value)) {
     throw new RangeError(`金額が数値になりません: ${value}`);
   }
-  const roundedToMicroYen =
-    Math.round(value * FLOAT_ERROR_MARGIN) / FLOAT_ERROR_MARGIN;
-  return Math.trunc(roundedToMicroYen);
+  return Math.trunc(snapToIntegerIfFloatNoise(value));
 }
 
 function assertFiniteNumber(value: number, label: string): void {

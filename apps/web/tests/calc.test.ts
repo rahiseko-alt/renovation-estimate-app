@@ -47,6 +47,12 @@ describe("lineAmount", () => {
     expect(lineAmount(line({ quantity: 0.29, unitPrice: 100 }))).toBe(29);
   });
 
+  it("本物の小数の端数は、浮動小数点ノイズと間違えて動かさない", () => {
+    // 1.9999996 は浮動小数点のノイズではなく、本当にその値の数量。
+    // 2に近いからといって2円に切り上げてはいけない（真の値は1円未満）。
+    expect(lineAmount(line({ quantity: 1.9999996, unitPrice: 1 }))).toBe(1);
+  });
+
   it("負の金額は0方向に切り捨てる（値引き額を勝手に増やさない）", () => {
     expect(
       lineAmount(line({ kind: "discount", quantity: 0.5, unitPrice: -333 })),
