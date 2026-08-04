@@ -23,12 +23,26 @@ const TAX_CATEGORIES = Object.keys(TAX_CATEGORY_LABELS) as TaxCategory[];
 
 type Props = {
   line: EditableLine;
+  /** 数量が数字として読めないとき true（保存から静かに消さず、その場で知らせるため）。 */
+  quantityInvalid: boolean;
+  /** 単価が数字として読めないとき true。 */
+  unitPriceInvalid: boolean;
   onChange: (patch: Partial<EditableLine>) => void;
   onRemove: () => void;
 };
 
+const NUMBER_FIELD_BASE = "tabular rounded border-2 px-3 py-3";
+const NUMBER_FIELD_VALID = `${NUMBER_FIELD_BASE} border-gray-500`;
+const NUMBER_FIELD_INVALID = `${NUMBER_FIELD_BASE} border-red-700 bg-red-50`;
+
 /** 見積エディタの明細1行。入力の見た目だけを持ち、状態は親（EstimateEditor）が持つ。 */
-export function EstimateLineRow({ line, onChange, onRemove }: Props) {
+export function EstimateLineRow({
+  line,
+  quantityInvalid,
+  unitPriceInvalid,
+  onChange,
+  onRemove,
+}: Props) {
   return (
     <li className="flex flex-col gap-3 rounded border-2 border-gray-400 p-4">
       <div className="flex flex-col gap-2">
@@ -76,8 +90,16 @@ export function EstimateLineRow({ line, onChange, onRemove }: Props) {
             inputMode="decimal"
             value={line.quantity}
             onChange={(e) => onChange({ quantity: e.target.value })}
-            className="tabular rounded border-2 border-gray-500 px-3 py-3"
+            aria-invalid={quantityInvalid}
+            className={
+              quantityInvalid ? NUMBER_FIELD_INVALID : NUMBER_FIELD_VALID
+            }
           />
+          {quantityInvalid ? (
+            <p role="alert" className="text-sm text-red-900">
+              {ESTIMATE_EDITOR_TEXT.invalidNumberField}
+            </p>
+          ) : null}
         </div>
 
         <div className="flex flex-col gap-2">
@@ -104,8 +126,16 @@ export function EstimateLineRow({ line, onChange, onRemove }: Props) {
             inputMode="decimal"
             value={line.unitPrice}
             onChange={(e) => onChange({ unitPrice: e.target.value })}
-            className="tabular rounded border-2 border-gray-500 px-3 py-3"
+            aria-invalid={unitPriceInvalid}
+            className={
+              unitPriceInvalid ? NUMBER_FIELD_INVALID : NUMBER_FIELD_VALID
+            }
           />
+          {unitPriceInvalid ? (
+            <p role="alert" className="text-sm text-red-900">
+              {ESTIMATE_EDITOR_TEXT.invalidNumberField}
+            </p>
+          ) : null}
         </div>
       </div>
 

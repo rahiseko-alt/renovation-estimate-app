@@ -36,18 +36,25 @@ function toEditableLine(line: EstimateLine): EditableLine {
   };
 }
 
-/** 数値に変換できない行（入力途中の空欄など）は集計・保存の対象から外す。 */
-function toEstimateLine(line: EditableLine): EstimateLine | null {
-  const quantity = Number(line.quantity);
-  const unitPrice = Number(line.unitPrice);
-  if (!Number.isFinite(quantity) || !Number.isFinite(unitPrice)) return null;
+/**
+ * 数字として読めるか（空欄・"abc" 等を弾く）。
+ * ここで弾いた行を黙って集計・保存から外すと、利用者が気付かないまま
+ * その行が消えるので、呼び出し側は必ず結果を画面に出す
+ * （CodeRabbit の指摘：無言で消さない）。
+ */
+function isValidNumberInput(value: string): boolean {
+  return value.trim() !== "" && Number.isFinite(Number(value));
+}
+
+/** isValidNumberInput で確かめた後にだけ呼ぶ。数値化できる前提で変換する。 */
+function parseEstimateLine(line: EditableLine): EstimateLine {
   return {
     kind: line.kind,
     name: line.name,
     spec: line.spec,
-    quantity,
+    quantity: Number(line.quantity),
     unit: line.unit,
-    unitPrice,
+    unitPrice: Number(line.unitPrice),
     taxCategory: line.taxCategory,
   };
 }
@@ -121,19 +128,28 @@ export function EstimateEditor({
     setLines((prev) => [...prev, emptyLine()]);
   }
 
+  const invalidQuantityKeys = new Set(
+    lines.filter((line) => !isValidNumberInput(line.quantity)).map((l) => l.key),
+  );
+  const invalidUnitPriceKeys = new Set(
+    lines
+      .filter((line) => !isValidNumberInput(line.unitPrice))
+      .map((l) => l.key),
+  );
+  const overheadRateValid = isValidNumberInput(overheadRatePercent);
+  const hasInputError =
+    invalidQuantityKeys.size > 0 ||
+    invalidUnitPriceKeys.size > 0 ||
+    !overheadRateValid;
+
   function handleSave(): void {
-    const validLines = lines
-      .map(toEstimateLine)
-      .filter((line): line is EstimateLine => line !== null);
+    if (hasInputError) return; // 保存ボタンは無効化済みだが、念のため二重に止める
+    const validLines = lines.map(parseEstimateLine);
     const rate = Number(overheadRatePercent);
     setSaveErrorMessage(null);
     startSaving(async () => {
       try {
-        await saveEstimateAction(
-          projectId,
-          validLines,
-          Number.isFinite(rate) ? rate : 0,
-        );
+        await saveEstimateAction(projectId, validLines, rate);
         setSaved(true);
       } catch (error) {
         setSaveErrorMessage(
@@ -143,21 +159,20 @@ export function EstimateEditor({
     });
   }
 
-  const overheadRateNumber = Number(overheadRatePercent);
-  let totals = null;
+  let totals: EstimateTotals | null = null;
   let calcErrorMessage: string | null = null;
-  try {
-    const validLines = lines
-      .map(toEstimateLine)
-      .filter((line): line is EstimateLine => line !== null);
-    totals = calcEstimate({
-      lines: validLines,
-      overheadRatePercent: Number.isFinite(overheadRateNumber)
-        ? overheadRateNumber
-        : 0,
-    });
-  } catch (error) {
-    calcErrorMessage = error instanceof Error ? error.message : String(error);
+  if (hasInputError) {
+    calcErrorMessage = ESTIMATE_EDITOR_TEXT.invalidNumberSummary;
+  } else {
+    try {
+      totals = calcEstimate({
+        lines: lines.map(parseEstimateLine),
+        overheadRatePercent: Number(overheadRatePercent),
+      });
+    } catch (error) {
+      calcErrorMessage =
+        error instanceof Error ? error.message : String(error);
+    }
   }
 
   return (
@@ -167,6 +182,8 @@ export function EstimateEditor({
           <EstimateLineRow
             key={line.key}
             line={line}
+            quantityInvalid={invalidQuantityKeys.has(line.key)}
+            unitPriceInvalid={invalidUnitPriceKeys.has(line.key)}
             onChange={(patch) => updateLine(line.key, patch)}
             onRemove={() => removeLine(line.key)}
           />
@@ -194,8 +211,18 @@ export function EstimateEditor({
             setSaved(false);
             setOverheadRatePercent(e.target.value);
           }}
-          className="tabular mt-2 w-full rounded border-2 border-gray-500 px-4 py-3"
+          aria-invalid={!overheadRateValid}
+          className={`tabular mt-2 w-full rounded border-2 px-4 py-3 ${
+            overheadRateValid
+              ? "border-gray-500"
+              : "border-red-700 bg-red-50"
+          }`}
         />
+        {overheadRateValid ? null : (
+          <p role="alert" className="mt-2 text-sm text-red-900">
+            {ESTIMATE_EDITOR_TEXT.invalidNumberField}
+          </p>
+        )}
         <p className="mt-2 text-sm text-gray-700">
           {OVERHEAD_TEXT.noDefaultNote}
         </p>

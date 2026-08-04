@@ -56,6 +56,11 @@ export const ESTIMATE_EDITOR_TEXT = {
   kindItem: "工事",
   kindDiscount: "値引き",
   overheadRateLabel: "諸経費率（%）",
+  /** 数量・単価・諸経費率の1マスに出す短い注意（フィールド直下）。 */
+  invalidNumberField: "数字を入力してください。",
+  /** 保存できない理由として合計欄の位置に出す説明。 */
+  invalidNumberSummary:
+    "数字になっていない入力があります。数量・単価・諸経費率を確認してください。",
 } as const;
 
 /** ログイン画面の文言。 */
