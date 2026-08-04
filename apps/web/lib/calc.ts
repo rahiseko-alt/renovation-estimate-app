@@ -162,6 +162,30 @@ function assertSafeAmount(value: number, label: string): void {
 }
 
 /**
+ * BigInt で積み上げた金額を、安全整数の範囲を確かめてから number に変換する。
+ *
+ * number の `+=` で複数行を積み上げると、行数が多いときに「期中の部分和が
+ * Number.MAX_SAFE_INTEGER を超えてから、後続の減算で範囲内に戻る」場合が
+ * ありうる。この瞬間に浮動小数点の精度が失われ、最終値だけ
+ * Number.isSafeInteger で確かめても「安全に見えるが実は違う整数」を
+ * 見逃す（最終値が範囲内に収まっているため）。BigInt は多倍長の整数演算
+ * なので、この種の中間オーバーフローが原理的に起きない。積み上げが終わった
+ * 後、number へ変換する直前に一度だけ範囲を確かめることで、変換自体が
+ * 別の整数を返すことも防ぐ。
+ */
+function bigIntToSafeAmount(value: bigint, label: string): number {
+  if (
+    value < BigInt(Number.MIN_SAFE_INTEGER) ||
+    value > BigInt(Number.MAX_SAFE_INTEGER)
+  ) {
+    throw new RangeError(
+      `${label}が扱える範囲を超えました: ${value}。入力を見直してください。`,
+    );
+  }
+  return Number(value);
+}
+
+/**
  * 数量として扱う最大の大きさ。exactMultiplyTrunc が数量を固定精度の整数
  * （quantity × QUANTITY_SCALE）に変換する処理が、浮動小数点の精度内で
  * 正確に行える前提にしている。㎡・m・人工といった実務の数量がこの上限を
@@ -250,9 +274,12 @@ export function lineAmount(line: EstimateLine): number {
   return amount;
 }
 
-/** 税区分ごとに対価の額を積む入れ物を作る。 */
-function emptyTaxableMap(): Record<TaxCategory, number> {
-  return { standard: 0, reduced: 0, exempt: 0 };
+/**
+ * 税区分ごとに対価の額を積む入れ物を作る。
+ * 複数行にまたがって積み上げるので BigInt で持つ（bigIntToSafeAmount 参照）。
+ */
+function emptyTaxableMap(): Record<TaxCategory, bigint> {
+  return { standard: 0n, reduced: 0n, exempt: 0n };
 }
 
 /**
@@ -286,15 +313,18 @@ export function calcEstimate(input: EstimateInput): EstimateTotals {
   const taxable = emptyTaxableMap();
 
   // 1. 直接工事費 小計
-  let directCostSubtotal = 0;
+  // ループの途中は BigInt のまま積み上げる（理由は bigIntToSafeAmount 参照）。
+  let directCostSubtotalRaw = 0n;
   for (const line of input.lines) {
     if (line.kind !== "item") continue;
     const amount = lineAmount(line);
-    directCostSubtotal += amount;
-    taxable[line.taxCategory] += amount;
+    directCostSubtotalRaw += BigInt(amount);
+    taxable[line.taxCategory] += BigInt(amount);
   }
-  // 行ごとの金額は安全整数でも、何行も積み上げた小計はその保証が無い。
-  assertSafeAmount(directCostSubtotal, "直接工事費 小計");
+  const directCostSubtotal = bigIntToSafeAmount(
+    directCostSubtotalRaw,
+    "直接工事費 小計",
+  );
 
   // 2. 諸経費（直接工事費 小計に対する率）
   const overheadAmount = exactPercentTrunc(
@@ -303,20 +333,20 @@ export function calcEstimate(input: EstimateInput): EstimateTotals {
     OVERHEAD_RATE_SCALE,
   );
   assertSafeAmount(overheadAmount, "諸経費");
-  taxable[overheadTaxCategory] += overheadAmount;
+  taxable[overheadTaxCategory] += BigInt(overheadAmount);
 
   const subtotalBeforeDiscount = directCostSubtotal + overheadAmount;
   assertSafeAmount(subtotalBeforeDiscount, "値引き前の小計");
 
   // 3. 値引き（税抜きの段階で引く）
-  let discountAmount = 0;
+  let discountAmountRaw = 0n;
   for (const line of input.lines) {
     if (line.kind !== "discount") continue;
     const amount = lineAmount(line);
-    discountAmount += amount;
-    taxable[line.taxCategory] += amount;
+    discountAmountRaw += BigInt(amount);
+    taxable[line.taxCategory] += BigInt(amount);
   }
-  assertSafeAmount(discountAmount, "値引き合計");
+  const discountAmount = bigIntToSafeAmount(discountAmountRaw, "値引き合計");
 
   // 4. 工事価格（税抜き）
   const netAmount = subtotalBeforeDiscount + discountAmount;
@@ -324,18 +354,21 @@ export function calcEstimate(input: EstimateInput): EstimateTotals {
 
   // 5. 取引に係る消費税等（税区分ごとに1回だけ端数処理）
   const taxBreakdown: TaxBreakdown[] = [];
-  let taxAmount = 0;
+  let taxAmountRaw = 0n;
   for (const category of TAX_CATEGORY_ORDER) {
-    const taxableAmount = taxable[category];
-    if (taxableAmount === 0) continue;
-    assertSafeAmount(taxableAmount, `${category}税率の対価の額`);
+    const taxableAmountRaw = taxable[category];
+    if (taxableAmountRaw === 0n) continue;
+    const taxableAmount = bigIntToSafeAmount(
+      taxableAmountRaw,
+      `${category}税率の対価の額`,
+    );
     const rate = TAX_RATES[category];
     const categoryTax = exactMultiplyTrunc(taxableAmount, rate, TAX_RATE_SCALE);
     assertSafeAmount(categoryTax, `${category}税率の消費税額`);
     taxBreakdown.push({ category, rate, taxableAmount, taxAmount: categoryTax });
-    taxAmount += categoryTax;
+    taxAmountRaw += BigInt(categoryTax);
   }
-  assertSafeAmount(taxAmount, "取引に係る消費税等");
+  const taxAmount = bigIntToSafeAmount(taxAmountRaw, "取引に係る消費税等");
 
   // 6. 合計（税込）
   const grandTotal = netAmount + taxAmount;

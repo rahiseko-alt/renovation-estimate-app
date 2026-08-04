@@ -190,4 +190,31 @@ describe("安全整数の範囲を超える金額を弾く", () => {
       }),
     ).toThrow(/諸経費率が大きすぎます/);
   });
+
+  it("積み上げの途中で安全整数を超えても、後で戻れば最終値は正確（中間オーバーフローの回帰）", () => {
+    // node -e で検証済み: number の += で同じ額を11回足してから10回引くと、
+    // 期中の部分和が Number.MAX_SAFE_INTEGER を超えた瞬間に浮動小数点の
+    // 精度が失われ、最終値は Number.isSafeInteger を通過するにもかかわらず
+    // 真値より2円少ない別の整数になる（998138113783385、真値は…387）。
+    // directCostSubtotal を BigInt で積み上げていれば、この壊れ方自体が
+    // 起きない。item は負の金額を許すので（支給材控除）、減算側もこの
+    // 種別のまま表現できる。
+    const quantity = 999_137;
+    const unitPrice = 999_000_251;
+    const trueAmount = 998_138_113_783_387;
+
+    const positiveLines = Array.from({ length: 11 }, () =>
+      line({ quantity, unitPrice }),
+    );
+    const negativeLines = Array.from({ length: 10 }, () =>
+      line({ name: "支給材控除", quantity, unitPrice: -unitPrice }),
+    );
+
+    const totals = calcEstimate({
+      lines: [...positiveLines, ...negativeLines],
+      overheadRatePercent: 0,
+    });
+
+    expect(totals.directCostSubtotal).toBe(trueAmount);
+  });
 });
