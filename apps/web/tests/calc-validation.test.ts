@@ -15,6 +15,12 @@ function line(partial: Partial<EstimateLine> = {}): EstimateLine {
   };
 }
 
+// item の控除と discount の比較で条件を揃えるための共有値
+// （AGENTS.md「結合を増やさない」1：同じ値を2箇所以上に書かない）。
+const COMPARISON_BASE_UNIT_PRICE = 100000;
+const COMPARISON_DEDUCTION_UNIT_PRICE = -20000;
+const COMPARISON_OVERHEAD_RATE_PERCENT = 10;
+
 describe("calcEstimate の入力検証", () => {
   it("単価が整数でなければ例外を投げる", () => {
     expect(() =>
@@ -94,10 +100,15 @@ describe("calcEstimate の入力検証", () => {
   it("item の負の金額は許す（支給材の控除など、直接工事費そのものが減る場合）", () => {
     const totals = calcEstimate({
       lines: [
-        line({ quantity: 1, unitPrice: 100000 }),
-        line({ name: "支給材控除", quantity: 1, unit: "式", unitPrice: -20000 }),
+        line({ quantity: 1, unitPrice: COMPARISON_BASE_UNIT_PRICE }),
+        line({
+          name: "支給材控除",
+          quantity: 1,
+          unit: "式",
+          unitPrice: COMPARISON_DEDUCTION_UNIT_PRICE,
+        }),
       ],
-      overheadRatePercent: 10,
+      overheadRatePercent: COMPARISON_OVERHEAD_RATE_PERCENT,
     });
 
     // 直接工事費が減るので、諸経費の算定基礎も一緒に減る（値引き行との違い）
@@ -109,17 +120,22 @@ describe("calcEstimate の入力検証", () => {
   it("同じ額でも item の控除と discount では諸経費が変わる", () => {
     const asItem = calcEstimate({
       lines: [
-        line({ quantity: 1, unitPrice: 100000 }),
-        line({ quantity: 1, unit: "式", unitPrice: -20000 }),
+        line({ quantity: 1, unitPrice: COMPARISON_BASE_UNIT_PRICE }),
+        line({ quantity: 1, unit: "式", unitPrice: COMPARISON_DEDUCTION_UNIT_PRICE }),
       ],
-      overheadRatePercent: 10,
+      overheadRatePercent: COMPARISON_OVERHEAD_RATE_PERCENT,
     });
     const asDiscount = calcEstimate({
       lines: [
-        line({ quantity: 1, unitPrice: 100000 }),
-        line({ kind: "discount", quantity: 1, unit: "式", unitPrice: -20000 }),
+        line({ quantity: 1, unitPrice: COMPARISON_BASE_UNIT_PRICE }),
+        line({
+          kind: "discount",
+          quantity: 1,
+          unit: "式",
+          unitPrice: COMPARISON_DEDUCTION_UNIT_PRICE,
+        }),
       ],
-      overheadRatePercent: 10,
+      overheadRatePercent: COMPARISON_OVERHEAD_RATE_PERCENT,
     });
 
     expect(asItem.overheadAmount).toBe(8000);
