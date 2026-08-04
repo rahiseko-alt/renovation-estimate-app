@@ -29,6 +29,33 @@ export const PROJECTS_TEXT = {
   heading: "案件",
   empty: "案件はまだありません。",
   back: "もどる",
+  newProject: "新しい案件",
+} as const;
+
+/** 案件を新規登録する画面の文言。 */
+export const NEW_PROJECT_TEXT = {
+  heading: "新しい案件",
+  customerNameLabel: "施主名",
+  siteAddressLabel: "現場住所",
+  submit: "登録する",
+  failed: "施主名と現場住所の両方を入力してください。",
+} as const;
+
+/** 案件詳細画面の文言。 */
+export const PROJECT_DETAIL_TEXT = {
+  estimateLink: "見積をつくる",
+} as const;
+
+/** 見積エディタの文言。 */
+export const ESTIMATE_EDITOR_TEXT = {
+  heading: "見積",
+  addLine: "明細を追加",
+  deleteLine: "削除",
+  save: "保存する",
+  saved: "保存しました。",
+  kindItem: "工事",
+  kindDiscount: "値引き",
+  overheadRateLabel: "諸経費率（%）",
 } as const;
 
 /** ログイン画面の文言。 */
