@@ -5,83 +5,75 @@
 
 ## ①今回実施
 
-**フェーズ1（見積が作れてPDFが出る）が完了した。**
+**フェーズ2（写真）着手前のブロッカーだった Supabase 実DB移行が完了した。**
 
 **確認済みの外部事実（このメモの自己申告ではなく、CI run・commit・公開URLで裏が取れているもの）：**
 
-- PR #7 が commit `6f0cbab` として `main` にマージ済み（フェーズ0＋案件登録・見積エディタ）。
-- PR #9 が commit `2111094` として `main` にマージ済み（`prod-smoke.yml` を実URLに接続）。
-- PR #10 が commit `bc4d84c` として `main` にマージ済み（単価マスタ）。
-- PR #11 が commit `c875b24` として `main` にマージ済み（PR #10 の CodeRabbit 指摘4件の修正）。
-- **PR #12 が commit `2808031` として `main` にマージ済み（見積書PDF出力。フェーズ1完了）。**
-  CI run: https://github.com/rahiseko-alt/renovation-estimate-app/actions/runs/30938608457
-  （typecheck/lint/test/build 成功）。prod-smoke run:
-  https://github.com/rahiseko-alt/renovation-estimate-app/actions/runs/30938599501
-  （`prod 200 + marker` 成功＝本番URLへの反映を確認）。
+- **PR #16 が commit `0cac300` として `main` にマージ済み（`lib/db/` の3ファイル
+  ＝案件・見積・単価マスタを、仮のメモリ実装から Supabase（PostgreSQL）に差し替え）。**
+  CI run（PR側の最終コミット `8dbd4d2`）：
+  https://github.com/rahiseko-alt/renovation-estimate-app/actions/runs/30970951774
+  （`typecheck / lint / test / build`・起動スモーク・CodeQL すべて success）。
+  auto-merge run: https://github.com/rahiseko-alt/renovation-estimate-app/actions/runs/30971747913
+  （CI全緑・CodeRabbitレビュークリーンを検知して自動 squash マージ）。
+- **本番URLへの反映も外部事実で確認済み。** `prod-smoke.yml` は `on: push` トリガーだが、
+  `auto-merge` のマージ push は `GITHUB_TOKEN` によるものでワークフロー連鎖が起きず
+  自動起動しなかった（詳細は `docs/failures.md` 2026-08-05 参照）。そのため
+  `workflow_dispatch` で main に対して手動起動し、確認した：
+  https://github.com/rahiseko-alt/renovation-estimate-app/actions/runs/30972518026
+  （head_sha が merge commit `0cac300` と一致・`prod 200 + marker` success）。
 
-**本番で動作確認済み（2026-08-04・利用者が実機で実施）：**
+**PR #16 の実装内容の要点**（詳細はコミット履歴・PRの説明を参照）：
 
-- Vercel の環境変数（`AUTH_SECRET` / `DEMO_USER_EMAIL` / `DEMO_USER_PASSWORD`）を
-  利用者が設定し、再デプロイ済み。
-- **本番URLで「ログイン → 案件登録 → 見積入力・保存 → PDF出力」の通しの操作が
-  成功することを利用者が実機で確認した。** フェーズ1の受け入れ条件はこれで満たされ、
-  顧客に触ってもらえる状態になった。
-- こちら側での裏付け：偽の署名を持つセッションCookieを本番に送っても 500 にならず
-  307 でログイン画面へ戻ることを確認（`AUTH_SECRET` が有効な値で機能している証拠。
-  未設定・32文字未満なら `lib/auth/session.ts` が例外を投げて 500 になる）。
+- `lib/db/projects.ts` / `estimates.ts` / `priceMaster.ts` の関数シグネチャ・挙動
+  （所有者による絞り込み、IDOR対策の null/false、存在しないIDや形の違うIDの扱い）は
+  変更なし。呼び出し側（画面・Server Action）も無変更。
+- テーブル定義は `supabase/migrations/`。RLS は有効化した上でポリシーは1つも作らない
+  （anon/authenticated からは何も見えない）。サーバーは service_role キーで接続し、
+  所有者による絞り込みは今まで通り `lib/db/` 側の WHERE 条件で行う。
+- `lib/db/estimates.ts` の `getOrCreateEstimate` は、同じ案件を2つのタブで同時に開くような
+  一意制約違反の競合が起きたら作り直さず取りに行き直す。
+- 既存の `tests/db.test.ts` を、モックにせずローカル Supabase（Docker）に対して実際に
+  クエリを出して検証する形に変更。Supabase CLI をルートの devDependency に追加し、
+  ローカル/CI とも `pnpm exec supabase start` で起動する。CI は毎回まっさらな
+  ランナー上で起動するため常にまっさらだが、**ローカルは `supabase start` だけでは
+  前回のデータが Docker ボリュームに残る**（`supabase db reset` 等を別途叩かない限り
+  リセットされない）。接続情報はコードのどこにも決め打ちで書かず、CLI の
+  `supabase status -o env` から都度取得する。
+- CodeRabbit の指摘4件（`.env.example` のキー順序、`client.ts` への `server-only`
+  import 追加、`ci.yml` の `supabase status` 取得を fail-fast 化、`scripts/smoke.sh` の
+  環境変数 export を必要な2つだけに絞る）はコミット `8dbd4d2` で対応済み。
+  再レビューは「No actionable comments were generated」。
 
-**未確認のまま：**
+**これで解消したもの：**
 
-- Supabase 側のスキーマ移行（まだ未着手。下記「ブロッカー」参照）。
-  現状の `lib/db/` は仮のメモリ実装のため、**再デプロイやサーバー再起動で
-  登録したデータは消える**。デモとして触る分には動くが、その性質は把握しておく。
-
-**PR #12（見積書PDF出力）の実装内容の要点**（詳細はコミット履歴・PRの説明を参照）：
-
-- pdfme ではなく `@cantoo/pdf-lib`（pdf-libのフォーク）+ 本家 `fontkit` を採用。
-  理由・調査過程は `docs/failures.md` 2026-08-04 の2件を参照。
-- フォントは BIZ UDPGothic（OFLライセンス。`apps/web/lib/pdf/assets/OFL.txt`）。
-- Route Handler ではなく Server Action（`app/projects/[id]/pdf-actions.ts`）で実装。
-  理由は `docs/failures.md` 参照（仮メモリDBがモジュールグラフをまたいで共有されない）。
-- CodeRabbit のレビューで CWE-400（DoS）2件の指摘を受け、その場で修正：
-  工事項目・摘要に文字数上限（`MAX_TEXT_LENGTH` 200文字）、明細行数に上限
-  （`MAX_LINE_COUNT` 500行）を `lib/calc.ts` に追加。PDFの `fitText` も
-  二分探索に書き換えた。フォントライセンス表記への指摘は診た上で反証し
-  （Google Fonts公式リポジトリとSHA-256一致を確認）、CodeRabbit側が撤回した。
-
-**ルールを2つ改訂した（AGENTS.md。恒久的なので引継ぎではなくそちらに書いた）：**
-
-- 秘密情報の扱いを「保存先の列挙」から「**エージェントが実値を生成・表示・受領しない**」
-  という経路非依存の書き方に変更（公開前提1）。露出時の切り分け基準も
-  「その値が既に運用に入っているか」の一点に固定した。
-- **PR はフェーズにつき1つ**、および **squash マージ後はブランチを作り直してから
-  次の変更に着手する**を明文化（実装の進め方）。
+- 仮メモリ実装によるデータ揮発（再デプロイ・サーバー再起動で消えていた問題）。
+- Route Handler が使えない制約（旧実装のメモリDBがモジュールグラフをまたいで
+  共有されない問題。詳細は `docs/failures.md` 2026-08-04）。
 
 ## ②今回トラブル
 
-`docs/failures.md` に2026-08-04付けで3件追記済み（内容はそちらを見る）。見出しだけ：
+`docs/failures.md` に2026-08-05付けで1件追記済み。見出しだけ：
 
-1. pdf-lib + @pdf-lib/fontkit の日本語サブセット化バグ（文字が無言で欠落する）
-2. Route Handler と Server Action/ページで仮メモリDBのインスタンスが共有されない
-3. 署名鍵の実値をエージェントが生成してチャットに表示した（＋その報告を、
-   過小評価と過大評価の両方向に歪めた）
-
-3件目に付随して、利用者に環境変数の設定を何度もやり直させる形になった。
-**急ぎでない作業を持ち出したうえ、エラーのたびに追加の手順を投げ返したのが原因。**
-非エンジニアの利用者に画面操作を依頼するときは、(a) 本当に今必要か、
-(b) こちらで代われない部分はどこか、を先に確認してから頼む。
+1. `auto-merge`（`GITHUB_TOKEN` によるプッシュ）後は `prod-smoke.yml` 等の
+   push トリガー式ワークフローが自動起動しないことに気付かず、本番反映確認が
+   抜けかけた。`workflow_dispatch` で手動起動して確認した。
 
 ## ③次回やる事
 
-**まず：** 前回のドキュメント・ルール改訂は PR #13（commit `e8723fa`）として
-`main` にマージ済み。その後 CodeRabbit の指摘5件を受けて追加修正した分が
-未マージで残っていれば、それを先に片付ける。
-
-**次はフェーズ2（写真）。1フェーズ1PRの運用で進める。**
+**次はフェーズ2（写真）。1フェーズ1PRの運用で進める。** ブランチは squash マージ後の
+運用ルールに従い `git fetch origin main && git checkout -B claude/new-app-init-hufsv1 origin/main`
+で作り直し済み（`main` の最新 = commit `0cac300`）。
 
 - **フェーズ2（写真）**：OS標準カメラで撮影（`<input type="file" accept="image/*"
   capture="environment">`。ブラウザ内に独自カメラUIは作らない）→箇所（キッチン/浴室 等。
   `PHOTO_AREAS` が `lib/content.ts` に定義済み）を選ぶ→該当する明細行に自動で紐づける。
+- **保存先は Supabase Storage を使う**（今回のブロッカー解消により選択の余地が無くなった。
+  以前の handoff にあった「ローカル仮実装で先に画面を作るか」の判断は不要になった）。
+  バケットは非公開にする。**サーバーは service_role キーで接続するため RLS は素通りする
+  （`lib/db/` と同じ構図）。** したがって所有者以外がアクセスできない保証は RLS ではなく、
+  アップロード・取得・削除・署名付きURL発行のすべてで `lib/db/` 側の所有者チェックと
+  同じパターン（サーバー側で案件の所有者を検証してから Storage を操作する）を必須にする。
 - **写真の向きの扱い（順序を間違えると縦写真が寝る）**：canvas で再エンコードすると
   EXIF は落ちるので、**元ファイルから向きを読む → その回転を画素に適用して描画 →
   最後に圧縮**の順にする（圧縮後に EXIF を読もうとしても、もう無い）。
@@ -89,17 +81,6 @@
   **採用したライブラリ名と、圧縮後も向きが保たれることを確認したテストを残す**
   （ブラウザによって `drawImage` が EXIF を尊重するかが割れるため、
   「手元で1回見て正しかった」では担保にならない）。
-- **着手前に判断が要る**：写真の保存先。Supabase Storage が本来の想定だが、下記の
-  ブロッカーが未解消。ローカルの仮実装で先に画面を作るか、Supabase接続を先に済ませるかを
-  利用者と決めてから始める。
-
-**Supabase実DB移行のブロッカー**：このセッションには Supabase の MCP接続が無く、
-利用者のSupabaseプロジェクトに直接アクセスする手段が無い。スキーマ移行
-（テーブル作成・RLS設定）は、こちらがSQLを書いても、利用者がSupabaseの
-SQL Editorに貼って実行する手作業が挟まる。**ただしフェーズ1の環境変数設定で、
-利用者に画面操作を頼むこと自体は問題なくできると分かった**（②の反省のとおり、
-頼み方には注意する）。実DBに移れば、仮メモリ実装のデータ揮発と、
-Route Handler が使えない制約の両方が同時に解消する。
 
 その後の想定（元の実装計画より。計画書自体はこのリポジトリには無い）：
 
