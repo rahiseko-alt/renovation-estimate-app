@@ -12,10 +12,12 @@
   },
   "dependencies": {
     "@cantoo/pdf-lib": "^2.8.1",
+    "@supabase/supabase-js": "^2.112.0",
     "fontkit": "^2.0.4",
     "next": "^16.2.12",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "server-only": "^0.0.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.0.0",

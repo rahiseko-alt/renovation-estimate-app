@@ -1,0 +1,63 @@
+# ローカル/CI 用の Supabase スタック設定。
+# `pnpm exec supabase start` で Docker 上に起動する。
+#
+# このアプリは Supabase Storage・Realtime・Edge Functions を使っていない
+# （写真保存はフェーズ2で着手時に検討する）。使っていないものを起動しても検証に
+# ならないため、これらは無効にしている。将来使うようになったら、その機能を
+# 実装するタイミングでここを有効化する。
+#
+# [auth] だけは例外的に有効にしている。認証そのものは今も lib/auth/ の自前実装
+# （Supabase Auth は使っていない）だが、`supabase status -o env` が API キー
+# （ANON_KEY / SERVICE_ROLE_KEY）を出力するのが auth 有効時だけのため、
+# 「テスト・CI がこのキーをコード側にハードコードせず毎回 CLI から読む」ことを
+# 優先してこの1機能だけ立ち上げている。
+#
+# 全項目のリファレンス: https://supabase.com/docs/guides/local-development/cli/config
+project_id = "renovation-estimate-app"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+health_timeout = "2m"
+major_version = 17
+
+[db.pooler]
+enabled = false
+
+[db.migrations]
+enabled = true
+schema_paths = []
+
+[db.seed]
+enabled = false
+
+[db.network_restrictions]
+enabled = false
+
+[realtime]
+enabled = false
+
+[studio]
+enabled = false
+
+[local_smtp]
+enabled = false
+
+[storage]
+enabled = false
+
+[auth]
+enabled = true
+
+[edge_runtime]
+enabled = false
+
+[analytics]
+enabled = false

@@ -50,9 +50,18 @@
 
 - 開発サーバ: `pnpm --filter web dev`（初回のみ `pnpm install`）
 - テスト（全件 / 1件だけ）: `pnpm --filter web test` / `pnpm --filter web test -- tests/calc.test.ts`
+  （`lib/db/` のテストはローカル Supabase が要る。下記「データの保存先」参照）
 - lint / 型チェック: `pnpm --filter web lint` / `pnpm --filter web typecheck`
 - 起動スモーク（受け入れ条件を HTTP で機械判定）: `bash scripts/smoke.sh`（先に `pnpm -r build`）
-- 必須の環境変数（名前だけ。値は書かない）: `AUTH_SECRET` / `DEMO_USER_EMAIL` / `DEMO_USER_PASSWORD`
+  （Docker が要る。ローカル Supabase の起動もこのスクリプトの中で行う）
+- データの保存先（Supabase・PostgreSQL）: テーブル定義は `supabase/migrations/`。
+  ローカル/CI は Docker 上のローカル Supabase に対して実際にクエリを出して検証する
+  （モックにしない）。手元でテストや `pnpm --filter web dev` を動かす前に、
+  リポジトリルートで `pnpm exec supabase start` を実行し、表示された API URL /
+  service_role キーを `apps/web/.env`（.gitignore 対象。.env.example ではない）に
+  `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` として書く。
+- 必須の環境変数（名前だけ。値は書かない）: `AUTH_SECRET` / `DEMO_USER_EMAIL` /
+  `DEMO_USER_PASSWORD` / `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY`
   （`apps/web/.env.example` 参照）
 - 共通の文言・値の置き場所: `apps/web/lib/content.ts`
 - 金額計算の置き場所: `apps/web/lib/calc.ts`（画面・PDF・API は必ずここを通す）
