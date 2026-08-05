@@ -26,7 +26,9 @@ async function login(page: Page): Promise<void> {
   await page.getByLabel("メールアドレス").fill(DEMO_USER_EMAIL!);
   await page.getByLabel("パスワード").fill(DEMO_USER_PASSWORD!);
   await page.getByRole("button", { name: "ログインする" }).click();
-  await expect(page.getByRole("link", { name: "新しい案件" })).toBeVisible();
+  // ログイン成功後の遷移先はトップ画面（HomeScreen）。ログイン状態でしか出ない
+  // 「ログアウト」ボタンで、ログインが通ったことを確かめる。
+  await expect(page.getByRole("button", { name: "ログアウト" })).toBeVisible();
 }
 
 async function createProject(page: Page): Promise<string> {
