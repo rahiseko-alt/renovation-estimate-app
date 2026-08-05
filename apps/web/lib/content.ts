@@ -280,12 +280,16 @@ export const QUOTE_REQUEST_FORM_TEXT = {
   submit: "リンクを発行する",
   submitting: "発行中…",
   cancel: "やめる",
-  invalidMarkupRate: "掛率を数字で入力してください（0以上）。",
+  // 上限の "1,000,000" は lib/calc.ts の MAX_MARKUP_RATE と同じ値。
+  // content.ts は calc.ts から import しない（calc.ts が content.ts を import しており、
+  // 循環importになるため）ため、ここは数値を書き下ろす。値を変えたら両方直すこと。
+  invalidMarkupRate: "掛率を数字で入力してください（0以上1,000,000以下）。",
   failed: "依頼の作成に失敗しました。もう一度お試しください。",
   /** リンク発行後に出す説明・ボタン。 */
   linkReady: "このリンクを下請に送ってください。",
   copyButton: "リンクをコピー",
   copied: "コピーしました。",
+  copyFailed: "コピーできませんでした。リンクを長押しして手動でコピーしてください。",
 } as const;
 
 /** 見積エディタの下請への依頼一覧の文言。 */

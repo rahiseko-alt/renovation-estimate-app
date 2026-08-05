@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import { DEFAULT_DISPOSAL_ITEM_NAME } from "../lib/content";
-import { getOrCreateEstimate, saveEstimate } from "../lib/db/estimates";
+import {
+  appendEstimateLine,
+  getOrCreateEstimate,
+  saveEstimate,
+} from "../lib/db/estimates";
 import {
   createPriceMasterItem,
   deletePriceMasterItemForOwner,
@@ -103,6 +107,49 @@ describe("estimates", () => {
     const reloaded = await getOrCreateEstimate(project.id);
     expect(reloaded.lines[0]?.name).toBe("クロス張替え");
     expect(reloaded.overheadRatePercent).toBe(10);
+  });
+
+  function itemLine(name: string) {
+    return {
+      kind: "item" as const,
+      name,
+      spec: "",
+      quantity: 1,
+      unit: "式",
+      unitPrice: 1000,
+      taxCategory: "standard" as const,
+    };
+  }
+
+  it("appendEstimateLineで明細を1件追加できる", async () => {
+    const project = await createProject(
+      { customerName: "テスト4", siteAddress: "テスト4" },
+      OWNER_A,
+    );
+    await getOrCreateEstimate(project.id);
+
+    const appended = await appendEstimateLine(project.id, itemLine("追加した明細"));
+    expect(appended.lines).toHaveLength(2);
+    expect(appended.lines[1]?.name).toBe("追加した明細");
+  });
+
+  it("appendEstimateLineを並行で呼んでも両方の行が残る（後勝ちで消えない）", async () => {
+    const project = await createProject(
+      { customerName: "テスト5", siteAddress: "テスト5" },
+      OWNER_A,
+    );
+    await getOrCreateEstimate(project.id);
+
+    await Promise.all([
+      appendEstimateLine(project.id, itemLine("依頼A")),
+      appendEstimateLine(project.id, itemLine("依頼B")),
+    ]);
+
+    const reloaded = await getOrCreateEstimate(project.id);
+    const names = reloaded.lines.map((line) => line.name);
+    expect(names).toContain("依頼A");
+    expect(names).toContain("依頼B");
+    expect(reloaded.lines).toHaveLength(3); // 既定行 + 依頼A + 依頼B
   });
 });
 
