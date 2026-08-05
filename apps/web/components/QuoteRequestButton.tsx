@@ -80,6 +80,7 @@ export function QuoteRequestButton({ projectId, item }: Props) {
   function handleCopy(): void {
     if (!link) return;
     setErrorMessage(null);
+    setCopied(false);
     navigator.clipboard.writeText(link).then(
       () => setCopied(true),
       () => setErrorMessage(QUOTE_REQUEST_FORM_TEXT.copyFailed),

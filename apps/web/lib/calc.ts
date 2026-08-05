@@ -7,7 +7,11 @@
 //
 // 金額はすべて整数（円）で持つ。浮動小数点で金額を保持しない。
 
-import { TAX_RATES } from "./content";
+import { MAX_MARKUP_RATE, TAX_RATES } from "./content";
+
+// QuoteRequestButton・quote-actions.ts は引き続き calc.ts から MAX_MARKUP_RATE を
+// import できるよう re-export する（値そのものの置き場所は content.ts に一本化した）。
+export { MAX_MARKUP_RATE };
 
 export type TaxCategory = keyof typeof TAX_RATES;
 
@@ -224,12 +228,6 @@ const MAX_OVERHEAD_RATE_PERCENT = 100_000;
 /** 諸経費率の最小刻み（1/1000 パーセントポイント）。 */
 const OVERHEAD_RATE_SCALE = 1_000;
 
-/**
- * 掛率として扱う最大の大きさ。理由は MAX_QUANTITY_MAGNITUDE と同じ。
- * 見積依頼（下請への依頼作成時に掛率を先に受け取る場面）でも同じ上限で確かめるため、
- * ここから export する（AGENTS.md「結合を増やさない」1：同じ値を2箇所以上に書かない）。
- */
-export const MAX_MARKUP_RATE = 1_000_000;
 /** 掛率の最小刻み（1/10,000）。 */
 const MARKUP_RATE_SCALE = 10_000;
 
