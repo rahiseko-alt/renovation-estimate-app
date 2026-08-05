@@ -132,6 +132,11 @@ expect_contains "manifest が standalone 起動" '"display":"standalone"' "${WOR
 expect_contains "manifest の start_url" '"start_url":"/"' "${WORK}/manifest.json"
 expect_contains "manifest に 512px アイコン" 'icon-512.png' "${WORK}/manifest.json"
 
+echo "== 写真圧縮ライブラリを自前ホストできている =="
+# lib/photo/compress.ts が libURL でここを指す。既定の外部CDN依存に戻ると
+# 現場の電波状況次第で圧縮に失敗しうる（docs/failures.md 参照）。
+check "GET /vendor/browser-image-compression.js" 200 "$(curl -s -o /dev/null -w '%{http_code}' "${BASE}/vendor/browser-image-compression.js")"
+
 echo "== セキュリティヘッダ =="
 for header in "strict-transport-security" "x-frame-options" "x-content-type-options" "referrer-policy" "content-security-policy"; do
   if printf '%s' "${HEADERS}" | grep -iq "^${header}:"; then
@@ -231,6 +236,14 @@ check "GET /projects（正しいセッション）" 200 "$(curl -s -o /dev/null 
 # ログインした利用者の画面で JS が一切動かない。
 PROJECTS_HEADERS=$(curl -s -D - -o "${WORK}/projects.html" -H "Cookie: rea_session=${VALID}" "${BASE}/projects")
 check_csp_and_nonce "/projects" "${PROJECTS_HEADERS}" "${WORK}/projects.html"
+# img-src が Supabase Storage のオリジンを許可していないと、撮った写真のサムネイルが
+# CSP でブロックされ、ブラウザに何も表示されなくなる（docs/failures.md 参照）。
+if printf '%s' "${PROJECTS_HEADERS}" | grep -iq "^content-security-policy:.*img-src[^;]*${SUPABASE_URL}"; then
+  echo "  OK   CSP img-src が写真ストレージのオリジンを許可"
+else
+  echo "  FAIL CSP img-src が写真ストレージのオリジン（${SUPABASE_URL}）を許可していない"
+  FAILURES=$((FAILURES + 1))
+fi
 
 echo "== 偽物・期限切れは弾く =="
 FORGED=$(node -e '

@@ -10,6 +10,17 @@ export function createNonce(): string {
   return btoa(binary);
 }
 
+/** SUPABASE_URL から img-src に足すオリジンを作る。未設定・不正な値なら足さない。 */
+function photoStorageOrigin(): string | null {
+  const url = process.env.SUPABASE_URL;
+  if (!url) return null;
+  try {
+    return new URL(url).origin;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * CSP の値を作る。
  *
@@ -26,13 +37,14 @@ export function createNonce(): string {
  */
 export function buildContentSecurityPolicy(nonce: string): string {
   const isDev = process.env.NODE_ENV !== "production";
+  const storageOrigin = photoStorageOrigin();
 
   const directives = [
     "default-src 'self'",
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDev ? " 'unsafe-eval'" : ""}`,
     "style-src 'self' 'unsafe-inline'",
-    // 写真は端末で作った blob と data URL から読む
-    "img-src 'self' data: blob:",
+    // 写真は端末で作った blob・data URL に加え、Supabase Storage の署名付きURLからも読む
+    `img-src 'self' data: blob:${storageOrigin ? ` ${storageOrigin}` : ""}`,
     "font-src 'self'",
     "connect-src 'self'",
     "object-src 'none'",

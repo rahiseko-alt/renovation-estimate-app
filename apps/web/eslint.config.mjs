@@ -3,7 +3,9 @@ import nextTypeScript from "eslint-config-next/typescript";
 
 const eslintConfig = [
   {
-    ignores: [".next/**", "node_modules/**", "next-env.d.ts"],
+    // public/vendor/ は npm パッケージからそのまま複製した第三者コード（lib/photo/compress.ts
+    // 参照）。手を入れないので lint 対象にしない。
+    ignores: [".next/**", "node_modules/**", "next-env.d.ts", "public/vendor/**"],
   },
   ...nextCoreWebVitals,
   ...nextTypeScript,
