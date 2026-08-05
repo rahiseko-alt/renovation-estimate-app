@@ -31,10 +31,6 @@ export default async function EstimatePage({
         {ESTIMATE_EDITOR_TEXT.heading}：{project.customerName}
       </h1>
       <EstimateEditor
-        // 見積依頼の取り込み（取り込むと明細が増える）は保存を経由してこのページを
-        // 再読み込みする形で反映する。updatedAt をキーにすることで、取り込み後の
-        // 再読み込みで新しい明細を初期値として持つエディタに作り直す。
-        key={estimate.updatedAt}
         projectId={project.id}
         initialLines={estimate.lines}
         initialOverheadRatePercent={estimate.overheadRatePercent}

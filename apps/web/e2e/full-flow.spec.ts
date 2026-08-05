@@ -36,7 +36,9 @@ async function createProject(page: Page): Promise<string> {
   await page.getByLabel("施主名").fill("テスト太郎");
   await page.getByLabel("現場住所").fill("東京都千代田区1-1-1");
   await page.getByRole("button", { name: "登録する" }).click();
-  await page.waitForURL(/\/projects\/[^/]+$/);
+  // 遷移前の "/projects/new" 自体も /\/projects\/[^/]+$/ にマッチしてしまうため、
+  // それを除外しないと waitForURL が実際の遷移を待たずに即座に解決してしまう。
+  await page.waitForURL((url) => /^\/projects\/[^/]+$/.test(url.pathname) && url.pathname !== "/projects/new");
   const id = page.url().match(/\/projects\/([^/]+)$/)?.[1];
   if (!id) throw new Error(`案件詳細のURLから id を取れない: ${page.url()}`);
   return id;
@@ -54,7 +56,9 @@ async function uploadPhoto(page: Page): Promise<void> {
 /** 見積エディタで明細を1行追加し、保存する。追加した行（li）を返す。 */
 async function addEstimateLine(page: Page) {
   await page.getByRole("button", { name: "明細を追加" }).click();
-  const row = page.locator("li").last();
+  // "li" をページ全体から探すと、後で下請への依頼一覧（別のul）にも同じ工事項目名の
+  // liが増えて last() の対象がすれ替わる。明細一覧の最初のulに絞って安定させる。
+  const row = page.locator("ul").first().locator("li").last();
   await row.getByLabel("工事項目").fill(ITEM_NAME);
   await row.getByLabel("数量").fill("10");
   await row.getByLabel("単位").selectOption({ label: "㎡" });
@@ -150,5 +154,7 @@ test("写真→明細→下請依頼→取り込み→見積書PDFまでの一�
   }
 
   await importQuoteResponse(page);
+  // 見積書PDFの出力ボタンは案件詳細ページ（見積エディタの外）にある。
+  await page.goto(`/projects/${projectId}`);
   await downloadPdf(page);
 });
