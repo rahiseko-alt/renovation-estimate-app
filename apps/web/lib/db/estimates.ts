@@ -96,6 +96,51 @@ export async function getOrCreateEstimate(projectId: string): Promise<Estimate> 
   return toEstimate(data as EstimateRow);
 }
 
+/**
+ * 明細を読んで・書き換えてから保存し直すまでの間に、別の追加が割り込む回数の上限。
+ * 現実的には1〜2回競合すれば十分で、これを使い切るのは異常系（バグ・過度な同時実行）。
+ */
+const MAX_APPEND_RETRIES = 5;
+
+/**
+ * 見積に明細行を1件だけ追加する。下請への見積依頼の取り込み専用の入口
+ * （app/projects/[id]/estimate/quote-actions.ts の importQuoteResponseAction）。
+ *
+ * saveEstimate（明細全体を渡して丸ごと書き換える）をここで使うと、2件の依頼を
+ * ほぼ同時に取り込んだときに「読む→配列に足す→書く」が競合し、後から保存した方が
+ * 先の追加ごと上書きしてしまう（互いの存在を知らないまま両方が「元の配列＋自分の1行」を
+ * 書き込むため）。updated_at を使った楽観ロックで、保存時点の行が読んだ時点と
+ * 変わっていないことを確かめ、変わっていたら読み直して1回だけ足し直す。
+ */
+export async function appendEstimateLine(
+  projectId: string,
+  newLine: EstimateLine,
+): Promise<Estimate> {
+  const client = getSupabaseClient();
+
+  for (let attempt = 0; attempt < MAX_APPEND_RETRIES; attempt += 1) {
+    const estimate = await getOrCreateEstimate(projectId);
+    const { data, error } = await client
+      .from("estimates")
+      .update({
+        lines: [...estimate.lines, newLine],
+        updated_at: new Date().toISOString(),
+      })
+      .eq("project_id", projectId)
+      .eq("updated_at", estimate.updatedAt)
+      .select(COLUMNS)
+      .maybeSingle();
+    if (error) throw error;
+    // data が無い = updated_at が読んだ時点から変わっていた（別の追加が割り込んだ）。
+    // 机上の空論ではない競合（フェーズ2の getOrCreateEstimate と同じ理由）なので、
+    // 上書きせず読み直して1回だけ足し直す。
+    if (data) return toEstimate(data as EstimateRow);
+  }
+  throw new Error(
+    "見積の更新が競合し続けました。もう一度お試しください。",
+  );
+}
+
 export async function saveEstimate(
   projectId: string,
   lines: EstimateLine[],

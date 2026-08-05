@@ -10,7 +10,7 @@ import {
 } from "../../../../lib/calc";
 import { getCurrentUser } from "../../../../lib/auth/server";
 import { UNITS } from "../../../../lib/content";
-import { getOrCreateEstimate, saveEstimate } from "../../../../lib/db/estimates";
+import { appendEstimateLine } from "../../../../lib/db/estimates";
 import { getProjectForOwner } from "../../../../lib/db/projects";
 import {
   createQuoteRequest,
@@ -142,10 +142,7 @@ export async function importQuoteResponseAction(
     taxCategory: imported.taxCategory,
   };
 
-  const estimate = await getOrCreateEstimate(projectId);
-  await saveEstimate(
-    projectId,
-    [...estimate.lines, newLine],
-    estimate.overheadRatePercent,
-  );
+  // 読んで・足して・書き直すのではなく、見積側の楽観ロック（appendEstimateLine）に
+  // 1行だけ渡す。複数の依頼をほぼ同時に取り込んでも、互いの追加が上書きし合わない。
+  await appendEstimateLine(projectId, newLine);
 }

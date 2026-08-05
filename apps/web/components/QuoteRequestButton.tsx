@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useId, useState, useTransition } from "react";
 
 import { requestQuoteAction } from "../app/projects/[id]/estimate/quote-actions";
+import { MAX_MARKUP_RATE } from "../lib/calc";
 import { QUOTE_REQUEST_FORM_TEXT } from "../lib/content";
 import { isValidNumberInput } from "../lib/estimateLineValidation";
 
@@ -37,7 +38,13 @@ export function QuoteRequestButton({ projectId, item }: Props) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSubmitting, startSubmitting] = useTransition();
 
-  const markupRateValid = isValidNumberInput(markupRate) && Number(markupRate) >= 0;
+  // requestQuoteAction（サーバー側）は MAX_MARKUP_RATE を超える掛率を弾く。
+  // ここで同じ上限を見ておかないと、送信ボタンが有効なままサーバー側でだけ弾かれ、
+  // 汎用の失敗文言しか出せない（AGENTS.md「結合を増やさない」1：同じ値を1箇所に）。
+  const markupRateValid =
+    isValidNumberInput(markupRate) &&
+    Number(markupRate) >= 0 &&
+    Number(markupRate) <= MAX_MARKUP_RATE;
 
   function handleOpen(): void {
     setOpen(true);
@@ -72,8 +79,11 @@ export function QuoteRequestButton({ projectId, item }: Props) {
 
   function handleCopy(): void {
     if (!link) return;
-    void navigator.clipboard.writeText(link);
-    setCopied(true);
+    setErrorMessage(null);
+    navigator.clipboard.writeText(link).then(
+      () => setCopied(true),
+      () => setErrorMessage(QUOTE_REQUEST_FORM_TEXT.copyFailed),
+    );
   }
 
   if (!open) {
