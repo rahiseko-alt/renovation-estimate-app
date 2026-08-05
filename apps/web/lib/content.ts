@@ -270,6 +270,15 @@ export const PHOTO_ALLOWED_TYPES = [
   "image/webp",
 ] as const;
 
+/**
+ * 掛率として扱う最大の大きさ。lib/calc.ts の sellingUnitPrice（掛率の妥当性検証）と、
+ * QuoteRequestButton（クライアント側の検証・文言の両方）が参照する。
+ * calc.ts は content.ts を import している（TAX_RATES）ため、循環importを避けて
+ * 値をここに1箇所だけ持ち、calc.ts 側は re-export する
+ * （AGENTS.md「結合を増やさない」1：同じ値を2箇所以上に書かない）。
+ */
+export const MAX_MARKUP_RATE = 1_000_000;
+
 /** 見積エディタで、明細1行から下請への依頼を作るときの文言。 */
 export const QUOTE_REQUEST_FORM_TEXT = {
   /** 明細行に出す、依頼フォームを開くボタン。 */
@@ -280,10 +289,7 @@ export const QUOTE_REQUEST_FORM_TEXT = {
   submit: "リンクを発行する",
   submitting: "発行中…",
   cancel: "やめる",
-  // 上限の "1,000,000" は lib/calc.ts の MAX_MARKUP_RATE と同じ値。
-  // content.ts は calc.ts から import しない（calc.ts が content.ts を import しており、
-  // 循環importになるため）ため、ここは数値を書き下ろす。値を変えたら両方直すこと。
-  invalidMarkupRate: "掛率を数字で入力してください（0以上1,000,000以下）。",
+  invalidMarkupRate: `掛率を数字で入力してください（0以上${MAX_MARKUP_RATE.toLocaleString("ja-JP")}以下）。`,
   failed: "依頼の作成に失敗しました。もう一度お試しください。",
   /** リンク発行後に出す説明・ボタン。 */
   linkReady: "このリンクを下請に送ってください。",
