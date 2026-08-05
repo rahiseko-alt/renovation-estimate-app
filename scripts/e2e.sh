@@ -41,9 +41,16 @@ if ! pnpm exec supabase start; then
   echo "FAIL: supabase start に失敗した"
   exit 1
 fi
-pnpm exec supabase status -o env >"${WORK}/supabase.env"
+if ! pnpm exec supabase status -o env >"${WORK}/supabase.env"; then
+  echo "FAIL: supabase status に失敗した"
+  exit 1
+fi
 # shellcheck disable=SC1091
 source "${WORK}/supabase.env"
+if [ -z "${API_URL:-}" ] || [ -z "${SERVICE_ROLE_KEY:-}" ]; then
+  echo "FAIL: supabase status から API_URL / SERVICE_ROLE_KEY を取得できない"
+  exit 1
+fi
 export SUPABASE_URL="${API_URL}"
 export SUPABASE_SERVICE_ROLE_KEY="${SERVICE_ROLE_KEY}"
 

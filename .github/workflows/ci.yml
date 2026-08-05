@@ -11,8 +11,12 @@ jobs:
   quality:
     name: typecheck / lint / test / build
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v6
@@ -62,8 +66,12 @@ jobs:
   smoke:
     name: 起動スモーク (build → start → 受け入れ条件を HTTP で判定)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v6
@@ -90,8 +98,12 @@ jobs:
   e2e:
     name: E2E (実ブラウザで一連の操作を検証)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v6
