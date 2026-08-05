@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useId, useState, useTransition } from "react";
+import { useId, useRef, useState, useTransition } from "react";
 
 import { requestQuoteAction } from "../app/projects/[id]/estimate/quote-actions";
 import { MAX_MARKUP_RATE } from "../lib/calc";
@@ -37,6 +37,8 @@ export function QuoteRequestButton({ projectId, item }: Props) {
   const [copied, setCopied] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSubmitting, startSubmitting] = useTransition();
+  // handleCopy が連打で重なったとき、後から押した方の結果だけを画面に反映するための通し番号。
+  const copyAttemptRef = useRef(0);
 
   // requestQuoteAction（サーバー側）は MAX_MARKUP_RATE を超える掛率を弾く。
   // ここで同じ上限を見ておかないと、送信ボタンが有効なままサーバー側でだけ弾かれ、
@@ -81,9 +83,17 @@ export function QuoteRequestButton({ projectId, item }: Props) {
     if (!link) return;
     setErrorMessage(null);
     setCopied(false);
+    const attempt = (copyAttemptRef.current += 1);
     navigator.clipboard.writeText(link).then(
-      () => setCopied(true),
-      () => setErrorMessage(QUOTE_REQUEST_FORM_TEXT.copyFailed),
+      () => {
+        // 連打で古い試行が後から解決しても、最新の試行の結果だけを画面に反映する。
+        if (copyAttemptRef.current === attempt) setCopied(true);
+      },
+      () => {
+        if (copyAttemptRef.current === attempt) {
+          setErrorMessage(QUOTE_REQUEST_FORM_TEXT.copyFailed);
+        }
+      },
     );
   }
 
