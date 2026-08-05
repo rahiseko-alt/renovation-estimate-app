@@ -16,7 +16,9 @@
 // ブラウザ側の自動回転と重なって二重に回転する組み合わせが起こりうる。
 import imageCompression from "browser-image-compression";
 
-const MAX_ORIGINAL_BYTES = 20 * 1024 * 1024;
+import { PHOTO_ALLOWED_TYPES, PHOTO_MAX_UPLOAD_MB } from "../content";
+
+const MAX_ORIGINAL_BYTES = PHOTO_MAX_UPLOAD_MB * 1024 * 1024;
 const MAX_OUTPUT_MB = 1.5;
 const MAX_DIMENSION = 1600;
 
@@ -24,8 +26,8 @@ export class InvalidPhotoTypeError extends Error {}
 export class PhotoTooLargeError extends Error {}
 
 export async function compressPhotoForUpload(file: File): Promise<File> {
-  if (!file.type.startsWith("image/")) {
-    throw new InvalidPhotoTypeError(`画像ファイルではありません: ${file.type || "(不明)"}`);
+  if (!PHOTO_ALLOWED_TYPES.includes(file.type as (typeof PHOTO_ALLOWED_TYPES)[number])) {
+    throw new InvalidPhotoTypeError(`対応していない画像形式です: ${file.type || "(不明)"}`);
   }
   if (file.size > MAX_ORIGINAL_BYTES) {
     throw new PhotoTooLargeError(`元ファイルが大きすぎます: ${file.size} bytes`);

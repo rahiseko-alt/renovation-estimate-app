@@ -161,7 +161,7 @@ export function PhotosSection({ projectId, initialPhotos }: Props) {
                       <button
                         type="button"
                         onClick={() => handleDelete(photo.id)}
-                        disabled={isDeleting && deletingId === photo.id}
+                        disabled={isDeleting}
                         className="tap rounded border-2 border-red-700 px-3 py-2 text-sm font-bold text-red-900 disabled:opacity-50"
                       >
                         {isDeleting && deletingId === photo.id

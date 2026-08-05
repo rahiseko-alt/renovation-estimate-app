@@ -248,6 +248,28 @@ export const PHOTO_AREAS = [
   "その他",
 ] as const;
 
+/**
+ * 写真アップロードの上限（元ファイル、MB）。lib/photo/compress.ts（クライアント側の
+ * 事前チェック）と app/projects/[id]/photos-actions.ts（Server Action 側の検証。
+ * クライアントの検証はバイパスできるため、ここでも同じ値で確かめる）の両方から
+ * 参照する（AGENTS.md「結合を増やさない」1：同じ値を2箇所以上に書かない）。
+ */
+export const PHOTO_MAX_UPLOAD_MB = 20;
+
+/**
+ * 写真の表示用に発行する署名付きURLの有効秒数。
+ * app/projects/[id]/page.tsx（一覧表示）と photos-actions.ts（アップロード直後の表示）
+ * の両方から参照する。
+ */
+export const PHOTO_SIGNED_URL_EXPIRES_SECONDS = 300;
+
+/** アップロードを受け付ける画像の種類。photos-actions.ts の検証で使う。 */
+export const PHOTO_ALLOWED_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+] as const;
+
 /** 案件詳細画面の写真セクションの文言。 */
 export const PHOTO_TEXT = {
   heading: "写真",
@@ -260,10 +282,10 @@ export const PHOTO_TEXT = {
   deleting: "削除中…",
   /** ファイル未選択で送信しようとしたとき。 */
   noFileSelected: "写真を選んでください。",
-  /** compress.ts の InvalidPhotoTypeError。 */
-  invalidType: "画像ファイルを選んでください。",
-  /** compress.ts の PhotoTooLargeError。 */
-  tooLarge: "20MBを超える写真は追加できません。",
+  /** compress.ts の InvalidPhotoTypeError、および photos-actions.ts の種類検証。 */
+  invalidType: "画像ファイル（JPEG・PNG・WebP）を選んでください。",
+  /** compress.ts の PhotoTooLargeError、および photos-actions.ts のサイズ検証。 */
+  tooLarge: `${PHOTO_MAX_UPLOAD_MB}MBを超える写真は追加できません。`,
   uploadFailed: "写真の追加に失敗しました。もう一度お試しください。",
   deleteFailed: "写真の削除に失敗しました。もう一度お試しください。",
 } as const;

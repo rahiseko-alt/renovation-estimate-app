@@ -1,7 +1,12 @@
 "use server";
 
 import { getCurrentUser } from "../../../lib/auth/server";
-import { PHOTO_AREAS } from "../../../lib/content";
+import {
+  PHOTO_ALLOWED_TYPES,
+  PHOTO_AREAS,
+  PHOTO_MAX_UPLOAD_MB,
+  PHOTO_SIGNED_URL_EXPIRES_SECONDS,
+} from "../../../lib/content";
 import {
   createPhoto,
   deletePhotoRowForOwner,
@@ -17,11 +22,8 @@ import { getProjectForOwner } from "../../../lib/db/projects";
 import type { Photo } from "../../../lib/db/types";
 
 const PHOTO_AREA_SET: ReadonlySet<string> = new Set(PHOTO_AREAS);
-
-// 一覧表示のたびに都度発行し直す短命の署名付きURL。
-// 案件詳細画面を開くたびに再取得されるので、長く持たせる必要が無い
-// （長く持たせるほど、URLの単独漏えい時の露出時間も伸びる）。
-const SIGNED_URL_EXPIRES_SECONDS = 300;
+const PHOTO_ALLOWED_TYPE_SET: ReadonlySet<string> = new Set(PHOTO_ALLOWED_TYPES);
+const MAX_UPLOAD_BYTES = PHOTO_MAX_UPLOAD_MB * 1024 * 1024;
 
 export type PhotoWithUrl = Photo & { url: string | null };
 
@@ -30,9 +32,10 @@ export type PhotoWithUrl = Photo & { url: string | null };
  * （IDOR対策）で、ログイン状態と案件の所有者をここでも確かめてから保存する。
  *
  * formData には圧縮済みの File（key: "photo"）と箇所（key: "area"）を入れて渡す。
- * 圧縮はクライアント側（lib/photo/compress.ts）で済ませたものだけを受け取る想定だが、
- * ここでも種別・サイズを信頼しない前提で area の妥当性だけは検証する
- * （ファイル自体の中身の検証は Supabase Storage 側のアップロードに委ねる）。
+ * 圧縮・種別・サイズの制限はクライアント側（lib/photo/compress.ts）でも行うが、
+ * Server Action はブラウザを経由しない呼び出しからも直接叩けるため、
+ * クライアント側の検証はバイパスできる前提でここでも同じ制限を確かめる
+ * （lib.content.ts の PHOTO_ALLOWED_TYPES / PHOTO_MAX_UPLOAD_MB と同じ値を使う）。
  */
 export async function uploadPhotoAction(
   projectId: string,
@@ -57,6 +60,12 @@ export async function uploadPhotoAction(
   if (!(file instanceof File) || file.size === 0) {
     throw new Error("写真が選択されていません。");
   }
+  if (!PHOTO_ALLOWED_TYPE_SET.has(file.type)) {
+    throw new Error("対応していない画像形式です。");
+  }
+  if (file.size > MAX_UPLOAD_BYTES) {
+    throw new Error("写真が大きすぎます。");
+  }
 
   const storagePath = newPhotoStoragePath(projectId, file.type);
   await uploadPhotoObject(storagePath, file);
@@ -71,7 +80,7 @@ export async function uploadPhotoAction(
     throw error;
   }
 
-  const url = await createPhotoSignedUrl(storagePath, SIGNED_URL_EXPIRES_SECONDS);
+  const url = await createPhotoSignedUrl(storagePath, PHOTO_SIGNED_URL_EXPIRES_SECONDS);
   return { ...photo, url };
 }
 
