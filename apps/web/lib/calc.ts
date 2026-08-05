@@ -202,8 +202,11 @@ function bigIntToSafeAmount(value: bigint, label: string): number {
  * （quantity × QUANTITY_SCALE）に変換する処理が、浮動小数点の精度内で
  * 正確に行える前提にしている。㎡・m・人工といった実務の数量がこの上限を
  * 超えることは無い。
+ *
+ * 見積依頼（下請への依頼作成時に数量を先に受け取る場面）でも同じ上限で確かめるため、
+ * ここから export する（AGENTS.md「結合を増やさない」1：同じ値を2箇所以上に書かない）。
  */
-const MAX_QUANTITY_MAGNITUDE = 1_000_000;
+export const MAX_QUANTITY_MAGNITUDE = 1_000_000;
 /** 数量の最小刻み（1/1000）。㎡・m・人工の実務でこれより細かい数量は無い。 */
 const QUANTITY_SCALE = 1_000;
 
@@ -221,8 +224,12 @@ const MAX_OVERHEAD_RATE_PERCENT = 100_000;
 /** 諸経費率の最小刻み（1/1000 パーセントポイント）。 */
 const OVERHEAD_RATE_SCALE = 1_000;
 
-/** 掛率として扱う最大の大きさ。理由は MAX_QUANTITY_MAGNITUDE と同じ。 */
-const MAX_MARKUP_RATE = 1_000_000;
+/**
+ * 掛率として扱う最大の大きさ。理由は MAX_QUANTITY_MAGNITUDE と同じ。
+ * 見積依頼（下請への依頼作成時に掛率を先に受け取る場面）でも同じ上限で確かめるため、
+ * ここから export する（AGENTS.md「結合を増やさない」1：同じ値を2箇所以上に書かない）。
+ */
+export const MAX_MARKUP_RATE = 1_000_000;
 /** 掛率の最小刻み（1/10,000）。 */
 const MARKUP_RATE_SCALE = 10_000;
 
@@ -235,8 +242,11 @@ const TAX_RATE_SCALE = 100_000;
  * Number.MAX_SAFE_INTEGER（約900兆）の1割程度に収まるよう選んでいる。
  * 輸入石材や特注一式のような高額品でも、この上限（10億円/単位）を
  * 超える単価は実務で無い。
+ *
+ * 下請の回答画面（/q/[token]）が原価単価を受け取る場面でも同じ上限で確かめるため、
+ * ここから export する（AGENTS.md「結合を増やさない」1：同じ値を2箇所以上に書かない）。
  */
-const MAX_UNIT_PRICE = 1_000_000_000;
+export const MAX_UNIT_PRICE = 1_000_000_000;
 
 function assertValidUnitPrice(value: number, label: string): void {
   assertIntegerAmount(value, label);
@@ -253,8 +263,12 @@ function assertValidUnitPrice(value: number, label: string): void {
  * 極端に長い文字列を保存できてしまい、PDF生成時の文字幅計測
  * （lib/pdf/layout.ts の fitText）に負荷をかけられる（CWE-400）。
  * 実務の工事項目・摘要はこの上限よりずっと短い。
+ *
+ * 見積依頼（下請への依頼作成時に明細のスナップショットを受け取る場面）でも
+ * 同じ上限で確かめるため、ここから export する
+ * （AGENTS.md「結合を増やさない」1：同じ値を2箇所以上に書かない）。
  */
-const MAX_TEXT_LENGTH = 200;
+export const MAX_TEXT_LENGTH = 200;
 
 function assertValidText(value: string, label: string): void {
   if (value.length > MAX_TEXT_LENGTH) {

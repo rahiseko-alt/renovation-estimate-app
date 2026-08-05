@@ -199,6 +199,7 @@ export function EstimateEditor({
         {lines.map((line) => (
           <EstimateLineRow
             key={line.key}
+            projectId={projectId}
             line={line}
             quantityInvalid={invalidQuantityKeys.has(line.key)}
             unitPriceInvalid={invalidUnitPriceKeys.has(line.key)}
