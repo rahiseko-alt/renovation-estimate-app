@@ -1,5 +1,5 @@
 // 案件・見積のドメイン型。lib/db/ の外（画面・API）はこの型だけを見て、
-// 実装（今は仮のメモリ実装、後で Supabase に差し替え）を知らない
+// 実装（Supabase・テーブル定義は supabase/migrations/）を知らない
 // （AGENTS.md「結合を増やさない」4：他の機能の内部を直接触らない）。
 
 import type { EstimateLine, TaxCategory } from "../calc";

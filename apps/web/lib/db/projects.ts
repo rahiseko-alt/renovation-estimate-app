@@ -1,19 +1,42 @@
 // 案件のデータアクセス。画面はここだけを通す（直接クエリを書かない）。
-// 今は lib/db/memory.ts の仮実装。Supabase に差し替えるときはこのファイルの中身だけを直す。
+// Supabase（PostgreSQL）を使う。テーブル定義は supabase/migrations/ を参照。
 //
 // 一覧・取得はすべて ownerId で絞る。呼び出し側が推測した他人の案件 ID を渡しても
 // 中身が返らないようにするため、絞り込まない取得関数はこのファイルに置かない
 // （他人の案件IDを知っているだけで読み書きできる状態を防ぐ境界を、ここ1箇所に固定する）。
 
-import { newId, nowIso } from "./memory";
+import { getSupabaseClient } from "./client";
 import type { NewProjectInput, Project } from "./types";
+import { isUuid } from "./uuid";
 
-const projects = new Map<string, Project>();
+const COLUMNS = "id, owner_id, customer_name, site_address, created_at";
+
+type ProjectRow = {
+  id: string;
+  owner_id: string;
+  customer_name: string;
+  site_address: string;
+  created_at: string;
+};
+
+function toProject(row: ProjectRow): Project {
+  return {
+    id: row.id,
+    ownerId: row.owner_id,
+    customerName: row.customer_name,
+    siteAddress: row.site_address,
+    createdAt: row.created_at,
+  };
+}
 
 export async function listProjectsForOwner(ownerId: string): Promise<Project[]> {
-  return [...projects.values()]
-    .filter((project) => project.ownerId === ownerId)
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const { data, error } = await getSupabaseClient()
+    .from("projects")
+    .select(COLUMNS)
+    .eq("owner_id", ownerId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data as ProjectRow[]).map(toProject);
 }
 
 /** 案件が存在し、かつ ownerId の持ち物であるときだけ返す。それ以外は null。 */
@@ -21,21 +44,31 @@ export async function getProjectForOwner(
   id: string,
   ownerId: string,
 ): Promise<Project | null> {
-  const project = projects.get(id);
-  return project && project.ownerId === ownerId ? project : null;
+  if (!isUuid(id)) return null;
+
+  const { data, error } = await getSupabaseClient()
+    .from("projects")
+    .select(COLUMNS)
+    .eq("id", id)
+    .eq("owner_id", ownerId)
+    .maybeSingle();
+  if (error) throw error;
+  return data ? toProject(data as ProjectRow) : null;
 }
 
 export async function createProject(
   input: NewProjectInput,
   ownerId: string,
 ): Promise<Project> {
-  const project: Project = {
-    id: newId(),
-    ownerId,
-    customerName: input.customerName,
-    siteAddress: input.siteAddress,
-    createdAt: nowIso(),
-  };
-  projects.set(project.id, project);
-  return project;
+  const { data, error } = await getSupabaseClient()
+    .from("projects")
+    .insert({
+      owner_id: ownerId,
+      customer_name: input.customerName,
+      site_address: input.siteAddress,
+    })
+    .select(COLUMNS)
+    .single();
+  if (error) throw error;
+  return toProject(data as ProjectRow);
 }

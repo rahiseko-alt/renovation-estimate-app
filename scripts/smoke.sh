@@ -8,6 +8,12 @@
 #
 # ここで使う AUTH_SECRET / DEMO_USER_* は、この検査の中だけで使い捨てる値を毎回生成している。
 # 本物の秘密情報ではない。実値は Vercel の環境変数で注入する。
+#
+# データの保存先はローカルの Supabase（Docker）。`pnpm exec supabase start` で
+# 起動し、SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY は CLI の `status -o env` から
+# 都度読む（値をこのファイルに書かない。CLI が出す値は起動のたびに同じなので
+# ハードコードしても意味は同じだが、コードのどこにも秘密情報の形をした文字列を
+# 置かないという方針を local/CI 用の値にも一貫させる）。
 
 set -uo pipefail
 
@@ -25,6 +31,25 @@ export AUTH_SECRET="$(head -c 48 /dev/urandom | base64 | tr -d '\n')"
 export DEMO_USER_EMAIL="smoke@example.com"
 export DEMO_USER_PASSWORD="$(head -c 24 /dev/urandom | base64 | tr -d '\n')"
 export NODE_ENV=production
+
+echo "== ローカル Supabase を起動 =="
+if ! docker info >/dev/null 2>&1; then
+  echo "FAIL: Docker デーモンに接続できない。ローカル Supabase の起動には Docker が要る。"
+  rm -rf "${WORK}"
+  exit 1
+fi
+if ! pnpm exec supabase start; then
+  echo "FAIL: supabase start に失敗した"
+  rm -rf "${WORK}"
+  exit 1
+fi
+pnpm exec supabase status -o env >"${WORK}/supabase.env"
+set -a
+# shellcheck disable=SC1091
+source "${WORK}/supabase.env"
+set +a
+export SUPABASE_URL="${API_URL}"
+export SUPABASE_SERVICE_ROLE_KEY="${SERVICE_ROLE_KEY}"
 
 FAILURES=0
 
