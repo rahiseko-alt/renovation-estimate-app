@@ -270,6 +270,61 @@ export const PHOTO_ALLOWED_TYPES = [
   "image/webp",
 ] as const;
 
+/** 見積エディタで、明細1行から下請への依頼を作るときの文言。 */
+export const QUOTE_REQUEST_FORM_TEXT = {
+  /** 明細行に出す、依頼フォームを開くボタン。 */
+  openButton: "下請に単価を頼む",
+  markupRateLabel: "掛率",
+  markupRateHint:
+    "下請から届いた原価単価にこの倍率を掛けて、見積の単価にします（例: 1.25）。",
+  submit: "リンクを発行する",
+  submitting: "発行中…",
+  cancel: "やめる",
+  invalidMarkupRate: "掛率を数字で入力してください（0以上）。",
+  failed: "依頼の作成に失敗しました。もう一度お試しください。",
+  /** リンク発行後に出す説明・ボタン。 */
+  linkReady: "このリンクを下請に送ってください。",
+  copyButton: "リンクをコピー",
+  copied: "コピーしました。",
+} as const;
+
+/** 見積エディタの下請への依頼一覧の文言。 */
+export const QUOTE_REQUESTS_LIST_TEXT = {
+  heading: "下請への依頼",
+  empty: "依頼はまだありません。",
+  itemLabel: "工事項目",
+  quantityLabel: "数量",
+  statusLabels: {
+    pending: "回答待ち",
+    responded: "回答あり",
+    imported: "取り込み済み",
+  } as const,
+  costUnitPriceLabel: "原価単価",
+  markupRateLabel: "掛率",
+  sellingUnitPriceLabel: "見積に入る単価",
+  importButton: "取り込む",
+  importing: "取り込み中…",
+  importFailed: "取り込みに失敗しました。もう一度お試しください。",
+} as const;
+
+/** 下請の回答画面（/q/[token]。ログイン不要）の文言。 */
+export const QUOTE_RESPONSE_TEXT = {
+  heading: "単価のご回答",
+  description: "下記の工事項目について、原価単価のみご入力ください。",
+  itemLabel: "工事項目",
+  specLabel: "摘要（仕様）",
+  quantityLabel: "数量",
+  unitLabel: "単位",
+  costUnitPriceLabel: "原価単価（円）",
+  submit: "回答する",
+  submitting: "送信中…",
+  invalidCostUnitPrice: "原価単価を数字で入力してください（0以上）。",
+  failed: "送信に失敗しました。もう一度お試しください。",
+  thanks: "回答しました。ありがとうございました。",
+  alreadyResponded: "この依頼は既に回答済みです。ご協力ありがとうございました。",
+  notFound: "この依頼は見つかりません。リンクをご確認ください。",
+} as const;
+
 /** 案件詳細画面の写真セクションの文言。 */
 export const PHOTO_TEXT = {
   heading: "写真",

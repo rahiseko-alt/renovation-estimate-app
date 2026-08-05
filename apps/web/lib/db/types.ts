@@ -75,3 +75,41 @@ export type NewPhotoInput = {
   area: string;
   storagePath: string;
 };
+
+/** 依頼の状態。pending: 回答待ち / responded: 回答が届いた（未取り込み） / imported: 見積に取り込み済み。 */
+export type QuoteRequestStatus = "pending" | "responded" | "imported";
+
+/**
+ * 下請への見積依頼（明細1件ぶんの単価を頼む）。
+ * 明細行に永続IDが無いため（Photo の area と同じ理由）、依頼した時点の
+ * 工事項目・摘要・数量・単位をスナップショットとして持つ（lib/db/quoteRequests.ts 参照）。
+ */
+export type QuoteRequest = {
+  id: string;
+  projectId: string;
+  /** 作った利用者の識別子。他人の依頼を推測 ID で読み書きさせないための境界に使う。 */
+  ownerId: string;
+  /** 回答画面 /q/[token] の資格情報。 */
+  token: string;
+  itemName: string;
+  itemSpec: string;
+  quantity: number;
+  unit: string;
+  taxCategory: TaxCategory;
+  markupRate: number;
+  costUnitPrice: number | null;
+  status: QuoteRequestStatus;
+  respondedAt: string | null;
+  importedAt: string | null;
+  createdAt: string;
+};
+
+export type NewQuoteRequestInput = {
+  projectId: string;
+  itemName: string;
+  itemSpec: string;
+  quantity: number;
+  unit: string;
+  taxCategory: TaxCategory;
+  markupRate: number;
+};

@@ -6,6 +6,8 @@ import {
   TAX_CATEGORY_LABELS,
   UNITS,
 } from "../lib/content";
+import { isValidNumberInput } from "../lib/estimateLineValidation";
+import { QuoteRequestButton } from "./QuoteRequestButton";
 
 /** 明細1行の入力中の値。空欄・変換不能な入力も許すため、数値も文字列で持つ。 */
 export type EditableLine = {
@@ -22,6 +24,7 @@ export type EditableLine = {
 const TAX_CATEGORIES = Object.keys(TAX_CATEGORY_LABELS) as TaxCategory[];
 
 type Props = {
+  projectId: string;
   line: EditableLine;
   /** 数量が数字として読めないとき true（保存から静かに消さず、その場で知らせるため）。 */
   quantityInvalid: boolean;
@@ -41,6 +44,7 @@ const NUMBER_FIELD_INVALID = `${NUMBER_FIELD_BASE} border-red-700 bg-red-50`;
  * ラベルは htmlFor で対応する入力欄と結び付け、支援技術が読み上げられるようにする。
  */
 export function EstimateLineRow({
+  projectId,
   line,
   quantityInvalid,
   unitPriceInvalid,
@@ -188,6 +192,19 @@ export function EstimateLineRow({
           ))}
         </select>
       </div>
+
+      {line.kind === "item" && isValidNumberInput(line.quantity) ? (
+        <QuoteRequestButton
+          projectId={projectId}
+          item={{
+            name: line.name,
+            spec: line.spec,
+            quantity: Number(line.quantity),
+            unit: line.unit,
+            taxCategory: line.taxCategory,
+          }}
+        />
+      ) : null}
 
       <button
         type="button"
