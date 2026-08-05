@@ -56,3 +56,22 @@ export type NewPriceMasterItemInput = {
   unitPrice: number;
   taxCategory: TaxCategory;
 };
+
+/** 案件に紐づく写真。特定の明細行ではなく「箇所」単位で管理する（lib/content.ts の PHOTO_AREAS）。 */
+export type Photo = {
+  id: string;
+  projectId: string;
+  /** 登録した利用者の識別子。他人の写真を推測 ID で読み書きさせないための境界に使う。 */
+  ownerId: string;
+  /** 箇所（PHOTO_AREAS のいずれか）。 */
+  area: string;
+  /** Supabase Storage バケット "photos" 内のオブジェクトキー。 */
+  storagePath: string;
+  createdAt: string;
+};
+
+export type NewPhotoInput = {
+  projectId: string;
+  area: string;
+  storagePath: string;
+};

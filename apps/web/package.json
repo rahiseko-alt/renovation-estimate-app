@@ -13,6 +13,7 @@
   "dependencies": {
     "@cantoo/pdf-lib": "^2.8.1",
     "@supabase/supabase-js": "^2.112.0",
+    "browser-image-compression": "^2.0.2",
     "fontkit": "^2.0.4",
     "next": "^16.2.12",
     "react": "^19.0.0",

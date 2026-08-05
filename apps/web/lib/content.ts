@@ -247,3 +247,23 @@ export const PHOTO_AREAS = [
   "屋根",
   "その他",
 ] as const;
+
+/** 案件詳細画面の写真セクションの文言。 */
+export const PHOTO_TEXT = {
+  heading: "写真",
+  empty: "写真はまだありません。",
+  areaLabel: "箇所",
+  fileLabel: "写真を撮る・選ぶ",
+  uploadButton: "追加する",
+  uploading: "追加中…",
+  deleteButton: "削除",
+  deleting: "削除中…",
+  /** ファイル未選択で送信しようとしたとき。 */
+  noFileSelected: "写真を選んでください。",
+  /** compress.ts の InvalidPhotoTypeError。 */
+  invalidType: "画像ファイルを選んでください。",
+  /** compress.ts の PhotoTooLargeError。 */
+  tooLarge: "20MBを超える写真は追加できません。",
+  uploadFailed: "写真の追加に失敗しました。もう一度お試しください。",
+  deleteFailed: "写真の削除に失敗しました。もう一度お試しください。",
+} as const;

@@ -1,10 +1,13 @@
 # ローカル/CI 用の Supabase スタック設定。
 # `pnpm exec supabase start` で Docker 上に起動する。
 #
-# このアプリは Supabase Storage・Realtime・Edge Functions を使っていない
-# （写真保存はフェーズ2で着手時に検討する）。使っていないものを起動しても検証に
-# ならないため、これらは無効にしている。将来使うようになったら、その機能を
-# 実装するタイミングでここを有効化する。
+# このアプリは Realtime・Edge Functions を使っていない。使っていないものを
+# 起動しても検証にならないため、これらは無効にしている。将来使うようになったら、
+# その機能を実装するタイミングでここを有効化する。
+#
+# [storage] はフェーズ2（写真）で有効化した。lib/db/photoStorage.ts が
+# バケット "photos"（supabase/migrations/ で作成）に対して実際にアップロード・
+# 署名付きURL発行・削除を行う。
 #
 # [auth] だけは例外的に有効にしている。認証そのものは今も lib/auth/ の自前実装
 # （Supabase Auth は使っていない）だが、`supabase status -o env` が API キー
@@ -51,7 +54,7 @@ enabled = false
 enabled = false
 
 [storage]
-enabled = false
+enabled = true
 
 [auth]
 enabled = true
