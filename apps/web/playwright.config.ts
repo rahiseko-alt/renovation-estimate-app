@@ -24,6 +24,9 @@ export default defineConfig({
     url: BASE_URL,
     reuseExistingServer: false,
     timeout: 60_000,
+    // サーバ側の例外（Server Component / Server Action のエラー）をテストのログに出す。
+    stdout: "pipe",
+    stderr: "pipe",
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
 });

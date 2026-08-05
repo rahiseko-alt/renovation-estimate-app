@@ -127,6 +127,12 @@ test("写真→明細→下請依頼→取り込み→見積書PDFまでの一�
   page,
   browser,
 }) => {
+  // 失敗時に原因が分かるよう、ブラウザ側の例外・コンソールエラーをCIのログに出す。
+  page.on("pageerror", (error) => console.error("[pageerror]", error));
+  page.on("console", (message) => {
+    if (message.type() === "error") console.error("[console.error]", message.text());
+  });
+
   await login(page);
   const projectId = await createProject(page);
   await uploadPhoto(page);
