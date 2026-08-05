@@ -3,7 +3,10 @@ name: prod-smoke
 # 本番到達の外部事実チェック。
 # 実行環境(サンドボックス)は *.vercel.app への外向きが遮断されるため、
 # プロキシ外の実機である GitHub Actions に本番URLを curl させて機械判定する。
-# この run が緑＝「公開URLが 200 かつ本文に 'リフォーム見積'」の evidence。
+# この run が緑＝「公開URLが 200 かつ本文に 'リフォーム見積'」で、かつ
+# 「アプリから本番DBへ到達できている」ことの evidence。
+# 検査は、壊れたときに実際に赤くなる経路を含めること。DBに触らない経路だけを見ていると、
+# 環境変数もテーブルも無い本番を緑と判定する（docs/failures.md 2026-08-05）。
 on:
   workflow_dispatch:
   push:
@@ -12,6 +15,11 @@ on:
 # 本番URL（Vercel production alias）。
 env:
   PROD_URL: "https://renovation-estimate-app-web.vercel.app"
+  # DB到達の検査に使うトークン。実在しない UUID でよいが、**UUID形式であること**が要る。
+  # getQuoteRequestByToken は `if (!isUuid(token)) return null;` で早期returnするため、
+  # UUID形式でない文字列ではDBに一度も問い合わせず、環境変数もテーブルも無い状態で
+  # 200 を返してしまい、検査が何も検証しないものになる。
+  PROD_DB_PROBE_TOKEN: "00000000-0000-0000-0000-000000000000"
 
 jobs:
   reachable:
@@ -50,3 +58,55 @@ jobs:
           echo "HTTP(/api/health)=${code}"
           test "${code}" = "200"
           echo "HEALTH OK: /api/health が 200"
+
+      - name: DBに到達する経路 /q/<uuid> が 200
+        run: |
+          # 上の3つ（トップページ・HSTS・/api/health）はどれもDBに触らないため、
+          # 本番の環境変数（SUPABASE_URL 等）が未設定でも、テーブルが1つも
+          # 適用されていなくても緑になる。実際にそれで本番が壊れたまま
+          # このワークフローが緑だった（docs/failures.md 2026-08-05）。
+          #
+          # /q/[token] はログイン不要で getQuoteRequestByToken を通り、
+          # 必ず本番DBへ問い合わせる。テーブルが無い・接続できないときは
+          # 例外がそのまま 500 になるので、200 であることが「アプリからDBへ
+          # 到達できている」外部事実になる。実在しない UUID を使うので、
+          # 応答は「この依頼は見つかりません」の画面（200）になる。
+          url="${PROD_URL}/q/${PROD_DB_PROBE_TOKEN}"
+          echo "Checking ${url}"
+          code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 30 "${url}")
+          echo "HTTP(/q/<uuid>)=${code}"
+          if [ "${code}" != "200" ]; then
+            echo "FAIL: 期待 200 に対し ${code}。DBに到達する経路が壊れている"
+            echo "  （本番の環境変数 SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY の未設定、"
+            echo "    または supabase/migrations/ が本番DBに未適用の可能性が高い）"
+            exit 1
+          fi
+          echo "DB OK: /q/<uuid> が 200（アプリから本番DBへ到達できている）"
+
+      - name: CSP の img-src に写真ストレージのオリジンがある
+        run: |
+          # CSP は lib/security/csp.ts が SUPABASE_URL からオリジンを足して組み立てる。
+          # 未設定・不正なら img-src は 'self' data: blob: だけになるので、
+          # ここに https:// のオリジンがあるかどうかで環境変数の設定漏れを直接検知できる。
+          # ストレージの提供元名（ホスト名）はここに書かない。書くと提供元を替えるたびに
+          # この検査も直すことになり、値が2箇所に分かれる（AGENTS.md「結合を増やさない」1）。
+          # 検査するのは「オリジンが1つ以上入っていること」だけにする。
+          #
+          # ヘッダは proxy.ts がリクエストごとに付けるため、HEAD ではなく GET で取る
+          # （docs/failures.md 2026-08-04「proxy が付けるヘッダを HEAD で検査して誤判定」）。
+          # grep が何も拾わないと非0で終わるため、ここでは落とさずに下の判定へ渡す
+          # （「CSP ヘッダが無い」を、原因の分かるメッセージで落としたい）。
+          csp=$(curl -sS -D - -o /dev/null --max-time 30 "${PROD_URL}" \
+            | tr -d '\r' | grep -i '^content-security-policy:' || true)
+          img_src=$(printf '%s' "${csp}" | tr ';' '\n' | grep -i 'img-src' || true)
+          if [ -z "${img_src}" ]; then
+            echo "FAIL: 応答の CSP に img-src が無い"
+            exit 1
+          fi
+          echo "img-src:${img_src}"
+          if ! printf '%s' "${img_src}" | grep -q 'https://'; then
+            echo "FAIL: CSP の img-src に写真ストレージのオリジンが無い"
+            echo "  （本番の環境変数 SUPABASE_URL が未設定、または URL として不正）"
+            exit 1
+          fi
+          echo "CSP OK: img-src に写真ストレージのオリジンを確認"
