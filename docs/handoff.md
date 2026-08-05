@@ -35,8 +35,11 @@
   一意制約違反の競合が起きたら作り直さず取りに行き直す。
 - 既存の `tests/db.test.ts` を、モックにせずローカル Supabase（Docker）に対して実際に
   クエリを出して検証する形に変更。Supabase CLI をルートの devDependency に追加し、
-  ローカル/CI とも `pnpm exec supabase start` で毎回まっさらに起動する。接続情報は
-  コードのどこにも決め打ちで書かず、CLI の `supabase status -o env` から都度読む。
+  ローカル/CI とも `pnpm exec supabase start` で起動する。CI は毎回まっさらな
+  ランナー上で起動するため常にまっさらだが、**ローカルは `supabase start` だけでは
+  前回のデータが Docker ボリュームに残る**（`supabase db reset` 等を別途叩かない限り
+  リセットされない）。接続情報はコードのどこにも決め打ちで書かず、CLI の
+  `supabase status -o env` から都度取得する。
 - CodeRabbit の指摘4件（`.env.example` のキー順序、`client.ts` への `server-only`
   import 追加、`ci.yml` の `supabase status` 取得を fail-fast 化、`scripts/smoke.sh` の
   環境変数 export を必要な2つだけに絞る）はコミット `8dbd4d2` で対応済み。
@@ -67,8 +70,10 @@
   `PHOTO_AREAS` が `lib/content.ts` に定義済み）を選ぶ→該当する明細行に自動で紐づける。
 - **保存先は Supabase Storage を使う**（今回のブロッカー解消により選択の余地が無くなった。
   以前の handoff にあった「ローカル仮実装で先に画面を作るか」の判断は不要になった）。
-  バケットの公開・非公開設定と、案件の所有者以外がアクセスできないようにする方法
-  （署名付きURL or RLS相当の制御）を先に決める。
+  バケットは非公開にする。**サーバーは service_role キーで接続するため RLS は素通りする
+  （`lib/db/` と同じ構図）。** したがって所有者以外がアクセスできない保証は RLS ではなく、
+  アップロード・取得・削除・署名付きURL発行のすべてで `lib/db/` 側の所有者チェックと
+  同じパターン（サーバー側で案件の所有者を検証してから Storage を操作する）を必須にする。
 - **写真の向きの扱い（順序を間違えると縦写真が寝る）**：canvas で再エンコードすると
   EXIF は落ちるので、**元ファイルから向きを読む → その回転を画素に適用して描画 →
   最後に圧縮**の順にする（圧縮後に EXIF を読もうとしても、もう無い）。
