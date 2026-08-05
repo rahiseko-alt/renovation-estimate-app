@@ -238,10 +238,14 @@ PROJECTS_HEADERS=$(curl -s -D - -o "${WORK}/projects.html" -H "Cookie: rea_sessi
 check_csp_and_nonce "/projects" "${PROJECTS_HEADERS}" "${WORK}/projects.html"
 # img-src が Supabase Storage のオリジンを許可していないと、撮った写真のサムネイルが
 # CSP でブロックされ、ブラウザに何も表示されなくなる（docs/failures.md 参照）。
-if printf '%s' "${PROJECTS_HEADERS}" | grep -iq "^content-security-policy:.*img-src[^;]*${SUPABASE_URL}"; then
+# CSP側（lib/security/csp.ts）は new URL(SUPABASE_URL).origin で正規化した値を使うため、
+# ここも同じ正規化をしてから比較する（末尾スラッシュ等の差でFAILしないように）。
+SUPABASE_ORIGIN=$(node -e 'console.log(new URL(process.env.SUPABASE_URL).origin)')
+IMG_SRC_DIRECTIVE=$(printf '%s' "${PROJECTS_HEADERS}" | grep -i "^content-security-policy:" | grep -o "img-src[^;]*")
+if printf '%s' "${IMG_SRC_DIRECTIVE}" | grep -qF "${SUPABASE_ORIGIN}"; then
   echo "  OK   CSP img-src が写真ストレージのオリジンを許可"
 else
-  echo "  FAIL CSP img-src が写真ストレージのオリジン（${SUPABASE_URL}）を許可していない"
+  echo "  FAIL CSP img-src が写真ストレージのオリジン（${SUPABASE_ORIGIN}）を許可していない"
   FAILURES=$((FAILURES + 1))
 fi
 

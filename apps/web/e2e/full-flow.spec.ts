@@ -131,10 +131,14 @@ test("写真→明細→下請依頼→取り込み→見積書PDFまでの一�
   page,
   browser,
 }) => {
-  // 失敗時に原因が分かるよう、ブラウザ側の例外・コンソールエラーをCIのログに出す。
-  page.on("pageerror", (error) => console.error("[pageerror]", error));
+  // ブラウザ側の例外・コンソールエラーを集めておき、最後にまとめて空であることを確かめる
+  // （起きていないはずの不具合を見逃さないため。個別のconsole.error出力はしない）。
+  const browserErrors: string[] = [];
+  page.on("pageerror", (error) => browserErrors.push(`[pageerror] ${error}`));
   page.on("console", (message) => {
-    if (message.type() === "error") console.error("[console.error]", message.text());
+    if (message.type() === "error") {
+      browserErrors.push(`[console.error] ${message.text()}`);
+    }
   });
 
   await login(page);
@@ -157,4 +161,6 @@ test("写真→明細→下請依頼→取り込み→見積書PDFまでの一�
   // 見積書PDFの出力ボタンは案件詳細ページ（見積エディタの外）にある。
   await page.goto(`/projects/${projectId}`);
   await downloadPdf(page);
+
+  expect(browserErrors, browserErrors.join("\n")).toEqual([]);
 });
