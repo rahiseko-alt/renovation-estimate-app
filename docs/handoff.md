@@ -5,134 +5,99 @@
 
 ## ①今回実施
 
+**フェーズ1（見積が作れてPDFが出る）が完了した。**
+
 **確認済みの外部事実（このメモの自己申告ではなく、CI run・commit・公開URLで裏が取れているもの）：**
 
 - PR #7 が commit `6f0cbab` として `main` にマージ済み（フェーズ0＋案件登録・見積エディタ）。
 - PR #9 が commit `2111094` として `main` にマージ済み（`prod-smoke.yml` を実URLに接続）。
 - PR #10 が commit `bc4d84c` として `main` にマージ済み（単価マスタ）。
 - PR #11 が commit `c875b24` として `main` にマージ済み（PR #10 の CodeRabbit 指摘4件の修正）。
-  CI run: https://github.com/rahiseko-alt/renovation-estimate-app/actions/runs/30924247255
+- **PR #12 が commit `2808031` として `main` にマージ済み（見積書PDF出力。フェーズ1完了）。**
+  CI run: https://github.com/rahiseko-alt/renovation-estimate-app/actions/runs/30938608457
   （typecheck/lint/test/build 成功）。prod-smoke run:
-  https://github.com/rahiseko-alt/renovation-estimate-app/actions/runs/30924224378
+  https://github.com/rahiseko-alt/renovation-estimate-app/actions/runs/30938599501
   （`prod 200 + marker` 成功＝本番URLへの反映を確認）。
 
-**未確認のまま（自己申告のみで外部事実の裏が無い項目。変わらず）：**
+**本番で動作確認済み（2026-08-04・利用者が実機で実施）：**
 
-- Vercel の環境変数（`AUTH_SECRET` / `DEMO_USER_EMAIL` / `DEMO_USER_PASSWORD`）が設定済みかどうか。
-- 本番URLでの実際のログイン成功（prod-smoke はトップページ・ヘルスチェックのみ）。
+- Vercel の環境変数（`AUTH_SECRET` / `DEMO_USER_EMAIL` / `DEMO_USER_PASSWORD`）を
+  利用者が設定し、再デプロイ済み。
+- **本番URLで「ログイン → 案件登録 → 見積入力・保存 → PDF出力」の通しの操作が
+  成功することを利用者が実機で確認した。** フェーズ1の受け入れ条件はこれで満たされ、
+  顧客に触ってもらえる状態になった。
+- こちら側での裏付け：偽の署名を持つセッションCookieを本番に送っても 500 にならず
+  307 でログイン画面へ戻ることを確認（`AUTH_SECRET` が有効な値で機能している証拠。
+  未設定・32文字未満なら `lib/auth/session.ts` が例外を投げて 500 になる）。
+
+**未確認のまま：**
+
 - Supabase 側のスキーマ移行（まだ未着手。下記「ブロッカー」参照）。
+  現状の `lib/db/` は仮のメモリ実装のため、**再デプロイやサーバー再起動で
+  登録したデータは消える**。デモとして触る分には動くが、その性質は把握しておく。
 
-**フェーズ1の残りだった「pdfme での協議会様式 PDF 出力」を実装した。**
-ユーザーから「GO」の指示を受けて着手。実装方針は当初計画の pdfme から変更している：
+**PR #12（見積書PDF出力）の実装内容の要点**（詳細はコミット履歴・PRの説明を参照）：
 
-- **pdfme ではなく `@cantoo/pdf-lib`（pdf-libのフォーク）+ `fontkit`（本家パッケージ、
-  `@pdf-lib/fontkit` ではない）を採用した。** 理由は2つ。①pdfme の
-  `@pdfme/schemas` は本見積書に不要な依存（バーコード・日付ピッカー・
-  署名パッド等）を大量に引き込む。②本家 `pdf-lib` + `@pdf-lib/fontkit` の
-  組み合わせは、日本語フォントのサブセット化で**一部の文字を無言で欠落させる
-  実害のあるバグ**を実機検証で確認した（`docs/failures.md` 2026-08-04
-  参照）。`@cantoo/pdf-lib` + 本家 `fontkit` の組み合わせで、実ブラウザ
-  （Chromium/PDFium）とPyMuPDFの両方で文字欠落が無いことを確認してから実装した。
-- **フォントは BIZ UDPGothic（OFLライセンス、Google Fonts配布の静的TrueType）
-  を採用**（`apps/web/lib/pdf/assets/`。ライセンス全文は同ディレクトリの
-  `OFL.txt`）。AGENTS.md の元計画が挙げていたUI側の第一候補フォントと揃えている。
-  Regular/Bold 合わせて約9.3MB。`next.config.ts` に `outputFileTracingIncludes`
-  を追加し、Vercel のデプロイに含める設定をした（fs.readFileSyncで読むだけの
-  ファイルはデフォルトのトレースに含まれないため）。
-- **`app/**/route.ts`（Route Handler）ではなく Server Action で実装した。**
-  最初 Route Handler で実装したところ、同じ案件がページでは見つかるのに
-  Route Handler からは常に404になる不具合に遭遇し、実機デバッグの結果
-  「Route Handler は Server Component/Server Action と別のモジュールグラフに
-  バンドルされ、仮のメモリDB（`lib/db/` のモジュールスコープ `Map`）を
-  共有しない」ことが根本原因と判明した（`docs/failures.md` 2026-08-04 参照）。
-  `app/projects/[id]/pdf-actions.ts` の Server Action
-  （`generateEstimatePdfAction`）に作り直し、結果をbase64にしてクライアント
-  コンポーネント（`components/DownloadPdfButton.tsx`）に返し、ブラウザ側で
-  Blobダウンロードする形にしたところ解消した。**Supabase接続後（`lib/db/` を
-  実DBに差し替えた後）はこの制約自体が無くなるが、それまでは新しい呼び出し
-  入口を Route Handler で作らないこと。**
-- レイアウトは住宅リフォーム推進協議会の様式（工事項目／摘要／数量／単位／単価／
-  金額の6列＋集計欄＋添付書類・保管の注記）。会社情報（請負者名・代表者・住所・印）
-  を入力する画面がまだ無いため、その欄は省略している（未確認事項として残す）。
-  明細が1ページに収まらない場合は表の見出し行を繰り返して自動改ページする。
-  金額列は省略記号で詰めず、収まらなければ文字サイズを縮めて必ず全桁を表示する
-  （`lib/pdf/layout.ts` の `drawNumericCell`。金額を黙って削らない設計）。
+- pdfme ではなく `@cantoo/pdf-lib`（pdf-libのフォーク）+ 本家 `fontkit` を採用。
+  理由・調査過程は `docs/failures.md` 2026-08-04 の2件を参照。
+- フォントは BIZ UDPGothic（OFLライセンス。`apps/web/lib/pdf/assets/OFL.txt`）。
+- Route Handler ではなく Server Action（`app/projects/[id]/pdf-actions.ts`）で実装。
+  理由は `docs/failures.md` 参照（仮メモリDBがモジュールグラフをまたいで共有されない）。
+- CodeRabbit のレビューで CWE-400（DoS）2件の指摘を受け、その場で修正：
+  工事項目・摘要に文字数上限（`MAX_TEXT_LENGTH` 200文字）、明細行数に上限
+  （`MAX_LINE_COUNT` 500行）を `lib/calc.ts` に追加。PDFの `fitText` も
+  二分探索に書き換えた。フォントライセンス表記への指摘は診た上で反証し
+  （Google Fonts公式リポジトリとSHA-256一致を確認）、CodeRabbit側が撤回した。
 
-**確認済みの外部事実（PDF機能・PR #12）**：draft PR #12 として push 済み
-（commit `c25537f`）。CI run（typecheck/lint/test/build）：
-https://github.com/rahiseko-alt/renovation-estimate-app/actions/runs/30937470344
-（成功）。prod-smoke run：
-https://github.com/rahiseko-alt/renovation-estimate-app/actions/runs/30937464342
-（`prod 200 + marker` 成功）。
+**ルールを2つ改訂した（AGENTS.md。恒久的なので引継ぎではなくそちらに書いた）：**
 
-**ローカルでの観測（外部事実の裏はまだ無い。上の commit `c25537f` 時点の話）**：
-typecheck・lint・test・`pnpm -r build`・`pnpm audit`・`scripts/smoke.sh` を
-ローカルで実行し、いずれも通った。本番相当ビルド（`next build && next start`）を
-起動し、Playwright（スクラッチ実行）で「案件作成→見積エディタに複数行
-（値引き含む）入力→保存→PDFダウンロード→ダウンロードしたPDFの内容を
-pdf-libで読み直して検証、PyMuPDFで画像化して目視確認」を行い、金額・値引きの
-▲表記・税額・合計が正しく反映されることと、未ログインでは案件詳細ページ自体が
-ログイン画面に飛ぶことを、この場では確認した。これらはローカル観測であり、
-CI run や公開URLでの裏は取れていない（別途 CI の結果自体が外部事実）。
-
-**PR #12 への CodeRabbit レビューで4件の指摘を受け、3件を修正・1件は
-検証のうえ反証してこのメモの直後に別 commit として push する：**
-
-1. **`EstimateLine.name`／`spec` に文字数上限が無く、`lib/pdf/layout.ts` の
-   `fitText`（1文字ずつ削って幅を測る実装）と組み合わせると、長大な文字列を
-   保存してPDF生成時にCPUを浪費させられる（CWE-400・Major）。** 修正：
-   `lib/calc.ts` に `MAX_TEXT_LENGTH`（200文字）を追加し `assertValidLine` で
-   検証。`fitText` 自体も二分探索に書き換え、幅の再計測回数を線形に抑えた。
-2. **見積の明細行数に上限が無く、`generateEstimatePdfAction` が全行を
-   無制限にPDF化してbase64にする（CWE-400・Major）。** 修正：
-   `lib/calc.ts` に `MAX_LINE_COUNT`（500行）を追加し `calcEstimate` で検証
-   （`saveEstimateAction` は `calcEstimate` を通すので保存時点で弾かれる）。
-3. `docs/handoff.md` のPDF機能の節が、CI run・commit の裏が無い自己申告の
-   ままだった指摘。この節がその修正版（上の「確認済みの外部事実」参照）。
-4. **反証した1件**：`apps/web/lib/pdf/assets/OFL.txt` が埋め込んでいる
-   BIZUDPGothicではなくBIZ UDMinchoのライセンスに見える、という指摘。
-   `diff <(curl 実際の Google Fonts 公式リポジトリの ofl/bizudpgothic/OFL.txt)
-   apps/web/lib/pdf/assets/OFL.txt` で差分が無いことを確認済み（`bizudgothic`
-   側のOFL.txtとも一致し、Morisawaの複数バリアントを1つの上流リポジトリで
-   まとめているための表記と判断）。PR上でCodeRabbitに根拠付きで返信済み。
-
-上記1・2の修正は typecheck・lint・test（120件全部緑。9件追加）を
-ローカルで確認済み。まだ push していない（このメモの直後に行う）。
+- 秘密情報の扱いを「保存先の列挙」から「**エージェントが実値を生成・表示・受領しない**」
+  という経路非依存の書き方に変更（公開前提1）。露出時の切り分け基準も
+  「その値が既に運用に入っているか」の一点に固定した。
+- **PR はフェーズにつき1つ**、および **squash マージ後はブランチを作り直してから
+  次の変更に着手する**を明文化（実装の進め方）。
 
 ## ②今回トラブル
 
-`docs/failures.md` に2026-08-04付けで2件追記した（要約）：
+`docs/failures.md` に2026-08-04付けで3件追記済み（内容はそちらを見る）。見出しだけ：
 
-1. **pdf-lib + @pdf-lib/fontkit の日本語サブセット化バグ**：保存は例外なく
-   成功するのに、一部の文字が無言で欠落する。`@cantoo/pdf-lib` + 本家
-   `fontkit` に差し替えて解消。教訓：PDF生成の「保存成功」は「正しく描画
-   される」の証明にならない。生成後に別のレンダラで実際に開いて確認する。
-2. **Route Handler と Server Action/ページで仮メモリDBのインスタンスが
-   共有されない**：教訓・回避策は上の①に記載のとおり。Supabase移行までは
-   新しい呼び出し入口を Route Handler で作らない。
+1. pdf-lib + @pdf-lib/fontkit の日本語サブセット化バグ（文字が無言で欠落する）
+2. Route Handler と Server Action/ページで仮メモリDBのインスタンスが共有されない
+3. 署名鍵の実値をエージェントが生成してチャットに表示した（＋その報告を、
+   過小評価と過大評価の両方向に歪めた）
+
+3件目に付随して、利用者に環境変数の設定を何度もやり直させる形になった。
+**急ぎでない作業を持ち出したうえ、エラーのたびに追加の手順を投げ返したのが原因。**
+非エンジニアの利用者に画面操作を依頼するときは、(a) 本当に今必要か、
+(b) こちらで代われない部分はどこか、を先に確認してから頼む。
 
 ## ③次回やる事
 
-**フェーズ1は今回でほぼ完了**（単価マスタ・PDF出力まで実装済み）。残るのは：
+**まず最初に：このブランチ（`claude/new-app-init-hufsv1`）に、まだ `main` に
+入っていないコミットが4つある**（AGENTS.mdのルール改訂2件、引継ぎ更新2件。
+いずれもドキュメント・ルールのみでコードは含まない）。利用者に確認して、
+マージするか、次フェーズのPRに同梱するかを決める。
 
-- Supabase 接続後、`lib/db/` の仮のメモリ実装を実DBに差し替え
-  **（ブロッカーあり。下記参照）**
-- （任意・優先度低）会社情報（請負者名・代表者・住所・印）の設定画面。
-  無いと見積書PDFのその欄が空のまま。
+**次はフェーズ2（写真）。1フェーズ1PRの運用で進める。**
 
-**Supabase実DB移行のブロッカー**（変わらず）：このセッションには
-Supabase・Vercel の MCP接続が無く、あなたのSupabaseプロジェクトに直接
-アクセスする手段が無い。実DBへのスキーマ移行（テーブル作成・RLS設定）は、
-こちらがSQLを書いても、ユーザーがSupabaseのSQL Editorに貼って実行する
-という手作業が必ず挟まる。また、Vercelの環境変数（`AUTH_SECRET` /
-`DEMO_USER_EMAIL` / `DEMO_USER_PASSWORD`）もユーザーがVercelの画面で
-設定する必要がある。次回セッションの最初に、本番URLで実際にログイン
-できるかを確認すること。
+- **フェーズ2（写真）**：OS標準カメラで撮影（`<input type="file" accept="image/*"
+  capture="environment">`。ブラウザ内に独自カメラUIは作らない）→箇所（キッチン/浴室 等。
+  `PHOTO_AREAS` が `lib/content.ts` に定義済み）を選ぶ→該当する明細行に自動で紐づける。
+  圧縮したあとにcanvasでEXIF回転を焼き込む順序に注意（逆にすると圧縮でEXIFが落ちる）。
+- **着手前に判断が要る**：写真の保存先。Supabase Storage が本来の想定だが、下記の
+  ブロッカーが未解消。ローカルの仮実装で先に画面を作るか、Supabase接続を先に済ませるかを
+  利用者と決めてから始める。
+
+**Supabase実DB移行のブロッカー**：このセッションには Supabase の MCP接続が無く、
+利用者のSupabaseプロジェクトに直接アクセスする手段が無い。スキーマ移行
+（テーブル作成・RLS設定）は、こちらがSQLを書いても、利用者がSupabaseの
+SQL Editorに貼って実行する手作業が挟まる。**ただしフェーズ1の環境変数設定で、
+利用者に画面操作を頼むこと自体は問題なくできると分かった**（②の反省のとおり、
+頼み方には注意する）。実DBに移れば、仮メモリ実装のデータ揮発と、
+Route Handler が使えない制約の両方が同時に解消する。
 
 その後の想定（元の実装計画より。計画書自体はこのリポジトリには無い）：
 
-- **フェーズ2（写真）**：OS標準カメラで撮影→箇所（キッチン/浴室 等）を選ぶ→
-  該当する明細行に自動で紐づける。
 - **フェーズ3（下請とのやり取り）**：明細を選んで見積依頼リンクを発行し、下請はログイン不要で
   単価だけ入力できる回答画面から回答。取り込むと原価→掛率→売価に反映される。
 - **フェーズ4（UX仕上げ）**：50代の現場作業者が実機・実ブラウザで一連の流れを通しで
@@ -141,6 +106,9 @@ Supabase・Vercel の MCP接続が無く、あなたのSupabaseプロジェク�
 **検討事項**：アプリ全体のE2E/対話コンポーネントテスト基盤（Playwright or Testing Library）の
 導入。今回もPlaywrightはスクラッチ実行のみ（リポジトリ未導入）で確認した。
 フェーズ4「UXの実機確認」で正式に扱うか、もっと早い段階で入れるかは要判断。
+
+**任意・優先度低**：会社情報（請負者名・代表者・住所・印）の設定画面。無いと
+見積書PDFのその欄が空のまま。
 
 **まだ埋まっていない前提**（顧客に聞く必要がある、変わらず）:
 
