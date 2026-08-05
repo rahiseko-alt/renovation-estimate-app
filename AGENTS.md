@@ -54,6 +54,10 @@
 - lint / 型チェック: `pnpm --filter web lint` / `pnpm --filter web typecheck`
 - 起動スモーク（受け入れ条件を HTTP で機械判定）: `bash scripts/smoke.sh`（先に `pnpm -r build`）
   （Docker が要る。ローカル Supabase の起動もこのスクリプトの中で行う）
+- E2E（実ブラウザで一連の操作を機械判定）: `bash scripts/e2e.sh`（先に `pnpm -r build` と、
+  初回のみ `pnpm --filter web exec playwright install --with-deps chromium`）
+  （Docker が要る。ローカル Supabase の起動もこのスクリプトの中で行う。
+  アプリの起動・停止は Playwright（`apps/web/playwright.config.ts`）に任せる）
 - データの保存先（Supabase・PostgreSQL）: テーブル定義は `supabase/migrations/`。
   ローカル/CI は Docker 上のローカル Supabase に対して実際にクエリを出して検証する
   （モックにしない）。手元でテストや `pnpm --filter web dev` を動かす前に、
