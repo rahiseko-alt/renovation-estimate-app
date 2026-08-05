@@ -38,7 +38,11 @@ export async function uploadPhotoObject(
 export async function deletePhotoObject(path: string): Promise<void> {
   const { error } = await getSupabaseClient().storage.from(BUCKET).remove([path]);
   if (error) {
-    console.error(`写真ストレージの削除に失敗した（path=${path}）:`, error);
+    // path を console.error の第一引数（フォーマット文字列扱いされる位置）に
+    // テンプレートリテラルで埋め込まない。path は最終的に projectId（URLパラメータ・
+    // 利用者が制御できる値）に由来するため、埋め込むと書式指定子として
+    // 解釈されうる（CWE-134）。第一引数は固定の文字列にし、値は別引数で渡す。
+    console.error("写真ストレージの削除に失敗した:", { path, error });
   }
 }
 
@@ -51,7 +55,9 @@ export async function createPhotoSignedUrl(
     .storage.from(BUCKET)
     .createSignedUrl(path, expiresInSeconds);
   if (error) {
-    console.error(`写真の署名付きURL発行に失敗した（path=${path}）:`, error);
+    // deletePhotoObject と同じ理由（CWE-134）で、path をテンプレートリテラルで
+    // 第一引数に埋め込まない。
+    console.error("写真の署名付きURL発行に失敗した:", { path, error });
     return null;
   }
   return data.signedUrl;
