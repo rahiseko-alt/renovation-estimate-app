@@ -236,17 +236,43 @@ export const PRICE_MASTER_TEXT = {
   addFromMasterEmpty: "単価マスタが空です。先に登録してください。",
 } as const;
 
-/** 写真を撮るときに選ぶ箇所。これが無いと明細への自動紐づけができない。 */
-export const PHOTO_AREAS = [
-  "キッチン",
-  "浴室",
-  "洗面",
-  "トイレ",
-  "内装",
-  "外壁",
-  "屋根",
-  "その他",
+/**
+ * 書類の中に置く「箇所」と、その箇所に決まっている工事項目名・単位。
+ *
+ * 見積依頼書では大分類の見出し行に相当し、写真枠と明細行がここにぶら下がる
+ * （docs/design.md 5章「写真をどこに入れるか」）。箇所が決まれば工事項目名と単位も
+ * 決まるため、現場では打たせない（docs/design.md 4章の「基本的に決まっている」側）。
+ *
+ * 工事項目名と単位の割り当ては**こちらの裁量**で決めたもので、業界の定めではない。
+ * 実務者レビュー（docs/design.md 8章）で見直す前提の初期値として扱う。
+ */
+export const WORK_AREAS = [
+  { area: "キッチン", itemName: "キッチン工事", unit: "式" },
+  { area: "浴室", itemName: "浴室工事", unit: "式" },
+  { area: "洗面", itemName: "洗面工事", unit: "式" },
+  { area: "トイレ", itemName: "トイレ工事", unit: "式" },
+  { area: "内装", itemName: "内装工事", unit: "㎡" },
+  { area: "外壁", itemName: "外壁工事", unit: "㎡" },
+  { area: "屋根", itemName: "屋根工事", unit: "㎡" },
+  { area: "その他", itemName: "その他工事", unit: "式" },
 ] as const;
+
+export type WorkArea = (typeof WORK_AREAS)[number];
+
+/**
+ * 写真を撮るときに選ぶ箇所の名前だけを取り出したもの。
+ * 写真テーブルが持つのは箇所の名前だけなので、検証・表示はこちらを使う
+ * （値の置き場所は WORK_AREAS に一本化する）。
+ */
+export const PHOTO_AREAS = WORK_AREAS.map((entry) => entry.area);
+
+/** 箇所を選ばせるときの初期値。WORK_AREAS の先頭を正とする。 */
+export const DEFAULT_PHOTO_AREA: string = WORK_AREAS[0].area;
+
+/** 箇所の名前から、決まっている工事項目名と単位を引く。知らない箇所なら null。 */
+export function findWorkArea(area: string): WorkArea | null {
+  return WORK_AREAS.find((entry) => entry.area === area) ?? null;
+}
 
 /**
  * 写真アップロードの上限（元ファイル、MB）。lib/photo/compress.ts（クライアント側の
