@@ -2,9 +2,25 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { DownloadPdfButton } from "../../../components/DownloadPdfButton";
+import { PhotosSection } from "../../../components/PhotosSection";
 import { getCurrentUser } from "../../../lib/auth/server";
+import { createPhotoSignedUrl } from "../../../lib/db/photoStorage";
+import { listPhotosForProject } from "../../../lib/db/photos";
 import { getProjectForOwner } from "../../../lib/db/projects";
-import { PROJECT_DETAIL_TEXT, PROJECTS_TEXT } from "../../../lib/content";
+import type { Photo } from "../../../lib/db/types";
+import {
+  PHOTO_SIGNED_URL_EXPIRES_SECONDS,
+  PROJECT_DETAIL_TEXT,
+  PROJECTS_TEXT,
+} from "../../../lib/content";
+
+async function withSignedUrl(photo: Photo) {
+  const url = await createPhotoSignedUrl(
+    photo.storagePath,
+    PHOTO_SIGNED_URL_EXPIRES_SECONDS,
+  );
+  return { ...photo, url };
+}
 
 export default async function ProjectDetailPage({
   params,
@@ -17,6 +33,9 @@ export default async function ProjectDetailPage({
 
   const project = await getProjectForOwner(id, user);
   if (!project) notFound();
+
+  const photos = await listPhotosForProject(project.id, user);
+  const photosWithUrl = await Promise.all(photos.map(withSignedUrl));
 
   return (
     <main className="mx-auto w-full max-w-md px-5 py-8">
@@ -38,6 +57,8 @@ export default async function ProjectDetailPage({
       >
         {PROJECTS_TEXT.back}
       </Link>
+
+      <PhotosSection projectId={project.id} initialPhotos={photosWithUrl} />
     </main>
   );
 }

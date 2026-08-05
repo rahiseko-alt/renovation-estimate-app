@@ -1,6 +1,16 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Server Action へのリクエスト本文の既定上限は1MB。写真アップロード
+  // （uploadPhotoAction）は圧縮後でも最大1.5MB（lib/photo/compress.ts の
+  // MAX_OUTPUT_MB）になりうる上、multipart/form-data のオーバーヘッドも乗るため、
+  // 既定のままだと圧縮後のファイルが Server Action に届く前に弾かれる。
+  experimental: {
+    serverActions: {
+      bodySizeLimit: "3mb",
+    },
+  },
+
   // 見積書PDFが埋め込むフォント（lib/pdf/assets/）は fs.readFileSync で読むだけで
   // import しないため、デフォルトのファイルトレースでは Vercel のデプロイに
   // 含まれない。全ルートを対象に明示的に含める（生成は app/projects/[id]/pdf-actions.ts
