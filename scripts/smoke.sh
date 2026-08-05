@@ -44,10 +44,10 @@ if ! pnpm exec supabase start; then
   exit 1
 fi
 pnpm exec supabase status -o env >"${WORK}/supabase.env"
-set -a
 # shellcheck disable=SC1091
+# ここで作られる DB_URL・JWT_SECRET 等、この検査が使わない値まで環境に
+# export しない（この検査が使うのは SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY だけ）。
 source "${WORK}/supabase.env"
-set +a
 export SUPABASE_URL="${API_URL}"
 export SUPABASE_SERVICE_ROLE_KEY="${SERVICE_ROLE_KEY}"
 

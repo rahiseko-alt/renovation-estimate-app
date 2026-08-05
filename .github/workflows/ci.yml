@@ -41,7 +41,12 @@ jobs:
       - name: Start local Supabase
         run: |
           pnpm exec supabase start
-          eval "$(pnpm exec supabase status -o env)"
+          status_output="$(pnpm exec supabase status -o env)"
+          eval "${status_output}"
+          if [ -z "${API_URL:-}" ] || [ -z "${SERVICE_ROLE_KEY:-}" ]; then
+            echo "FAIL: supabase status から API_URL / SERVICE_ROLE_KEY を取得できない"
+            exit 1
+          fi
           echo "SUPABASE_URL=${API_URL}" >> "$GITHUB_ENV"
           echo "SUPABASE_SERVICE_ROLE_KEY=${SERVICE_ROLE_KEY}" >> "$GITHUB_ENV"
 
