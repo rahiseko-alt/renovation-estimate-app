@@ -41,5 +41,11 @@ describe("compressPhotoForUpload", () => {
     const [calledFile, options] = compressCalls[0]!;
     expect(calledFile).toBe(file);
     expect(options).toMatchObject({ maxSizeMB: 1.5, maxWidthOrHeight: 1600 });
+    // libURL を自前ホストの同一オリジンに固定する。既定のまま（未指定）だと
+    // ライブラリが Web Worker 内で外部CDN（cdn.jsdelivr.net）を読みに行き、
+    // 現場の電波状況次第で失敗しうる（lib/photo/compress.ts のコメント参照）。
+    expect(options).toMatchObject({
+      libURL: "/vendor/browser-image-compression.js",
+    });
   });
 });

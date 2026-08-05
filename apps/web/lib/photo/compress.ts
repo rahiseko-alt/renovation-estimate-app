@@ -14,6 +14,13 @@
 // 二重回転を避ける（v2.0.2 のソース `lib/image-compression.js` で確認済み）。
 // ここで exifOrientation を手動で渡すと、この自動判定を上書きしてしまい、
 // ブラウザ側の自動回転と重なって二重に回転する組み合わせが起こりうる。
+//
+// useWebWorker: true にすると、このライブラリは既定で自分自身を
+// https://cdn.jsdelivr.net から Web Worker 内に読み込む（README の libURL 参照）。
+// 現場（電波の弱い場所）での撮影を前提にした PWA でこれに頼ると、圧縮のたびに
+// 外部CDNへの接続が要る（失敗時はメインスレッド圧縮へ自動で落ちるため撮影自体は
+// 止まらないが、毎回無駄な通信とコンソールエラーが出る）。同じファイルを
+// public/vendor/ に自前で置き、libURL で同一オリジンを指す。
 import imageCompression from "browser-image-compression";
 
 import { PHOTO_ALLOWED_TYPES, PHOTO_MAX_UPLOAD_MB } from "../content";
@@ -37,5 +44,6 @@ export async function compressPhotoForUpload(file: File): Promise<File> {
     maxSizeMB: MAX_OUTPUT_MB,
     maxWidthOrHeight: MAX_DIMENSION,
     useWebWorker: true,
+    libURL: "/vendor/browser-image-compression.js",
   });
 }
