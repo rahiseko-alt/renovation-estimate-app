@@ -480,12 +480,14 @@
 - **事象**：PR #23のdraftを解除した直後、CIが全緑になり `auto-merge.yml` が
   再評価されて数十秒でsquashマージされた。その後CodeRabbitのレビューが完了し、
   7件の指摘（うち5件は妥当）が付いたが、その時点でPRは既にマージ済みで、
-  同じPRに指摘を反映することができなくなっていた。
+  同じPRには指摘を反映できなくなっていた。
 - **根因**：`auto-merge.yml`（このリポジトリ独自実装、`.github/workflows/auto-merge.yml`）の
-  マージ条件は「CIのcheck runsが全てsuccess/neutral」「commit statusのcombinedがsuccess」
-  「draftでない」「`hold`ラベルが無い」「mergeableがtrue」の5点のみで、**CodeRabbitのレビュー
-  完了やapproveは条件に含まれていない。** CIとCodeRabbitのレビューは並行して走るため、
-  CIの方が先に緑になれば、レビューが終わる前にマージされる余地が常にある。
+  マージ条件は「同一リポジトリ発のPRであること」「CIのcheck runsが全てsuccess/neutral」
+  「commit statusのcombinedがsuccess」「draftでない」「`hold`ラベルが無い」
+  「mergeableがtrue」の6点のみで、**CodeRabbitのレビュー完了やapproveは条件に含まれていない。**
+  （ワークフローの `pull_request_review` トリガーは、レビューイベントを再評価のきっかけに
+  使っているだけで、レビュー結果そのものを条件にはしていない。）CIとCodeRabbitのレビューは
+  並行して走るため、CIの方が先に緑になれば、レビューが終わる前にマージされる余地が常にある。
 - **教訓**：**このリポジトリでは「draftを解除する」＝「レビュー指摘を待たずに数十秒〜数分で
   マージされ得る」と心得る。** レビュー指摘を先に見てから直したい場合は、draftのまま
   `@coderabbitai review` を呼ぶ（AGENTS.mdに明記されている手段）。マージ後にレビュー指摘が

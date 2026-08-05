@@ -240,9 +240,14 @@ check_csp_and_nonce "/projects" "${PROJECTS_HEADERS}" "${WORK}/projects.html"
 # CSP でブロックされ、ブラウザに何も表示されなくなる（docs/failures.md 参照）。
 # CSP側（lib/security/csp.ts）は new URL(SUPABASE_URL).origin で正規化した値を使うため、
 # ここも同じ正規化をしてから比較する（末尾スラッシュ等の差でFAILしないように）。
-SUPABASE_ORIGIN=$(node -e 'console.log(new URL(process.env.SUPABASE_URL).origin)')
+SUPABASE_ORIGIN=$(node -e 'console.log(new URL(process.env.SUPABASE_URL).origin)' 2>/dev/null || true)
 IMG_SRC_DIRECTIVE=$(printf '%s' "${PROJECTS_HEADERS}" | grep -i "^content-security-policy:" | grep -o "img-src[^;]*")
-if printf '%s' "${IMG_SRC_DIRECTIVE}" | grep -qF "${SUPABASE_ORIGIN}"; then
+# 正規化に失敗した場合、空文字を grep -qF に渡すと何にでもマッチしてしまい誤ってOK扱いに
+# なるため、先に明示的にFAILにする（set -e を使っていないため、ここで自前に検査する）。
+if [ -z "${SUPABASE_ORIGIN}" ]; then
+  echo "  FAIL SUPABASE_URL（${SUPABASE_URL}）からoriginを取れない"
+  FAILURES=$((FAILURES + 1))
+elif printf '%s' "${IMG_SRC_DIRECTIVE}" | grep -qF "${SUPABASE_ORIGIN}"; then
   echo "  OK   CSP img-src が写真ストレージのオリジンを許可"
 else
   echo "  FAIL CSP img-src が写真ストレージのオリジン（${SUPABASE_ORIGIN}）を許可していない"
