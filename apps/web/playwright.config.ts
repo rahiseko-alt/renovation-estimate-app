@@ -28,5 +28,12 @@ export default defineConfig({
     stdout: "pipe",
     stderr: "pipe",
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  projects: [
+    { name: "chromium", use: { ...devices["Desktop Chrome"] } },
+    // 新設計の中核（縮小した書類の上で行ブロック・写真枠を押す）は、実機に近い
+    // 幅でしか踏めない。Desktop Chrome だけだと縮小倍率が1倍のままで、
+    // 「小さくなった書類を親指で押す」という肝心の経路が検査されない
+    // （docs/plan-rebuild.md「E2E は現在 Desktop Chrome 1プロジェクト」）。
+    { name: "mobile", use: { ...devices["iPhone 13"] } },
+  ],
 });

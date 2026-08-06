@@ -352,73 +352,15 @@ export const PHOTO_TEXT = {
   deleteFailed: "写真の削除に失敗しました。もう一度お試しください。",
 } as const;
 
-/** 書類画面のUI文言（紙に印字される文字はテンプレート側が持つ）。 */
-export const SPIKE_TEXT = {
-  note: "書類の行を押すと、写真と数量を入れるシートが出ます。写真枠は直接押せます。",
-  openSheet: "写真・数量を入れる",
-  print: "印刷する",
-  takePhoto: "写真を撮る",
-  retakePhoto: "撮り直す",
-  quantityLabel: "数量",
-  closeSheet: "閉じる",
-} as const;
 
-/**
- * 下請の回答画面（/q/[token]。ログイン不要）の文言。作り直した版。
- *
- * 明細ごとに数量・単価を入れさせ、依頼全体に必要経費の内訳欄を出す
- * （docs/design.md 3章「下請が返す見積書に求められる内訳」。単価1つだけの形は
- * ガイドラインが望ましくない行為事例として名指ししている）。
- */
-export const QUOTE_GROUP_RESPONSE_TEXT = {
-  heading: "御見積のご依頼",
-  description:
-    "下記の工事について、数量と単価をご記入ください。必要経費の内訳もご記入いただけます。",
-  workNameLabel: "工事名称",
-  siteAddressLabel: "施工場所",
-  dueAtLabel: "見積回答期限",
-  linesHeading: "工事内容",
-  quantityLabel: "数量",
-  costUnitPriceLabel: "単価（円）",
-  breakdownHeading: "必要経費の内訳",
-  /** 努力義務であることを、書かせる前に明示する。 */
-  breakdownNote:
-    "建設業法にもとづき、下記の内訳を明示するよう努めることとされています。分かる範囲でご記入ください（未記入でも送信できます）。",
-  materialCostLabel: "材料費（円）",
-  materialSuppliedNoteLabel: "元請支給の材料があれば、その内容",
-  laborCostLabel: "労務費（円）",
-  legalWelfareCostLabel: "法定福利費（事業主負担分・円）",
-  safetyHealthCostLabel: "安全衛生経費（円）",
-  retirementMutualAidCostLabel: "建設業退職金共済掛金（円）",
-  workDaysLabel: "必要となる作業日数（日）",
-  submit: "回答する",
-  submitting: "送信中…",
-  invalidNumber: "数字を入力してください（0以上）。",
-  needAllLines: "すべての工事について、数量と単価をご記入ください。",
-  failed: "送信に失敗しました。もう一度お試しください。",
-  thanks: "回答しました。ありがとうございました。",
-  alreadyResponded: "この依頼は既に回答済みです。ご協力ありがとうございました。",
-  notFound: "この依頼は見つかりません。リンクをご確認ください。",
-} as const;
-
-/**
- * 比較表と採用の画面の文言（docs/design.md 7章「取り込みは『追加』ではなく
- * 『採用』にする」）。1明細につき採用は1社まで（排他）。
- */
-export const COMPARISON_TEXT = {
-  heading: "見積の比較",
-  empty: "まだ依頼がありません。",
-  noResponses: "まだ回答がありません。",
-  lineColumn: "工事項目",
-  quantityColumn: "数量",
-  adopt: "採用する",
-  adopted: "採用中",
-  cancelAdoption: "採用をやめる",
-  waiting: "回答待ち",
-  cheapestMark: "最安",
-  /** 自動で選ばない理由を画面にも書く。 */
-  cheapestNote:
-    "最安の印は目安です。自動では選びません。明細ごとに1社だけ選べます。",
-  adoptFailed: "採用できませんでした。もう一度お試しください。",
-  back: "もどる",
-} as const;
+// 新設計の画面（依頼グループ・下請の回答・比較表と採用・書類画面）の文言は
+// lib/quoteFlowText.ts が持つ。文言の入口はこのファイルのままにするため re-export する
+// （AGENTS.md「結合を増やさない」2：同じものを引く入口は1つにする）。
+export {
+  COMPARISON_TEXT,
+  LEGAL_ITEM_SLOT_LABELS,
+  QUOTE_GROUP_RESPONSE_TEXT,
+  SEND_REQUEST_TEXT,
+  SITE_CONDITION_LABELS,
+  SPIKE_TEXT,
+} from "./quoteFlowText";
