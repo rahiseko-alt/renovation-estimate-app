@@ -400,3 +400,25 @@ export const QUOTE_GROUP_RESPONSE_TEXT = {
   alreadyResponded: "この依頼は既に回答済みです。ご協力ありがとうございました。",
   notFound: "この依頼は見つかりません。リンクをご確認ください。",
 } as const;
+
+/**
+ * 比較表と採用の画面の文言（docs/design.md 7章「取り込みは『追加』ではなく
+ * 『採用』にする」）。1明細につき採用は1社まで（排他）。
+ */
+export const COMPARISON_TEXT = {
+  heading: "見積の比較",
+  empty: "まだ依頼がありません。",
+  noResponses: "まだ回答がありません。",
+  lineColumn: "工事項目",
+  quantityColumn: "数量",
+  adopt: "採用する",
+  adopted: "採用中",
+  cancelAdoption: "採用をやめる",
+  waiting: "回答待ち",
+  cheapestMark: "最安",
+  /** 自動で選ばない理由を画面にも書く。 */
+  cheapestNote:
+    "最安の印は目安です。自動では選びません。明細ごとに1社だけ選べます。",
+  adoptFailed: "採用できませんでした。もう一度お試しください。",
+  back: "もどる",
+} as const;
