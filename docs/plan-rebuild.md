@@ -45,7 +45,7 @@
 `supabase/migrations/` に新規マイグレーション。**テーブルごとに `enable row level security` と `service_role` への明示 `grant` の2行を必ず書く**（`supabase/migrations/20260805022403_init.sql:9-13,25-31` に「新しいテーブルは service_role であっても自動では権限を持たない」と明記。忘れると黙って全機能が壊れる）。
 
 1. **明細行の安定ID** — `estimates.lines` は jsonb 配列。**本番に既存行があるので backfill マイグレーションが要る**。
-2. **法定項目スロット** — design.md 3章の13〜14スロット。**1スロット3状態**（値あり／未定を明示／未入力）。**状態列と本文列を分ける**（`text NULL` 1本でも文字列 `"未定"` でも表現できない）。
+2. **法定項目スロット** — design.md 7章で確定：`legal_item_slots`（④⑤⑥⑧の**9キー**。`LEGAL_ITEM_SLOT_KEYS` が唯一の正）と、`site_condition_checks`（⑦を表す**12区分**の施工条件・範囲リスト。`SITE_CONDITION_CATEGORIES` が唯一の正）の2テーブルに分ける。①②③は人が個別に埋めるスロットではないため対象外。**1スロット3状態**（値あり／未定を明示／未入力、⑦は含める／含めない／未検討）。**状態列と本文列を分ける**（`text NULL` 1本でも文字列 `"未定"` でも表現できない）。
 3. **会社設定** — 請負者名・代表者・住所・印、法定④⑥⑧の定型文の初期値。
 4. **下請台帳** — 社名・メール。
 5. **依頼グループ** — グループ（提示日時を持つ）と、社ごとの依頼（宛先・トークン・予定価格帯・回答期限・対象明細の範囲）。
@@ -67,7 +67,7 @@
 | A1 | 明細行に安定IDが付き、保存・再読込でIDが変わらない | `tests/db.test.ts` に追加 |
 | A2 | backfill 後、既存の明細行すべてにIDがある | マイグレーション適用後に全行を読んでIDの有無を確認 |
 | A3 | 法定スロットが3状態を区別できる | 「未定を明示」と「未入力」を保存して読み直し、**別の値として復元される**ことを確認 |
-| A4 | 13〜14スロット全部について A3 が成り立つ | スロット定義を配列から回してループ検査（8個のループで書かない） |
+| A4 | `legal_item_slots` の9キー全部・`site_condition_checks` の12区分全部について A3 が成り立つ | `LEGAL_ITEM_SLOT_KEYS` / `SITE_CONDITION_CATEGORIES` を配列から回してループ検査（個数をハードコードしない） |
 | A5 | 新テーブルすべてで、他人のIDを知っていても読めない | 既存の IDOR テストの定型（`tests/db.test.ts:37-43`）をコピー |
 | A6 | 下請向け投影型に禁止キーが含まれない | **前例が無いので新規に書く**。`Object.keys(projection)` に `markupRate` `costUnitPrice`(他社分) `ownerId` `customerName` が無いことを assert |
 | A7 | 社Aのトークンから社Bの単価が引けない | 2社ぶんの依頼を作り、社Aのトークンで引いた結果に社Bの値が無いことを確認 |
@@ -80,7 +80,7 @@
 1. マイグレーションを書く → `pnpm exec supabase start` して適用 → **手でテーブルを1つ SELECT して存在を確かめる**
 2. 型（`lib/db/types.ts`）→ DB層モジュール
 3. テストを書く（下記「テスト方針」の作法に従う）
-4. `pnpm --filter web typecheck && lint && test && build` を通す
+4. `pnpm --filter web typecheck && pnpm --filter web lint && pnpm --filter web test && pnpm --filter web build` を通す
 5. `bash scripts/smoke.sh` を通す（既存の検査が壊れていないことの確認）
 
 ---
@@ -268,7 +268,7 @@ design.md 7章の計算値：A4縦（793.7 × 1122.5 CSS px）を幅375pxに収�
 
 ## ローカル検証一式（draft 解除の前に必ず全部通す）
 
-```
+```shell
 pnpm --filter web typecheck
 pnpm --filter web lint
 pnpm --filter web test          # ローカル Supabase 起動済みで

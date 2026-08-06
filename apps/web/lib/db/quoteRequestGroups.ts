@@ -8,6 +8,8 @@
 
 import { computeResponseDueAt } from "../legalPeriod";
 import { getSupabaseClient } from "./client";
+import { getOrCreateEstimate } from "./estimates";
+import { getSubcontractorForOwner } from "./subcontractors";
 import type {
   NewQuoteGroupRequestInput,
   NewQuoteRequestGroupInput,
@@ -118,6 +120,13 @@ function toQuoteGroupRequest(row: QuoteGroupRequestRow): QuoteGroupRequest {
  * 社ごとの依頼を1件作る。見積回答期限は、グループの提示日時と予定価格帯から
  * ここで計算して保存する（docs/design.md 7章「見積期間の元になる予定価格」）。
  * 呼び出し側で案件・グループの所有者確認を済ませた上で使う。
+ *
+ * さらにここで2つ確かめる（CodeRabbit のレビューで指摘。IDOR / データ整合性）。
+ * - subcontractorId が ownerId の持ち物であること。確かめずに insert すると、
+ *   他人の下請台帳のIDを自分の依頼に紐づけられてしまう（owner_id 列はここで
+ *   自分のものに上書きするが、subcontractor_id が指す行の持ち主までは検証していなかった）。
+ * - lineItemIds が、対象案件の見積に実在する明細行のIDだけであること。存在しない
+ *   ID・他案件のIDが紛れ込むと、比較表・採用（PR-C）が壊れた範囲を参照してしまう。
  */
 export async function createQuoteGroupRequest(
   input: NewQuoteGroupRequestInput,
@@ -126,6 +135,20 @@ export async function createQuoteGroupRequest(
   const group = await getQuoteRequestGroupForOwner(input.groupId, ownerId);
   if (!group) {
     throw new Error("依頼グループが見つかりません。");
+  }
+
+  const subcontractor = await getSubcontractorForOwner(
+    input.subcontractorId,
+    ownerId,
+  );
+  if (!subcontractor) {
+    throw new Error("下請が見つかりません。");
+  }
+
+  const estimate = await getOrCreateEstimate(group.projectId);
+  const validLineIds = new Set(estimate.lines.map((line) => line.id));
+  if (input.lineItemIds.some((id) => !validLineIds.has(id))) {
+    throw new Error("対象明細の範囲に、存在しない明細IDが含まれています。");
   }
 
   const responseDueAt = computeResponseDueAt(

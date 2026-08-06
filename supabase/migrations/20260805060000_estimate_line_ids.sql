@@ -7,6 +7,10 @@
 -- 既存の estimates 行（本番稼働中のものも含む）にはまだ id が無いため、
 -- ここで jsonb の各要素に id を注入する backfill を行う。
 
+-- jsonb_agg は入力行の順序を保証しない（PostgreSQL公式ドキュメント）。
+-- 明細の並び順（見積書に印字される順序）を変えないよう、jsonb_array_elements の
+-- WITH ORDINALITY で元の位置番号を取り、jsonb_agg の中で ORDER BY する
+-- （CodeRabbit のレビューで指摘）。
 update public.estimates
 set lines = (
   select coalesce(
@@ -15,9 +19,10 @@ set lines = (
         when elem ? 'id' then elem
         else elem || jsonb_build_object('id', gen_random_uuid()::text)
       end
+      order by ord
     ),
     '[]'::jsonb
   )
-  from jsonb_array_elements(lines) as elem
+  from jsonb_array_elements(lines) with ordinality as t(elem, ord)
 )
 where lines is not null and jsonb_array_length(lines) > 0;

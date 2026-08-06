@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { minimumQuotePeriodDays } from "../lib/legalPeriod";
+import { appendEstimateLine, getOrCreateEstimate } from "../lib/db/estimates";
 import {
   createQuoteGroupRequest,
   createQuoteRequestGroup,
@@ -13,6 +14,7 @@ import { createSubcontractor } from "../lib/db/subcontractors";
 import type { PlannedPriceBand } from "../lib/db/types";
 
 const OWNER_A = "owner-a@example.com";
+const OWNER_B = "owner-b@example.com";
 
 async function setupGroup(customerName: string) {
   const project = await createProject(
@@ -20,7 +22,9 @@ async function setupGroup(customerName: string) {
     OWNER_A,
   );
   const group = await createQuoteRequestGroup({ projectId: project.id }, OWNER_A);
-  return { project, group };
+  // 既定行（解体・廃棄物処理費）が1件あるので、これを実在する明細IDとして使える。
+  const estimate = await getOrCreateEstimate(project.id);
+  return { project, group, estimate };
 }
 
 describe("quoteRequestGroups", () => {
@@ -62,10 +66,11 @@ describe("quoteRequestGroups", () => {
       const expectedDays = minimumQuotePeriodDays(band);
       const presentedAtMillis = new Date(group.presentedAt).getTime();
       const dueAtMillis = new Date(request.responseDueAt).getTime();
-      const actualDays = Math.round(
-        (dueAtMillis - presentedAtMillis) / (24 * 60 * 60 * 1000),
+      // 四捨五入せず、ミリ秒単位の差分そのものを比較する（前後12時間近いズレを
+      // 「同じ日数」として見逃さないため。CodeRabbit のレビューで指摘）。
+      expect(dueAtMillis - presentedAtMillis).toBe(
+        expectedDays * 24 * 60 * 60 * 1000,
       );
-      expect(actualDays).toBe(expectedDays);
     }
   });
 
@@ -95,8 +100,59 @@ describe("quoteRequestGroups", () => {
     ).rejects.toThrow();
   });
 
+  it("存在しない明細IDを対象範囲に含めると依頼を作れない", async () => {
+    const { group } = await setupGroup("依頼グループ3-2");
+    const sub = await createSubcontractor(
+      { companyName: "不正明細確認建設", email: "dangling-line@example.com" },
+      OWNER_A,
+    );
+    await expect(
+      createQuoteGroupRequest(
+        {
+          groupId: group.id,
+          subcontractorId: sub.id,
+          plannedPriceBand: "under_500man",
+          lineItemIds: ["99999999-9999-9999-9999-999999999999"],
+        },
+        OWNER_A,
+      ),
+    ).rejects.toThrow();
+  });
+
+  it("他人の下請台帳のIDを自分の依頼に紐づけられない（IDOR対策）", async () => {
+    const { group } = await setupGroup("依頼グループ3-3");
+    const othersSubcontractor = await createSubcontractor(
+      { companyName: "他人の下請", email: "others-sub@example.com" },
+      OWNER_B,
+    );
+    await expect(
+      createQuoteGroupRequest(
+        {
+          groupId: group.id,
+          subcontractorId: othersSubcontractor.id,
+          plannedPriceBand: "under_500man",
+          lineItemIds: [],
+        },
+        OWNER_A,
+      ),
+    ).rejects.toThrow();
+  });
+
   it("社ごとの依頼は別トークンを持ち、他社の依頼を巻き込まない（A7）", async () => {
-    const { group } = await setupGroup("依頼グループ4");
+    const { group, project, estimate } = await setupGroup("依頼グループ4");
+    // 社ごとに別の明細を対象にできることを確かめるため、行をもう1本足す。
+    const estimateWithTwoLines = await appendEstimateLine(project.id, {
+      kind: "item",
+      name: "社B向けの工事",
+      spec: "",
+      quantity: 1,
+      unit: "式",
+      unitPrice: 0,
+      taxCategory: "standard",
+    });
+    const lineIdA = estimate.lines[0]!.id;
+    const lineIdB = estimateWithTwoLines.lines[1]!.id;
+
     const subA = await createSubcontractor(
       { companyName: "社A", email: "company-a@example.com" },
       OWNER_A,
@@ -111,7 +167,7 @@ describe("quoteRequestGroups", () => {
         groupId: group.id,
         subcontractorId: subA.id,
         plannedPriceBand: "under_500man",
-        lineItemIds: ["11111111-1111-1111-1111-111111111111"],
+        lineItemIds: [lineIdA],
       },
       OWNER_A,
     );
@@ -120,7 +176,7 @@ describe("quoteRequestGroups", () => {
         groupId: group.id,
         subcontractorId: subB.id,
         plannedPriceBand: "over_5000man",
-        lineItemIds: ["22222222-2222-2222-2222-222222222222"],
+        lineItemIds: [lineIdB],
       },
       OWNER_A,
     );
@@ -223,7 +279,7 @@ describe("quoteRequestGroups", () => {
           plannedPriceBand: "under_500man",
           lineItemIds: [],
         },
-        "owner-b@example.com",
+        OWNER_B,
       ),
     ).rejects.toThrow();
   });
@@ -247,7 +303,7 @@ describe("quoteRequestGroups", () => {
       request,
     );
     expect(
-      await getQuoteGroupRequestForOwner(request.id, "owner-b@example.com"),
+      await getQuoteGroupRequestForOwner(request.id, OWNER_B),
     ).toBeNull();
   });
 });

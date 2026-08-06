@@ -134,6 +134,34 @@ describe("estimates", () => {
     expect(reloaded.overheadRatePercent).toBe(10);
   });
 
+  it("空のIDを持つ明細は保存できない", async () => {
+    const project = await createProject(
+      { customerName: "テスト3-空ID", siteAddress: "テスト3-空ID" },
+      OWNER_A,
+    );
+    await expect(
+      saveEstimate(project.id, [{ ...itemLine("空ID"), id: "" }], 0),
+    ).rejects.toThrow();
+  });
+
+  it("同じIDを持つ明細を2行は保存できない（React key・写真の紐づけ・単価採用が事故るため）", async () => {
+    const project = await createProject(
+      { customerName: "テスト3-重複ID", siteAddress: "テスト3-重複ID" },
+      OWNER_A,
+    );
+    const duplicateId = "22222222-2222-2222-2222-222222222222";
+    await expect(
+      saveEstimate(
+        project.id,
+        [
+          { ...itemLine("行A"), id: duplicateId },
+          { ...itemLine("行B"), id: duplicateId },
+        ],
+        0,
+      ),
+    ).rejects.toThrow();
+  });
+
   function itemLine(name: string) {
     return {
       kind: "item" as const,
