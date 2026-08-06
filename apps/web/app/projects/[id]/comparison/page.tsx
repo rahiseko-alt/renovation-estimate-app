@@ -1,12 +1,12 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 
+import { AdoptedTotal } from "../../../../components/AdoptedTotal";
 import { ComparisonTable } from "../../../../components/ComparisonTable";
 import { DemoBanner } from "../../../../components/DemoBanner";
 import { DownloadPdfButton } from "../../../../components/DownloadPdfButton";
 import { isDemoOwner } from "../../../../lib/auth/demoOwner";
 import { getCurrentUser } from "../../../../lib/auth/server";
-import { formatYen } from "../../../../lib/calc";
 import { COMPARISON_TEXT } from "../../../../lib/content";
 import {
   DEMO_COMPARISON_TEXT,
@@ -58,30 +58,8 @@ export default async function ComparisonPage({
         cheapestByLineId={cheapestByLineId}
       />
 
-      {/*
-        採用しているぶんの合計。見積書を押す前に金額が見える。
-        サーバ側で描くので、外からの検査（scripts/prod-demo-check.sh）が
-        「0円のまま書類が出る」状態を見つけられる。
-      */}
-      <section
-        aria-label={COMPARISON_TEXT.adoptedTotalLabel}
-        className="mt-6 rounded border border-gray-300 p-4"
-      >
-        <p className="flex items-baseline justify-between gap-4">
-          <span className="text-gray-700">{COMPARISON_TEXT.adoptedTotalLabel}</span>
-          {/*
-            金額と「円」を1つの文字列にして描く。分けて書くと React が間に
-            コメントノードを挟み、外から金額を読む検査（scripts/prod-demo-check.sh）が
-            数字と単位を別々に拾うことになる。ComparisonTable の単価も同じ書き方。
-          */}
-          <span className="text-2xl font-bold">
-            {`${formatYen(comparison.adoptedTotals.grandTotal)}円`}
-          </span>
-        </p>
-        <p className="mt-1 text-sm text-gray-700">
-          {COMPARISON_TEXT.adoptedTotalNote}
-        </p>
-      </section>
+      {/* 採用しているぶんの合計。見積書を押す前に金額が見える（部品側にその理由を書いた）。 */}
+      <AdoptedTotal totals={comparison.adoptedTotals} />
 
       {demo ? (
         <div className="mt-8 flex flex-col gap-3">

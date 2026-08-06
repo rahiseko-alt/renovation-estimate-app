@@ -11,6 +11,8 @@ import { readFileSync } from "node:fs";
 
 import { expect, test } from "@playwright/test";
 
+import { COMPARISON_TEXT } from "../lib/content";
+
 /** 3タップの中身。ここに1つ足したら、それはデモが3タップでなくなったということ。 */
 const TAPS = ["デモを触ってみる", "写真なしで進む", "見積書PDFを出力"] as const;
 
@@ -69,7 +71,10 @@ test("トップから3タップで見積書PDFまで行ける", async ({ page })
   // **見積書を押す前に金額が出ていること。** 3タップ目に出る書類が全行0円だった
   // （docs/failures.md 2026-08-06）。PDFのバイト列から金額は読めないので、
   // 0円のまま書類が出る状態は、この画面の合計でしか外から捕まえられない。
-  const totalRegion = page.getByRole("region", { name: "採用中の合計（税込）" });
+  // 目印の文言は画面と同じ値を使う（2箇所に書くと、片方だけ直したときに黙って通る）。
+  const totalRegion = page.getByRole("region", {
+    name: COMPARISON_TEXT.adoptedTotalLabel,
+  });
   await expect(totalRegion).toBeVisible();
   const totalText = await totalRegion.innerText();
   const totalYen = totalText.match(/([\d,]+)円/)?.[1];

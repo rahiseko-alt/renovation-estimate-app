@@ -34,6 +34,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          # 検査スクリプトは Git 認証を使わない（公開URLを curl するだけ）。
+          # 既定のままだと GITHUB_TOKEN が .git/config に残る（zizmor: artipacked）。
+          persist-credentials: false
 
       - name: bash scripts/prod-demo-check.sh
         run: |
