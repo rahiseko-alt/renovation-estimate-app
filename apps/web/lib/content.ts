@@ -275,6 +275,21 @@ export function findWorkArea(area: string): WorkArea | null {
 }
 
 /**
+ * 法定①工事名称（docs/design.md 3章）の初期値を、現場住所から組み立てる。
+ * projects.work_name の既定値として使う。画面上で直せる
+ * （docs/design.md 7章「自動で埋めた項目も、画面に出す」）。
+ *
+ * 施主名からは組み立てない。工事名称は法定②施工場所と同じく下請に見せる項目だが、
+ * 施主名は法定8項目に含まれず見せない（docs/design.md 7章「下請に見せるもの・
+ * 見せないもの」）。「〇〇様邸」という業界の命名慣行（5章の実物調査でも確認）を
+ * 初期値にすると、見せない項目のはずの施主名が工事名称という見せる項目に紛れ込み、
+ * 下請への投影から漏れてしまう。現場住所（＝もともと見せる情報）から組み立てる。
+ */
+export function buildDefaultWorkName(siteAddress: string): string {
+  return `${siteAddress} リフォーム工事`;
+}
+
+/**
  * 写真アップロードの上限（元ファイル、MB）。lib/photo/compress.ts（クライアント側の
  * 事前チェック）と app/projects/[id]/photos-actions.ts（Server Action 側の検証。
  * クライアントの検証はバイパスできるため、ここでも同じ値で確かめる）の両方から

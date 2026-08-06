@@ -69,6 +69,30 @@ describe("estimates", () => {
     expect(estimate.overheadRatePercent).toBe(0);
   });
 
+  it("明細行の安定IDは、保存・再読込のたびに変わらない（A1）", async () => {
+    const project = await createProject(
+      { customerName: "テスト1-ID", siteAddress: "テスト1-ID" },
+      OWNER_A,
+    );
+    const created = await getOrCreateEstimate(project.id);
+    const firstId = created.lines[0]?.id;
+    expect(firstId).toBeTruthy();
+
+    const reloaded = await getOrCreateEstimate(project.id);
+    expect(reloaded.lines[0]?.id).toBe(firstId);
+
+    // appendEstimateLine で足した行にも新しい安定IDが付き、既存行のIDは変わらない。
+    const appended = await appendEstimateLine(project.id, itemLine("追加行"));
+    expect(appended.lines[0]?.id).toBe(firstId);
+    const newLineId = appended.lines[1]?.id;
+    expect(newLineId).toBeTruthy();
+    expect(newLineId).not.toBe(firstId);
+
+    const reloadedAfterAppend = await getOrCreateEstimate(project.id);
+    expect(reloadedAfterAppend.lines[0]?.id).toBe(firstId);
+    expect(reloadedAfterAppend.lines[1]?.id).toBe(newLineId);
+  });
+
   it("同じ案件で2回呼んでも同じ見積を返す（作り直さない）", async () => {
     const project = await createProject(
       { customerName: "テスト2", siteAddress: "テスト2" },
@@ -90,6 +114,7 @@ describe("estimates", () => {
       project.id,
       [
         {
+          id: "11111111-1111-1111-1111-111111111111",
           kind: "item",
           name: "クロス張替え",
           spec: "量産品",

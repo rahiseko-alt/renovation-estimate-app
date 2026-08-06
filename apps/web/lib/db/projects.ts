@@ -5,17 +5,20 @@
 // 中身が返らないようにするため、絞り込まない取得関数はこのファイルに置かない
 // （他人の案件IDを知っているだけで読み書きできる状態を防ぐ境界を、ここ1箇所に固定する）。
 
+import { buildDefaultWorkName } from "../content";
 import { getSupabaseClient } from "./client";
 import type { NewProjectInput, Project } from "./types";
 import { isUuid } from "./uuid";
 
-const COLUMNS = "id, owner_id, customer_name, site_address, created_at";
+const COLUMNS =
+  "id, owner_id, customer_name, site_address, work_name, created_at";
 
 type ProjectRow = {
   id: string;
   owner_id: string;
   customer_name: string;
   site_address: string;
+  work_name: string;
   created_at: string;
 };
 
@@ -25,6 +28,7 @@ function toProject(row: ProjectRow): Project {
     ownerId: row.owner_id,
     customerName: row.customer_name,
     siteAddress: row.site_address,
+    workName: row.work_name,
     createdAt: row.created_at,
   };
 }
@@ -66,6 +70,7 @@ export async function createProject(
       owner_id: ownerId,
       customer_name: input.customerName,
       site_address: input.siteAddress,
+      work_name: buildDefaultWorkName(input.siteAddress),
     })
     .select(COLUMNS)
     .single();

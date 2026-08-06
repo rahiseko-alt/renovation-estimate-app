@@ -10,7 +10,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { EstimateLine, TaxCategory } from "../calc";
 import { DEFAULT_DISPOSAL_ITEM_NAME } from "../content";
 import { getSupabaseClient } from "./client";
-import type { Estimate } from "./types";
+import type { Estimate, PersistedEstimateLine } from "./types";
 
 const COLUMNS =
   "id, project_id, lines, overhead_rate_percent, overhead_tax_category, updated_at";
@@ -21,7 +21,7 @@ const UNIQUE_VIOLATION = "23505";
 type EstimateRow = {
   id: string;
   project_id: string;
-  lines: EstimateLine[];
+  lines: PersistedEstimateLine[];
   overhead_rate_percent: number;
   overhead_tax_category: string;
   updated_at: string;
@@ -38,9 +38,10 @@ function toEstimate(row: EstimateRow): Estimate {
   };
 }
 
-function defaultLines(): EstimateLine[] {
+function defaultLines(): PersistedEstimateLine[] {
   return [
     {
+      id: crypto.randomUUID(),
       kind: "item",
       name: DEFAULT_DISPOSAL_ITEM_NAME,
       spec: "",
@@ -111,19 +112,26 @@ const MAX_APPEND_RETRIES = 5;
  * 先の追加ごと上書きしてしまう（互いの存在を知らないまま両方が「元の配列＋自分の1行」を
  * 書き込むため）。updated_at を使った楽観ロックで、保存時点の行が読んだ時点と
  * 変わっていないことを確かめ、変わっていたら読み直して1回だけ足し直す。
+ *
+ * 呼び出し側は id を持たない EstimateLine を渡す。安定IDは追加のたびにここで
+ * 発行する（docs/design.md 7章「明細行に安定したIDを持たせる」）。
  */
 export async function appendEstimateLine(
   projectId: string,
   newLine: EstimateLine,
 ): Promise<Estimate> {
   const client = getSupabaseClient();
+  const persistedLine: PersistedEstimateLine = {
+    ...newLine,
+    id: crypto.randomUUID(),
+  };
 
   for (let attempt = 0; attempt < MAX_APPEND_RETRIES; attempt += 1) {
     const estimate = await getOrCreateEstimate(projectId);
     const { data, error } = await client
       .from("estimates")
       .update({
-        lines: [...estimate.lines, newLine],
+        lines: [...estimate.lines, persistedLine],
         updated_at: new Date().toISOString(),
       })
       .eq("project_id", projectId)
@@ -143,7 +151,7 @@ export async function appendEstimateLine(
 
 export async function saveEstimate(
   projectId: string,
-  lines: EstimateLine[],
+  lines: PersistedEstimateLine[],
   overheadRatePercent: number,
 ): Promise<Estimate> {
   const { data, error } = await getSupabaseClient()
