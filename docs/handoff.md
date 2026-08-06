@@ -27,7 +27,7 @@
 | 明細の「式」を1行に減らした | `lib/demoFixture.ts`（`content.ts` の `WORK_AREAS` は並び順だけ） |
 | 1タップ目の後始末を飛ばす | `seedDemoData(ownerId, { ownerIsNew: true })` |
 | 比較表の N+1 を解消 | `listQuoteGroupResponsesForRequests`（社が何社でも2往復） |
-| 本番を日次で踏む | `.github/workflows/prod-smoke.yml` の `demo-three-taps` ジョブ |
+| 本番を日次で踏む | `.github/workflows/prod-demo-check.yml`（新規。`schedule` + 手動のみ） |
 
 掛率の決定（採用の売価は原価そのまま＝1）は **`docs/design.md` 7章「まだ決めていないこと」**
 に書いた。恒久的な決定はそちらが正。失敗の経緯は `docs/failures.md` 2026-08-06。
@@ -69,6 +69,10 @@ typecheck / lint / test 283件 / `pnpm -r build` / `scripts/smoke.sh` / `scripts
   「速くなった」を「速い」と言いかけた。上限を決めたら、直したあとに同じ上限で測り直す。
 - 検査スクリプトに足した金額の読み取りが、React のコメントノードで壊れていた。
   **手元のビルドに実際に走らせて初めて分かった。** 書いた検査は赤と緑を1回ずつ踏む。
+- **自分で足したCIジョブが auto-merge を永久に止める形になっていた。**
+  `push` で走るワークフローに `if:` 付きのジョブを足したので、push のたびに `skipped` になる。
+  `auto-merge.yml` は「skipped を緑扱いしない」ので、以後すべてのPRが止まる。
+  **push で走るワークフローに `if:` でジョブを飛ばさない。飛ばしたいならファイルを分ける。**
 
 ## ③次回やる事
 

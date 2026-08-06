@@ -11,12 +11,6 @@ on:
   workflow_dispatch:
   push:
     branches: ["**"]
-  # デモ経路の検査（下の demo-three-taps）は push では走らせない。
-  # auto-merge は GITHUB_TOKEN でマージするので push が発火しない場合があり、
-  # 発火しても直後は Vercel のデプロイが終わっておらず古いビルドを測る。
-  # 日次で本番そのものを踏み直す。
-  schedule:
-    - cron: "0 22 * * *"
 
 # 本番URL（Vercel production alias）。
 env:
@@ -123,19 +117,3 @@ jobs:
           fi
           echo "CSP OK: img-src に写真ストレージのオリジンを確認"
 
-  demo-three-taps:
-    name: demo 3タップを本番で実際に踏む
-    # push では走らせない（上の schedule のコメント参照）。
-    if: github.event_name != 'push'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: bash scripts/prod-demo-check.sh
-        run: |
-          # 商談で見せる3タップの経路を、外から実際に踏んで機械判定する。
-          # 「動いています」と一度も踏まずに言って、実際には1タップ目が10秒かかって
-          # 落ちていたことがある（docs/failures.md 2026-08-06）。
-          # 秘密情報は使わない。無ログインで誰でも踏める経路だけを見る。
-          # 本番URLの置き場所はこのファイルの env.PROD_URL 1箇所にする。
-          BASE="${PROD_URL}" bash scripts/prod-demo-check.sh
