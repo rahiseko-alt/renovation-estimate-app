@@ -2,8 +2,10 @@
 // ここで金額を再計算しない（AGENTS.md「結合を増やさない」2）。
 //
 // 住宅リフォーム推進協議会「住宅リフォーム工事 御見積書」書式Ⅳ-1 を土台にした
-// レイアウト。会社情報（請負者名・代表者・住所・印）を入力する画面がまだ無いため、
-// その欄は省略している（docs/handoff.md 参照。設定画面ができたら追加する）。
+// レイアウト。請負者ボックス（請負者名・代表者・住所）は様式に印字されている欄で、
+// 経路の異なる実物5件すべてで一致した項目でもある（docs/design.md 5章）。
+// 値は会社設定（/settings/company）が持ち、未設定なら欄ごと出さない。
+// 社印は画像を預かる仕組みがまだ無いので出していない。
 
 import { PDFDocument, type PDFFont } from "@cantoo/pdf-lib";
 import * as fontkit from "fontkit";
@@ -17,6 +19,7 @@ import {
 } from "../doc/templates/estimate";
 import { loadBoldFontBytes, loadRegularFontBytes } from "./fonts";
 import {
+  BLACK,
   CONTENT_WIDTH,
   GRAY,
   MARGIN,
@@ -26,10 +29,18 @@ import {
   drawNumericCell,
   drawTextCell,
   ensureSpace,
+  fitText,
   formatDate,
   newCursor,
   type Cursor,
 } from "./layout";
+
+/** 請負者ボックスに印字する自社の情報。会社設定が未入力なら空文字で来る。 */
+export type ContractorInfo = {
+  contractorName: string;
+  representativeName: string;
+  address: string;
+};
 
 export type EstimateDocumentInput = {
   customerName: string;
@@ -37,6 +48,7 @@ export type EstimateDocumentInput = {
   lines: EstimateLine[];
   totals: EstimateTotals;
   issuedAt: Date;
+  contractor?: ContractorInfo;
 };
 
 type Fonts = { regular: PDFFont; bold: PDFFont };
@@ -69,6 +81,68 @@ const TOTALS_ROWS: {
   amount: ESTIMATE_TOTALS_AMOUNT_BY_KEY[row.key],
 }));
 
+export type ContractorRow = { text: string; size: number; bold: boolean };
+
+/**
+ * 請負者ボックスに実際に印字する行を決める。**中身のある欄だけを返す。**
+ * 空欄を行として残すと、会社設定を埋めていない利用者のPDFに空行が並ぶ。
+ *
+ * 描画から切り出してあるのは、埋め込みフォントのPDFから文字列を取り出して
+ * 検査するのが現実的でないため。ここを純関数にして、何を出し何を出さないかを
+ * tests/pdf.test.ts が直接確かめられるようにしている。
+ */
+export function contractorRows(contractor: ContractorInfo): ContractorRow[] {
+  const rows: ContractorRow[] = [];
+  if (contractor.contractorName.trim()) {
+    rows.push({ text: contractor.contractorName, size: 12, bold: true });
+  }
+  if (contractor.representativeName.trim()) {
+    rows.push({ text: contractor.representativeName, size: 10, bold: false });
+  }
+  if (contractor.address.trim()) {
+    rows.push({ text: contractor.address, size: 9, bold: false });
+  }
+  return rows;
+}
+
+/**
+ * 請負者ボックス（様式では宛名の右）。1行でも中身があるときだけ描く。
+ * 会社設定が空のまま出力しても、空の枠が並ぶだけの見た目にはしない。
+ *
+ * 描いたあとのカーソル位置は呼び出し側が決める（宛名と同じ高さから始めて
+ * 右側に伸びるため、この関数は自分が使い終わった y を返すだけにする）。
+ */
+function drawContractorBlock(
+  cursor: Cursor,
+  fonts: Fonts,
+  contractor: ContractorInfo,
+  top: number,
+): number {
+  const rows = contractorRows(contractor);
+  if (rows.length === 0) return top;
+
+  // 宛名と同じ高さに並ぶので、内容幅の半分に収める。長い社名で宛名に重ねない。
+  const maxWidth = CONTENT_WIDTH / 2;
+
+  const saved = cursor.y;
+  cursor.y = top;
+  for (const row of rows) {
+    const font = row.bold ? fonts.bold : fonts.regular;
+    drawLine(
+      cursor,
+      font,
+      fitText(font, row.text, row.size, maxWidth),
+      row.size,
+      "right",
+      row.bold ? BLACK : GRAY,
+    );
+    cursor.y -= row.size + 6;
+  }
+  const bottom = cursor.y;
+  cursor.y = saved;
+  return bottom;
+}
+
 function drawHeaderBlock(cursor: Cursor, fonts: Fonts, input: EstimateDocumentInput): void {
   drawLine(cursor, fonts.bold, ESTIMATE_DOCUMENT_TEXT.title, 20, "center");
   cursor.y -= 30;
@@ -77,12 +151,21 @@ function drawHeaderBlock(cursor: Cursor, fonts: Fonts, input: EstimateDocumentIn
   drawLine(cursor, fonts.regular, issuedLabel, 10, "right", GRAY);
   cursor.y -= 22;
 
+  // 宛名（左）と請負者ボックス（右）は同じ高さから始める。
+  const blockTop = cursor.y;
+
   const recipient = `${input.customerName}${ESTIMATE_DOCUMENT_TEXT.recipientSuffix}`;
   drawLine(cursor, fonts.bold, recipient, 16, "left");
   cursor.y -= 20;
 
   drawLine(cursor, fonts.regular, input.siteAddress, 10, "left", GRAY);
   cursor.y -= 24;
+
+  // 左右のうち、下まで伸びたほうに合わせて次の描画位置を決める。
+  const contractorBottom = input.contractor
+    ? drawContractorBlock(cursor, fonts, input.contractor, blockTop)
+    : blockTop;
+  cursor.y = Math.min(cursor.y, contractorBottom - 8);
 }
 
 function drawTableHeaderRow(cursor: Cursor, fonts: Fonts): void {

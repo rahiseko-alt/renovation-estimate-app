@@ -363,6 +363,7 @@ export const PHOTO_TEXT = {
 // lib/quoteFlowText.ts が持つ。文言の入口はこのファイルのままにするため re-export する
 // （AGENTS.md「結合を増やさない」2：同じものを引く入口は1つにする）。
 export {
+  COMPANY_PROFILE_TEXT,
   COMPARISON_TEXT,
   LEGAL_ITEM_SLOT_LABELS,
   LEGAL_ITEMS_LINK_LABEL,

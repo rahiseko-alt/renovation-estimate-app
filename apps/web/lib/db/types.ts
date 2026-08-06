@@ -183,6 +183,34 @@ export const MAX_LEGAL_ITEM_SLOT_VALUE_LENGTH = 2_000;
 
 export type LegalItemSlotStatus = (typeof LEGAL_ITEM_SLOT_STATUSES)[number];
 
+/**
+ * 会社設定が定型文の初期値を持つスロット（`docs/design.md` 7章
+ * 「会社設定の定型文が初期値。案件ごとに上書き可 ／ ④責任施工範囲・⑥の3スロット・
+ * ⑧の3スロット」）。
+ *
+ * **⑤（`subcontract_schedule` / `overall_schedule`）は入っていない。**
+ * ⑤は工程、つまり案件ごとの日付で、事業者で共通の定型文にならない
+ * （設計文書では着工希望日から埋める側の項目として分けてある）。
+ */
+export const COMPANY_DEFAULT_SLOT_KEYS = [
+  "responsibility_scope",
+  "quote_conditions",
+  "trade_boundary",
+  "special_parts",
+  "material_cost_burden",
+  "safety_measures_burden",
+  "waste_disposal_burden",
+] as const satisfies readonly LegalItemSlotKey[];
+
+export type CompanyDefaultSlotKey = (typeof COMPANY_DEFAULT_SLOT_KEYS)[number];
+
+/**
+ * 請負者名・代表者名・住所の上限。①②の様式に印字される欄で、書けるのは
+ * ログイン済みの所有者だけなので、DBの制約ではなくアプリ側の境界で止める
+ * （`MAX_LEGAL_ITEM_SLOT_VALUE_LENGTH` と同じ考え方）。
+ */
+export const MAX_COMPANY_FIELD_LENGTH = 200;
+
 export type LegalItemSlot = {
   id: string;
   projectId: string;

@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "../../lib/auth/server";
 import { listProjectsForOwner } from "../../lib/db/projects";
 import {
+  COMPANY_PROFILE_TEXT,
   PRICE_MASTER_TEXT,
   PROJECTS_TEXT,
   SUBCONTRACTORS_TEXT,
@@ -54,6 +55,13 @@ export default async function ProjectsPage() {
         className="tap mt-4 flex items-center justify-center rounded border-2 border-gray-500 px-5 py-3 font-bold"
       >
         {SUBCONTRACTORS_TEXT.heading}
+      </Link>
+
+      <Link
+        href="/settings/company"
+        className="tap mt-4 flex items-center justify-center rounded border-2 border-gray-500 px-5 py-3 font-bold"
+      >
+        {COMPANY_PROFILE_TEXT.heading}
       </Link>
 
       <Link
