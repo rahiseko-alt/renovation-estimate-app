@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { DEFAULT_DISPOSAL_ITEM_NAME } from "../lib/content";
+import { DEFAULT_DISPOSAL_ITEM_NAME } from "../lib/doc/templates/estimate";
 import {
   appendEstimateLine,
   getOrCreateEstimate,

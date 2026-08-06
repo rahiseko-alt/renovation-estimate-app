@@ -11,6 +11,13 @@
 import type { EstimateLine, EstimateTotals } from "../calc";
 
 /**
+ * 書類が扱う明細行。写真の紐づけ・単価採用が明細行を一意に指せる必要があるので、
+ * 安定IDを持つ行だけを受ける（lib/db/types.ts の PersistedEstimateLine と同じ形。
+ * 書類の層が保存の層に依存しないよう、ここでは構造だけで表す）。
+ */
+export type DocLine = EstimateLine & { id: string };
+
+/**
  * 誰に見せてよい欄か。同じ書類を見るのは元請（掛率・売価・原価を見てよい）と
  * 下請（自社の原価しか見てはいけない）の2者である（docs/design.md 7章
  * 「テンプレートに『誰に見せてよい欄か』の軸を持たせる」）。
@@ -33,7 +40,7 @@ export type DocData = {
   responseDueAt: Date | null;
   /** 作成日。 */
   issuedAt: Date;
-  lines: EstimateLine[];
+  lines: DocLine[];
   /** 明細の集計。①（単価が空の依頼書）では null。 */
   totals: EstimateTotals | null;
   /** 明細行のIDごとの写真URL。写真枠に流し込む。 */

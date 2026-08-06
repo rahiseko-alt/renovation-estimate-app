@@ -8,7 +8,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { EstimateLine, TaxCategory } from "../calc";
-import { DEFAULT_DISPOSAL_ITEM_NAME } from "../content";
+import { DEFAULT_DISPOSAL_ITEM_NAME } from "../doc/templates/estimate";
 import { getSupabaseClient } from "./client";
 import type { Estimate, PersistedEstimateLine } from "./types";
 

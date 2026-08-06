@@ -9,7 +9,12 @@ import { PDFDocument, type PDFFont } from "@cantoo/pdf-lib";
 import * as fontkit from "fontkit";
 
 import { formatYen, lineAmount, type EstimateLine, type EstimateTotals } from "../calc";
-import { ESTIMATE_COLUMNS, ESTIMATE_DOCUMENT_TEXT, ESTIMATE_TOTALS_TEXT } from "../content";
+import {
+  ESTIMATE_COLUMN_HEADINGS,
+  ESTIMATE_DOCUMENT_TEXT,
+  ESTIMATE_TOTALS_AMOUNT_BY_KEY,
+  ESTIMATE_TOTALS_ROWS,
+} from "../doc/templates/estimate";
 import { loadBoldFontBytes, loadRegularFontBytes } from "./fonts";
 import {
   CONTENT_WIDTH,
@@ -53,18 +58,16 @@ const COLUMNS: Column[] = [
 const TABLE_FONT_SIZE = 9;
 const ROW_HEIGHT = 20;
 
+// 印字される言葉と並び順は書類テンプレートが持つ（docs/design.md 7章）。
 const TOTALS_ROWS: {
-  label: keyof typeof ESTIMATE_TOTALS_TEXT;
+  key: (typeof ESTIMATE_TOTALS_ROWS)[number]["key"];
+  label: string;
   amount: (totals: EstimateTotals) => number;
-}[] = [
-  { label: "directCostSubtotal", amount: (t) => t.directCostSubtotal },
-  { label: "overhead", amount: (t) => t.overheadAmount },
-  { label: "subtotalBeforeDiscount", amount: (t) => t.subtotalBeforeDiscount },
-  { label: "discount", amount: (t) => t.discountAmount },
-  { label: "netAmount", amount: (t) => t.netAmount },
-  { label: "tax", amount: (t) => t.taxAmount },
-  { label: "grandTotal", amount: (t) => t.grandTotal },
-];
+}[] = ESTIMATE_TOTALS_ROWS.map((row) => ({
+  key: row.key,
+  label: row.label,
+  amount: ESTIMATE_TOTALS_AMOUNT_BY_KEY[row.key],
+}));
 
 function drawHeaderBlock(cursor: Cursor, fonts: Fonts, input: EstimateDocumentInput): void {
   drawLine(cursor, fonts.bold, ESTIMATE_DOCUMENT_TEXT.title, 20, "center");
@@ -85,7 +88,7 @@ function drawHeaderBlock(cursor: Cursor, fonts: Fonts, input: EstimateDocumentIn
 function drawTableHeaderRow(cursor: Cursor, fonts: Fonts): void {
   let x = MARGIN;
   for (const col of COLUMNS) {
-    drawTextCell(cursor, fonts.bold, ESTIMATE_COLUMNS[col.key], TABLE_FONT_SIZE, x, col.width, col.align);
+    drawTextCell(cursor, fonts.bold, ESTIMATE_COLUMN_HEADINGS[col.key], TABLE_FONT_SIZE, x, col.width, col.align);
     x += col.width;
   }
   cursor.y -= 6;
@@ -144,11 +147,11 @@ function drawTotalsBlock(doc: PDFDocument, cursor: Cursor, fonts: Fonts, totals:
   const valueRight = MARGIN + CONTENT_WIDTH;
 
   for (const row of TOTALS_ROWS) {
-    const isGrandTotal = row.label === "grandTotal";
+    const isGrandTotal = row.key === "grandTotal";
     const font = isGrandTotal ? fonts.bold : fonts.regular;
     const size = isGrandTotal ? 13 : 10;
 
-    cursor.page.drawText(ESTIMATE_TOTALS_TEXT[row.label], {
+    cursor.page.drawText(row.label, {
       x: labelX,
       y: cursor.y,
       size,

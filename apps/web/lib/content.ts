@@ -63,6 +63,12 @@ export const ESTIMATE_EDITOR_TEXT = {
   /** 保存できない理由として合計欄の位置に出す説明。 */
   invalidNumberSummary:
     "数字になっていない入力があります。数量・単価・諸経費率を確認してください。",
+  /**
+   * 画面編集用の列の見出し。協議会様式には無い列なのでここが持つ
+   * （様式にある列の見出しは lib/doc/templates/estimate.ts）。
+   */
+  columnKind: "種別",
+  columnTaxCategory: "税区分",
 } as const;
 
 /** ログイン画面の文言。 */
@@ -125,64 +131,14 @@ export const TAX_CATEGORY_LABELS = {
   exempt: "非課税",
 } as const;
 
-/**
- * 見積書の集計欄の文言。
- * 住宅リフォーム推進協議会「住宅リフォーム工事 御見積書」書式Ⅳ-1 の印字に合わせている。
- * https://www.j-reform.com/publish/pdf_shosiki/mitumori.pdf
- * 画面・PDF の両方がここを参照する。勝手に言い換えない。
+/*
+ * 紙に印字される文言（見積書の集計欄・明細の列見出し・ヘッダ/フッタ・既定の費目名）は
+ * ここに置かない。**テンプレート側（lib/doc/templates/）が持つ**
+ * （docs/design.md 7章「文言の住所を1つに決める規則」）。
+ * 依存の向きは固定する：テンプレートは content.ts を import しない。
+ * content.ts はテンプレートを import しない。描画器だけが両方を知る。
  */
-export const ESTIMATE_TOTALS_TEXT = {
-  directCostSubtotal: "直接工事費 小計",
-  overhead: "諸経費",
-  subtotalBeforeDiscount: "小計",
-  discount: "値引き",
-  netAmount: "工事価格 （税抜き）",
-  tax: "取引に係る消費税等",
-  grandTotal: "合計 （税込）",
-} as const;
 
-/**
- * 見積明細の列見出し。
- * 協議会様式は「工事項目／摘要（仕様）／（単価・数量・時間 等）／金額」の4列だが、
- * 金額を計算可能にするため 3列目を 数量／単位／単価 に分解している。
- */
-export const ESTIMATE_COLUMNS = {
-  /** 見積エディタの明細行だけが持つ列（協議会様式の4列には無い）。 */
-  kind: "種別",
-  name: "工事項目",
-  spec: "摘要（仕様）",
-  quantity: "数量",
-  unit: "単位",
-  unitPrice: "単価",
-  taxCategory: "税区分",
-  amount: "金額",
-} as const;
-
-/**
- * 見積書のヘッダー・フッターの文言。協議会様式の印字に合わせている。
- */
-export const ESTIMATE_DOCUMENT_TEXT = {
-  title: "御見積書",
-  recipientSuffix: "様",
-  issuedAtLabel: "作成日",
-  validUntilPrefix: "本見積書の有効期限は、",
-  validUntilSuffix: "までとさせていただきます。",
-  attachmentNote:
-    "■添付書類：見積内容を補足するため、打ち合わせシートは必ず添付します。",
-  keepNote: "※ この書類は大切に保管してください。",
-} as const;
-
-/**
- * 明細の末尾に既定で立てる費目。
- * 協議会様式では明細最終行に印字済みで、立て忘れを防ぐ設計になっている。
- */
-export const DEFAULT_DISPOSAL_ITEM_NAME = "解体・廃棄物処理費";
-
-/**
- * 単位の選択肢。リフォームの見積で実際に使われるもの。
- * 「式」は実務で必須だが、公的機関（住まいるダイヤル・消費生活センター）が
- * 内訳の分からなさを繰り返し注意喚起しているため、画面では摘要の記入を促す。
- */
 export const UNITS = [
   "式",
   "㎡",
@@ -394,4 +350,15 @@ export const PHOTO_TEXT = {
   tooLarge: `${PHOTO_MAX_UPLOAD_MB}MBを超える写真は追加できません。`,
   uploadFailed: "写真の追加に失敗しました。もう一度お試しください。",
   deleteFailed: "写真の削除に失敗しました。もう一度お試しください。",
+} as const;
+
+/** 書類画面のUI文言（紙に印字される文字はテンプレート側が持つ）。 */
+export const SPIKE_TEXT = {
+  note: "書類の行を押すと、写真と数量を入れるシートが出ます。写真枠は直接押せます。",
+  openSheet: "写真・数量を入れる",
+  print: "印刷する",
+  takePhoto: "写真を撮る",
+  retakePhoto: "撮り直す",
+  quantityLabel: "数量",
+  closeSheet: "閉じる",
 } as const;

@@ -59,3 +59,184 @@ textarea {
   outline: 3px solid #1d4ed8;
   outline-offset: 2px;
 }
+
+/*
+ * 書類（lib/doc/render/html.tsx が描く）の見た目。
+ *
+ * 画面と印刷で同じこの定義を使う。描画器が1つなのでずれる余地が構造的に無い
+ * （docs/design.md 7章「①見積依頼書のPDFは作らない」）。
+ * 書類の中の文字サイズは、画面のUI（本文16px）とは別の体系で、紙の様式に合わせる。
+ */
+.doc-page {
+  background: #fff;
+  color: #111;
+  box-sizing: border-box;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.doc-title {
+  font-size: 22px;
+  font-weight: 700;
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.doc-section-heading {
+  font-size: 16px;
+  font-weight: 700;
+  border-bottom: 2px solid #333;
+  padding-bottom: 8px;
+  margin: 32px 0 12px;
+}
+
+.doc-fields {
+  margin-bottom: 16px;
+}
+.doc-fields--right {
+  text-align: right;
+}
+.doc-field {
+  display: flex;
+  gap: 8px;
+}
+.doc-fields--right .doc-field {
+  justify-content: flex-end;
+}
+.doc-field dt {
+  width: 96px;
+  color: #555;
+  flex-shrink: 0;
+}
+
+.doc-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.doc-table th,
+.doc-table td {
+  border-bottom: 1px solid #ccc;
+  padding: 6px 4px;
+}
+.doc-table th {
+  font-weight: 700;
+  border-bottom: 2px solid #333;
+}
+
+.doc-photo-line {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  border-bottom: 1px solid #ccc;
+  padding: 12px 0;
+  min-height: 100px;
+}
+.doc-photo-frame {
+  border: 2px dashed #999;
+  flex-shrink: 0;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #999;
+}
+.doc-photo-frame img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.doc-photo-line-name {
+  font-weight: 700;
+}
+.doc-photo-line-quantity {
+  color: #555;
+}
+
+.doc-totals {
+  margin: 24px 0 0 auto;
+  width: 60%;
+}
+.doc-total {
+  display: flex;
+  justify-content: space-between;
+  padding: 3px 0;
+}
+.doc-total--strong {
+  font-size: 17px;
+  font-weight: 700;
+  border-top: 2px solid #333;
+  margin-top: 6px;
+  padding-top: 8px;
+}
+
+.doc-legal-item {
+  margin-bottom: 10px;
+}
+.doc-legal-item dt {
+  font-weight: 700;
+  font-size: 13px;
+}
+.doc-legal-item dd {
+  font-size: 13px;
+  color: #333;
+}
+
+.doc-notes {
+  margin-top: 24px;
+  font-size: 12px;
+  color: #555;
+}
+
+/*
+ * 印刷。用紙はA4縦、余白はテンプレートが持つ padding に任せる（@page の margin を
+ * 0 にして二重に効かせない）。書類だけを紙に出し、画面用のUIは全部落とす。
+ */
+@page {
+  size: A4 portrait;
+  margin: 0;
+}
+
+@media print {
+  /* 印刷時は書類以外を隠す。.doc-print-root を持つ要素の中だけが紙に出る */
+  body * {
+    visibility: hidden;
+  }
+  .doc-print-root,
+  .doc-print-root * {
+    visibility: visible;
+  }
+  .doc-print-root {
+    position: absolute;
+    inset: 0;
+  }
+  /* 画面では幅に合わせて縮小しているが、紙では実寸で出す */
+  .doc-print-root .doc-scaler {
+    transform: none !important;
+    width: auto !important;
+    height: auto !important;
+  }
+  .doc-page {
+    box-shadow: none;
+    border: none;
+  }
+  /* 明細の途中で改ページさせない */
+  .doc-photo-line,
+  .doc-total,
+  .doc-legal-item {
+    break-inside: avoid;
+  }
+  .doc-table thead {
+    display: table-header-group;
+  }
+  .doc-table tr {
+    break-inside: avoid;
+  }
+}
+
+/* 画面にだけ出す部品（案内文・ボタン・シート）。紙には出さない。 */
+@media print {
+  .doc-screen-only {
+    display: none !important;
+  }
+}

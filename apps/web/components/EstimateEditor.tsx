@@ -6,11 +6,14 @@ import { saveEstimateAction } from "../app/projects/[id]/estimate/actions";
 import { calcEstimate, formatYen, type EstimateTotals } from "../lib/calc";
 import {
   ESTIMATE_EDITOR_TEXT,
-  ESTIMATE_TOTALS_TEXT,
   OVERHEAD_TEXT,
   UNITS,
 } from "../lib/content";
 import type { PersistedEstimateLine, PriceMasterItem } from "../lib/db/types";
+import {
+  ESTIMATE_TOTALS_AMOUNT_BY_KEY,
+  ESTIMATE_TOTALS_ROWS,
+} from "../lib/doc/templates/estimate";
 import { isValidNumberInput } from "../lib/estimateLineValidation";
 import { EstimateLineRow, type EditableLine } from "./EstimateLineRow";
 import { PriceMasterPicker } from "./PriceMasterPicker";
@@ -76,20 +79,19 @@ function lineFromMasterItem(item: PriceMasterItem): EditableLine {
   };
 }
 
+// 印字される言葉は書類テンプレートが持つ（docs/design.md 7章「文言の住所を1つに
+// 決める規則」）。エディタは同じ見積書を編集しているので同じ言葉を使う。
+// 「小計（値引き前）」だけは画面に出さない（値引き行を足すまで直接工事費小計と
+// 同じ値になり、二重に見えるため）。
 const TOTALS_ROWS: {
-  label: keyof typeof ESTIMATE_TOTALS_TEXT;
+  label: string;
   amount: (totals: EstimateTotals) => number;
-}[] = [
-  {
-    label: "directCostSubtotal",
-    amount: (totals) => totals.directCostSubtotal,
-  },
-  { label: "overhead", amount: (totals) => totals.overheadAmount },
-  { label: "discount", amount: (totals) => totals.discountAmount },
-  { label: "netAmount", amount: (totals) => totals.netAmount },
-  { label: "tax", amount: (totals) => totals.taxAmount },
-  { label: "grandTotal", amount: (totals) => totals.grandTotal },
-];
+}[] = ESTIMATE_TOTALS_ROWS.filter(
+  (row) => row.key !== "subtotalBeforeDiscount",
+).map((row) => ({
+  label: row.label,
+  amount: ESTIMATE_TOTALS_AMOUNT_BY_KEY[row.key],
+}));
 
 type Props = {
   projectId: string;
@@ -258,7 +260,7 @@ export function EstimateEditor({
         <dl className="rounded border-2 border-gray-400 p-4">
           {TOTALS_ROWS.map((row) => (
             <div key={row.label} className="flex justify-between py-1">
-              <dt>{ESTIMATE_TOTALS_TEXT[row.label]}</dt>
+              <dt>{row.label}</dt>
               <dd className="tabular font-bold">
                 {formatYen(row.amount(resolvedTotals))}円
               </dd>
