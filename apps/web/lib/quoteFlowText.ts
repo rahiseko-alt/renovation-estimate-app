@@ -97,6 +97,34 @@ export const SITE_CONDITION_LABELS = {
 } as const;
 
 /** 下請台帳の画面の文言（docs/design.md 7章「画面は5つ」）。 */
+/**
+ * 会社設定の文言（`docs/design.md` 7章「画面は5つ」）。
+ *
+ * この画面が持つのは2種類ある。**請負者情報**は①②の様式に印字される欄で、
+ * 保存した1件を全案件が参照する。**定型文**は法定項目の初期値で、
+ * 案件を新しく作るときにその案件へ複製する（あとから会社設定を直しても、
+ * 既に作った案件は変わらない。案件ごとに上書きできることと矛盾させないため）。
+ */
+export const COMPANY_PROFILE_TEXT = {
+  heading: "会社設定",
+  description:
+    "見積書に印字する自社の情報と、法定項目の定型文の初期値をここに置きます。",
+  contractorHeading: "請負者情報",
+  contractorNote: "見積書と見積依頼書に印字します。",
+  contractorNameLabel: "請負者名（会社名）",
+  representativeNameLabel: "代表者名",
+  addressLabel: "住所",
+  defaultsHeading: "法定項目の定型文",
+  defaultsNote:
+    "新しい案件を作ったとき、ここに書いた内容が法定項目の初期値として入ります。既にある案件は変わりません。空のままにした項目は初期値を入れません。",
+  save: "保存する",
+  saving: "保存中…",
+  saved: "保存しました。",
+  failed: "保存できませんでした。もう一度お試しください。",
+  tooLong: "入力が長すぎます。短くしてください。",
+  back: "もどる",
+} as const;
+
 export const SUBCONTRACTORS_TEXT = {
   heading: "下請台帳",
   description: "見積依頼の送り先は、ここに登録した会社から選びます。",

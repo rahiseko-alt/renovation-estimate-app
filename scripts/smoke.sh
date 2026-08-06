@@ -262,6 +262,15 @@ SUBCONTRACTORS_HEADERS=$(curl -s -D - -o "${WORK}/subcontractors.html" -H "Cooki
 check "GET /subcontractors（正しいセッション）" 200 "$(printf '%s' "${SUBCONTRACTORS_HEADERS}" | head -1 | grep -o '[0-9]\{3\}')"
 expect_contains "下請台帳に登録フォームが出る" "会社名" "${WORK}/subcontractors.html"
 
+echo "== 会社設定 =="
+# 請負者情報（①②の様式に印字される欄）と、法定項目の定型文の初期値を置く画面。
+# /settings は proxy.ts の保護対象に足したばかりなので、素通りしないことも確かめる。
+check "GET /settings/company（Cookie 無し）" 307 "$(curl -s -o /dev/null -w '%{http_code}' "${BASE}/settings/company")"
+COMPANY_HEADERS=$(curl -s -D - -o "${WORK}/company.html" -H "Cookie: rea_session=${VALID}" "${BASE}/settings/company")
+check "GET /settings/company（正しいセッション）" 200 "$(printf '%s' "${COMPANY_HEADERS}" | head -1 | grep -o '[0-9]\{3\}')"
+expect_contains "会社設定に請負者名の欄が出る" "請負者名" "${WORK}/company.html"
+expect_contains "会社設定に定型文の欄が出る" "責任施工範囲" "${WORK}/company.html"
+
 echo "== 下請の回答画面（第三者が触る唯一の画面） =="
 # /q は**ログインしていない第三者が開く唯一の画面**なので、CSP と nonce を必ず検査する
 # （docs/plan-rebuild.md B3。これまで / と /projects にしか掛けていなかった）。

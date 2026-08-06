@@ -2,6 +2,7 @@
 
 import { getCurrentUser } from "../../../lib/auth/server";
 import { calcEstimate } from "../../../lib/calc";
+import { getCompanyProfile } from "../../../lib/db/companyProfiles";
 import { getOrCreateEstimate } from "../../../lib/db/estimates";
 import { getProjectForOwner } from "../../../lib/db/projects";
 import { generateEstimatePdf } from "../../../lib/pdf/estimateDocument";
@@ -39,7 +40,10 @@ export async function generateEstimatePdfAction(
     throw new Error("案件が見つかりません。");
   }
 
-  const estimate = await getOrCreateEstimate(projectId);
+  const [estimate, company] = await Promise.all([
+    getOrCreateEstimate(projectId),
+    getCompanyProfile(user),
+  ]);
   const totals = calcEstimate({
     lines: estimate.lines,
     overheadRatePercent: estimate.overheadRatePercent,
@@ -52,6 +56,13 @@ export async function generateEstimatePdfAction(
     lines: estimate.lines,
     totals,
     issuedAt: new Date(),
+    // 請負者ボックス（様式に印字されている欄）。会社設定が空なら空文字で渡り、
+    // PDF 側が欄ごと出さない。
+    contractor: {
+      contractorName: company.contractorName,
+      representativeName: company.representativeName,
+      address: company.address,
+    },
   });
 
   return {

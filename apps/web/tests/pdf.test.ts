@@ -2,7 +2,11 @@ import { PDFDocument } from "@cantoo/pdf-lib";
 import { describe, expect, it } from "vitest";
 
 import { calcEstimate, type EstimateLine } from "../lib/calc";
-import { generateEstimatePdf, type EstimateDocumentInput } from "../lib/pdf/estimateDocument";
+import {
+  contractorRows,
+  generateEstimatePdf,
+  type EstimateDocumentInput,
+} from "../lib/pdf/estimateDocument";
 
 function line(partial: Partial<EstimateLine> = {}): EstimateLine {
   return {
@@ -89,5 +93,67 @@ describe("generateEstimatePdf", () => {
   it("明細が0行でも例外を投げない", async () => {
     const bytes = await generateEstimatePdf(input({ lines: [] }));
     expect(Buffer.from(bytes.slice(0, 5)).toString("ascii")).toBe("%PDF-");
+  });
+
+  it("請負者情報を渡しても例外を投げない", async () => {
+    const bytes = await generateEstimatePdf(
+      input({
+        contractor: {
+          contractorName: "テスト工務店",
+          representativeName: "代表 太郎",
+          address: "東京都千代田区1-1",
+        },
+      }),
+    );
+    expect(Buffer.from(bytes.slice(0, 5)).toString("ascii")).toBe("%PDF-");
+  });
+
+  it("極端に長い請負者名でも1ページに収まる（宛名の側へはみ出さない）", async () => {
+    const bytes = await generateEstimatePdf(
+      input({
+        contractor: {
+          contractorName: "あ".repeat(200),
+          representativeName: "い".repeat(200),
+          address: "う".repeat(200),
+        },
+      }),
+    );
+    const doc = await PDFDocument.load(bytes);
+    expect(doc.getPageCount()).toBe(1);
+  });
+});
+
+describe("contractorRows", () => {
+  it("3欄すべて埋まっていれば3行。社名だけ太字にする", () => {
+    const rows = contractorRows({
+      contractorName: "テスト工務店",
+      representativeName: "代表 太郎",
+      address: "東京都千代田区1-1",
+    });
+    expect(rows.map((row) => row.text)).toEqual([
+      "テスト工務店",
+      "代表 太郎",
+      "東京都千代田区1-1",
+    ]);
+    expect(rows.map((row) => row.bold)).toEqual([true, false, false]);
+  });
+
+  it("会社設定が未入力なら1行も出さない（空の枠を作らない）", () => {
+    expect(
+      contractorRows({
+        contractorName: "",
+        representativeName: "",
+        address: "",
+      }),
+    ).toEqual([]);
+  });
+
+  it("空白だけの欄は書いていないものとして扱う", () => {
+    const rows = contractorRows({
+      contractorName: "テスト工務店",
+      representativeName: "   ",
+      address: "",
+    });
+    expect(rows.map((row) => row.text)).toEqual(["テスト工務店"]);
   });
 });
