@@ -254,6 +254,25 @@ else
   FAILURES=$((FAILURES + 1))
 fi
 
+echo "== 下請の回答画面（第三者が触る唯一の画面） =="
+# /q は**ログインしていない第三者が開く唯一の画面**なので、CSP と nonce を必ず検査する
+# （docs/plan-rebuild.md B3。これまで / と /projects にしか掛けていなかった）。
+# nonce が本文と一致しないと、この画面だけ JS が丸ごとブロックされて回答できなくなる。
+#
+# 実在しないトークンを使う。UUIDの形は満たすので、isUuid の早期returnではなく
+# 実際にDBまで引きに行く経路を通る（形の違う文字列だとDBに触らず素通りしてしまい、
+# 検査したつもりで何も見ていないことになる。docs/failures.md 2026-08-05 の再発防止）。
+MISSING_TOKEN="00000000-0000-0000-0000-000000000000"
+Q_HEADERS=$(curl -s -D - -o "${WORK}/q.html" "${BASE}/q/${MISSING_TOKEN}")
+check "GET /q/<実在しないトークン>" 200 "$(printf '%s' "${Q_HEADERS}" | head -1 | grep -o '[0-9]\{3\}')"
+check_csp_and_nonce "/q/<token>" "${Q_HEADERS}" "${WORK}/q.html"
+# 500 やスタックトレースではなく、専用の文言を出すこと（docs/plan-rebuild.md C5）。
+expect_contains "/q が実在しないトークンに専用の案内を出す" "この依頼は見つかりません" "${WORK}/q.html"
+
+# 形の違うトークン（UUIDでない）でも、500 にせず同じ案内を出す。
+curl -s -o "${WORK}/q-garbage.html" "${BASE}/q/not-a-uuid"
+expect_contains "/q が形の違うトークンにも専用の案内を出す" "この依頼は見つかりません" "${WORK}/q-garbage.html"
+
 echo "== 偽物・期限切れは弾く =="
 FORGED=$(node -e '
   const b64 = (value) => Buffer.from(value).toString("base64url");
