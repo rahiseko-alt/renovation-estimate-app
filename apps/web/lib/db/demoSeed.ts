@@ -1,4 +1,4 @@
-// デモ用の初期データを入れる（docs/plan-rebuild.md PR-C の5）。
+// デモ用の一式（案件・明細・法定項目・下請3社・返信済みの回答3件）を作る。
 //
 // **下請の返信を待つデモは成立しない。** 商談の場で「では下請が返信するまでお待ち
 // ください」とは言えないので、**返信済みのデータを最初から用意する**。
@@ -6,68 +6,30 @@
 // 登場する会社名・人名・住所・メールアドレスはすべて架空のダミー
 // （AGENTS.md 公開前提2：実在する第三者を特定できる情報を書かない）。
 //
-// 実行: DEMO_USER_EMAIL=<ログインする利用者のメール> bash scripts/seed-demo.sh
-// （接続情報の受け渡しは scripts/seed-demo.sh が行う。直接 node で動かすときは
-//   apps/web を作業ディレクトリにすること。@supabase/supabase-js が apps/web の依存で、
-//   Node は import をファイルの位置から解決するため）
-//
-// owner_id はログインした利用者のメールアドレスなので、DEMO_USER_EMAIL から取る
-// （固定のSQLに書けない。だから supabase の seed.sql ではなくこのスクリプトにしている）。
-//
-// 何度実行しても増えないよう、同じ工事名称の案件が既にあれば先に消してから作り直す。
+// 入口はこの関数1つ。アプリの「デモを始める」（app/demo/actions.ts）と、
+// ログイン済み利用者に入れる CLI（scripts/seed-demo.ts）の両方がここを通る
+// （AGENTS.md「結合を増やさない」2：同じ処理を呼ぶ入口は1つにする）。
 
 import { randomUUID } from "node:crypto";
 
-import { createClient } from "@supabase/supabase-js";
-
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const OWNER_ID = process.env.DEMO_USER_EMAIL;
-
-if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-  throw new Error(
-    "SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY が未設定です。supabase status -o env から取ってください。",
-  );
-}
-if (!OWNER_ID) {
-  throw new Error("DEMO_USER_EMAIL が未設定です。ログインする利用者と同じ値にしてください。");
-}
-
-const db = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-  auth: { persistSession: false },
-});
-
-/** エラーを握りつぶさない。seed が半分だけ入った状態を「成功」と見せない。 */
-function must(result, what) {
-  if (result.error) {
-    throw new Error(`${what} に失敗: ${result.error.message}`);
-  }
-  return result.data;
-}
+import { getSupabaseClient } from "./client";
 
 const CUSTOMER_NAME = "見本 太郎";
 const SITE_ADDRESS = "東京都新宿区西新宿0-0-0 サンプルマンション101";
-const WORK_NAME = `${SITE_ADDRESS} リフォーム工事`;
+
+/** 同じ内容に作り直すための目印。同じ owner_id で2回実行しても増えない。 */
+export const DEMO_WORK_NAME = `${SITE_ADDRESS} リフォーム工事`;
 
 /** 明細。単価は下請が埋めるので0で置く（元請は金額を知らないのが正しい前提）。 */
-const LINES = [
+const LINE_SOURCE = [
   { name: "キッチン工事", unit: "式", quantity: 1 },
   { name: "浴室工事", unit: "式", quantity: 1 },
   { name: "内装工事", unit: "㎡", quantity: 42 },
   { name: "解体・廃棄物処理費", unit: "式", quantity: 1 },
-].map((line) => ({
-  id: randomUUID(),
-  kind: "item",
-  name: line.name,
-  spec: "",
-  quantity: line.quantity,
-  unit: line.unit,
-  unitPrice: 0,
-  taxCategory: "standard",
-}));
+];
 
 /** 法定④⑤⑥⑧の9スロット。会社設定の定型文が入っている想定の初期値。 */
-const LEGAL_SLOTS = [
+const LEGAL_SLOTS: ReadonlyArray<readonly [string, string]> = [
   ["responsibility_scope", "本書に記載の工事範囲一式とする。"],
   ["subcontract_schedule", "着工日は別途協議のうえ決定する。"],
   ["overall_schedule", "全体工期は着工日から30日間を予定する。"],
@@ -80,7 +42,7 @@ const LEGAL_SLOTS = [
 ];
 
 /** 施工条件・範囲リストの12区分。デモでは全部に印を付けた状態にする。 */
-const SITE_CONDITIONS = [
+const SITE_CONDITIONS: ReadonlyArray<readonly [string, string]> = [
   ["materials", "include"],
   ["assembly_processing", "include"],
   ["transport", "include"],
@@ -94,6 +56,13 @@ const SITE_CONDITIONS = [
   ["inspection_confirmation", "include"],
   ["safety", "include"],
 ];
+
+/** 会社設定（請負者情報）。見積書PDFの請負者ボックスに出る。 */
+const COMPANY_PROFILE = {
+  contractor_name: "サンプル建設株式会社",
+  representative_name: "見本 一郎",
+  address: "東京都千代田区丸の内0-0-0 サンプルビル5階",
+};
 
 /** 3社ぶんの回答。同じ明細でも社によって値が違うのが比較表の見どころ。 */
 const COMPANIES = [
@@ -142,16 +111,29 @@ const COMPANIES = [
   },
 ];
 
-async function removeExistingDemoProject() {
+/** エラーを握りつぶさない。半分だけ入った状態を「成功」と見せない。 */
+function must<T>(result: { data: T; error: unknown }, what: string): T {
+  if (result.error) {
+    const message =
+      result.error instanceof Error
+        ? result.error.message
+        : String((result.error as { message?: string })?.message ?? result.error);
+    throw new Error(`${what} に失敗: ${message}`);
+  }
+  return result.data;
+}
+
+async function removeExistingDemoData(ownerId: string): Promise<void> {
+  const db = getSupabaseClient();
   const existing = must(
     await db
       .from("projects")
       .select("id")
-      .eq("owner_id", OWNER_ID)
-      .eq("work_name", WORK_NAME),
+      .eq("owner_id", ownerId)
+      .eq("work_name", DEMO_WORK_NAME),
     "既存のデモ案件の確認",
   );
-  for (const row of existing) {
+  for (const row of existing as Array<{ id: string }>) {
     // 依頼・回答・採用はすべて on delete cascade で一緒に消える。
     must(await db.from("projects").delete().eq("id", row.id), "既存のデモ案件の削除");
   }
@@ -160,33 +142,62 @@ async function removeExistingDemoProject() {
     await db
       .from("subcontractors")
       .delete()
-      .eq("owner_id", OWNER_ID)
-      .in("email", COMPANIES.map((company) => company.email)),
+      .eq("owner_id", ownerId)
+      .in(
+        "email",
+        COMPANIES.map((company) => company.email),
+      ),
     "既存のデモ下請の削除",
   );
 }
 
-async function seed() {
-  await removeExistingDemoProject();
+/**
+ * デモ一式を作り、案件IDを返す。同じ owner_id で何度呼んでも同じ内容に作り直す。
+ * 進捗の文言は返さない（呼び出し側の画面・CLI がそれぞれの言い方で出す）。
+ */
+export async function seedDemoData(ownerId: string): Promise<string> {
+  const db = getSupabaseClient();
+  await removeExistingDemoData(ownerId);
+
+  const lines = LINE_SOURCE.map((line) => ({
+    id: randomUUID(),
+    kind: "item",
+    name: line.name,
+    spec: "",
+    quantity: line.quantity,
+    unit: line.unit,
+    unitPrice: 0,
+    taxCategory: "standard",
+  }));
+
+  // 会社設定は1事業者1件（owner_id が主キー）。デモでは請負者ボックスを埋めたいので入れる。
+  must(
+    await db
+      .from("company_profiles")
+      .upsert({ owner_id: ownerId, ...COMPANY_PROFILE })
+      .select("owner_id")
+      .single(),
+    "会社設定の作成",
+  );
 
   const project = must(
     await db
       .from("projects")
       .insert({
-        owner_id: OWNER_ID,
+        owner_id: ownerId,
         customer_name: CUSTOMER_NAME,
         site_address: SITE_ADDRESS,
-        work_name: WORK_NAME,
+        work_name: DEMO_WORK_NAME,
       })
       .select("id")
       .single(),
     "案件の作成",
-  );
+  ) as { id: string };
 
   must(
     await db
       .from("estimates")
-      .insert({ project_id: project.id, lines: LINES, overhead_rate_percent: 15 })
+      .insert({ project_id: project.id, lines, overhead_rate_percent: 15 })
       .select("id")
       .single(),
     "見積の作成",
@@ -196,7 +207,7 @@ async function seed() {
     await db.from("legal_item_slots").insert(
       LEGAL_SLOTS.map(([slotKey, value]) => ({
         project_id: project.id,
-        owner_id: OWNER_ID,
+        owner_id: ownerId,
         slot_key: slotKey,
         status: "filled",
         value,
@@ -209,7 +220,7 @@ async function seed() {
     await db.from("site_condition_checks").insert(
       SITE_CONDITIONS.map(([category, mark]) => ({
         project_id: project.id,
-        owner_id: OWNER_ID,
+        owner_id: ownerId,
         category,
         mark,
       })),
@@ -222,41 +233,41 @@ async function seed() {
       .from("quote_request_groups")
       .insert({
         project_id: project.id,
-        owner_id: OWNER_ID,
+        owner_id: ownerId,
         presented_at: new Date().toISOString(),
       })
       .select("id, presented_at")
       .single(),
     "依頼グループの作成",
-  );
+  ) as { id: string; presented_at: string };
 
   // 500万円未満なので見積期間は1日以上（建設業法施行令第6条。lib/legalPeriod.ts と同じ）。
   const responseDueAt = new Date(
     new Date(group.presented_at).getTime() + 24 * 60 * 60 * 1000,
   ).toISOString();
 
-  const lineIds = LINES.map((line) => line.id);
+  const lineIds = lines.map((line) => line.id);
 
   for (const company of COMPANIES) {
     const subcontractor = must(
       await db
         .from("subcontractors")
         .insert({
-          owner_id: OWNER_ID,
+          owner_id: ownerId,
           company_name: company.companyName,
           email: company.email,
         })
         .select("id")
         .single(),
       "下請台帳の作成",
-    );
+    ) as { id: string };
 
     const request = must(
       await db
         .from("quote_group_requests")
         .insert({
           group_id: group.id,
-          owner_id: OWNER_ID,
+          owner_id: ownerId,
           subcontractor_id: subcontractor.id,
           planned_price_band: "under_500man",
           response_due_at: responseDueAt,
@@ -264,10 +275,10 @@ async function seed() {
           status: "responded",
           responded_at: new Date().toISOString(),
         })
-        .select("id, token")
+        .select("id")
         .single(),
       "社ごとの依頼の作成",
-    );
+    ) as { id: string };
 
     const response = must(
       await db
@@ -279,26 +290,33 @@ async function seed() {
         .select("id")
         .single(),
       "回答の作成",
-    );
+    ) as { id: string };
 
     must(
       await db.from("quote_group_response_lines").insert(
-        lineIds.map((lineItemId, index) => ({
-          response_id: response.id,
-          line_item_id: lineItemId,
-          quantity: LINES[index].quantity,
-          cost_unit_price: company.prices[index],
-        })),
+        lines.map((line, index) => {
+          const costUnitPrice = company.prices[index];
+          // 明細を足して単価を足し忘れると、0円の回答が黙って入る。
+          // 比較表では「最安」に見えてしまうので、そこで気づけない。
+          if (costUnitPrice === undefined) {
+            throw new Error(
+              `${company.companyName} の単価の数が明細の数と合っていません`,
+            );
+          }
+          return {
+            response_id: response.id,
+            line_item_id: line.id,
+            quantity: line.quantity,
+            cost_unit_price: costUnitPrice,
+          };
+        }),
       ),
       "回答明細の作成",
     );
-
-    // トークンは /q の唯一の資格情報なので出力しない（端末履歴・ログに残る）。
-    console.log(`回答済みの依頼を作成: ${company.companyName}`);
   }
 
-  console.log(`デモ案件を作成しました: ${WORK_NAME}`);
-  console.log(`比較表: /projects/${project.id}/comparison`);
+  return project.id;
 }
 
-await seed();
+/** デモに登場する下請の社数。画面の案内文が数字を持たないようにここから取る。 */
+export const DEMO_SUBCONTRACTOR_COUNT = COMPANIES.length;

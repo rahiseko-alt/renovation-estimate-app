@@ -142,6 +142,14 @@ echo "== 誰でも開けるページ =="
 HEADERS=$(curl -s -D - -o "${WORK}/home.html" "${BASE}/")
 check "GET /" 200 "$(curl -s -o /dev/null -w '%{http_code}' "${BASE}/")"
 expect_contains "本文にマーカー '${MARKER}'" "${MARKER}" "${WORK}/home.html"
+# デモの入口は未ログインのトップに出ていなければ意味が無い（商談で見せる相手は
+# アカウントを持っていない）。lib/demoText.ts の DEMO_ENTRY_TEXT.start と同じ値。
+expect_contains "未ログインのトップにデモの入口" "デモを触ってみる" "${WORK}/home.html"
+# デモを始める前に /demo を直打ちしても開かない（実利用者・無関係の訪問者に
+# 他人のデモ案件を見せない）。案件IDの形だけ合っていても 404 になる。
+check "GET /demo/<uuid>/photo（デモ未開始）" 404 \
+  "$(curl -s -o /dev/null -w '%{http_code}' \
+    "${BASE}/demo/00000000-0000-4000-8000-000000000000/photo")"
 check "GET /login" 200 "$(curl -s -o /dev/null -w '%{http_code}' "${BASE}/login")"
 check "GET /api/health" 200 "$(curl -s -o /dev/null -w '%{http_code}' "${BASE}/api/health")"
 check "GET /offline" 200 "$(curl -s -o /dev/null -w '%{http_code}' "${BASE}/offline")"

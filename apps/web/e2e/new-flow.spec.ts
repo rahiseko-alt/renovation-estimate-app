@@ -8,7 +8,7 @@
 // 書類画面のシート入力（PR-B の S2〜S4 に相当する経路）／C11（ブラウザのエラー0件）。
 //
 // 前提データは scripts/seed-demo.sh が入れる（scripts/e2e.sh が Playwright の前に実行し、
-// 失敗したらここまで来ない）。下の期待値はその seed（apps/web/scripts/seed-demo.mjs）と
+// 失敗したらここまで来ない）。下の期待値はその seed（apps/web/lib/db/demoSeed.ts）と
 // 対になっている。seed を変えたらここも直す。
 
 import { expect, test, type Page } from "@playwright/test";

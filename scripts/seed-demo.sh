@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # デモ用の初期データを入れる（docs/plan-rebuild.md PR-C の5）。
-# 実体は apps/web/scripts/seed-demo.mjs。ここは Supabase の接続情報を渡す役だけを持つ
+# 実体は apps/web/lib/db/demoSeed.ts。ここは Supabase の接続情報を渡す役だけを持つ
 # （AGENTS.md「結合を増やさない」2：同じ処理を呼ぶ入口は1つにする）。
 #
 # 使い方: DEMO_USER_EMAIL=<ログインする利用者のメール> bash scripts/seed-demo.sh
@@ -32,4 +32,8 @@ fi
 export SUPABASE_URL="${API_URL}"
 export SUPABASE_SERVICE_ROLE_KEY="${SERVICE_ROLE_KEY}"
 export DEMO_USER_EMAIL
-pnpm --filter web exec node scripts/seed-demo.mjs
+# lib/db/client.ts は "server-only" を import する。CLI は React Server Component の
+# 外なので、そのままだと server-only が例外を投げる。パッケージが用意している
+# react-server 条件で解決させて空実装に差し替える（vitest.config.ts が
+# 同じ理由でエイリアスを張っているのと同じ対処）。
+NODE_OPTIONS="--conditions=react-server" pnpm --filter web exec tsx scripts/seed-demo.ts
