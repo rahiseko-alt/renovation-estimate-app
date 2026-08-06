@@ -6,19 +6,8 @@
 import { DEMO_OWNER_PREFIX } from "../auth/demoOwner";
 import { DEMO_WORK_NAME } from "../demoFixture";
 import { getSupabaseClient } from "./client";
-import { tryDeletePhotoObject } from "./photoStorage";
-
-/** エラーを握りつぶさない。半分だけ消えた状態を「成功」と見せない。 */
-function must<T>(result: { data: T; error: unknown }, what: string): T {
-  if (result.error) {
-    const message =
-      result.error instanceof Error
-        ? result.error.message
-        : String((result.error as { message?: string })?.message ?? result.error);
-    throw new Error(`${what} に失敗: ${message}`);
-  }
-  return result.data;
-}
+import { must } from "./mustResult";
+import { tryDeletePhotoObjects } from "./photoStorage";
 
 /**
  * この利用者のデモ案件があればそのIDを返す。無ければ null。
@@ -74,6 +63,63 @@ async function ownersWithNothingLeft(
 }
 
 /**
+ * 1回の掃除で扱う案件の上限。
+ *
+ * **上限を置かないと、溜まったときに掃除そのものが通らなくなる。**
+ * ここで取ったIDは `.in(...)` に載ってURLになるので、件数が増えるとURLが長くなりすぎて
+ * 弾かれる。しかも次の回も同じ大きさの一覧を作り直すので、二度と減らない。
+ * 1回ぶんを区切っておけば、デモが始まるたびに少しずつ減る。
+ */
+const PURGE_BATCH_SIZE = 100;
+
+/**
+ * 案件を1件も持たない `demo:` 所有者を探す（下請台帳・会社設定だけが残っている状態）。
+ *
+ * 掃除は「案件を消す → owner_id 単位の行を消す」の順で、トランザクションを張っていない。
+ * 前半だけ成功して後半で落ちると、案件から辿れない行が残る。**それは案件を起点にする
+ * 掃除では二度と拾えない**ので、こちらから直接探す。
+ *
+ * **投入中のデモを巻き込まないよう、期限を過ぎたものだけを見る。**
+ * 投入は案件と下請を同時に入れるので、その一瞬だけ「案件の無い所有者」に見える。
+ * 時刻で縛らないと、始めたばかりのデモの下請台帳を消してしまう。
+ */
+async function orphanedDemoOwners(cutoff: string): Promise<string[]> {
+  const db = getSupabaseClient();
+
+  const [fromSubcontractors, fromProfiles] = await Promise.all([
+    db
+      .from("subcontractors")
+      .select("owner_id")
+      .like("owner_id", `${DEMO_OWNER_PREFIX}%`)
+      .lt("created_at", cutoff)
+      .limit(PURGE_BATCH_SIZE)
+      .then((r) => must(r, "取り残されたデモ下請の確認") as Array<{ owner_id: string }>),
+    db
+      .from("company_profiles")
+      .select("owner_id")
+      .like("owner_id", `${DEMO_OWNER_PREFIX}%`)
+      .lt("updated_at", cutoff)
+      .limit(PURGE_BATCH_SIZE)
+      .then((r) => must(r, "取り残されたデモ会社設定の確認") as Array<{ owner_id: string }>),
+  ]);
+
+  const candidates = [
+    ...new Set(
+      [...fromSubcontractors, ...fromProfiles].map((row) => row.owner_id),
+    ),
+  ];
+  if (candidates.length === 0) return [];
+
+  const owned = must(
+    await db.from("projects").select("owner_id").in("owner_id", candidates),
+    "取り残された所有者の案件の確認",
+  ) as Array<{ owner_id: string }>;
+
+  const hasProject = new Set(owned.map((row) => row.owner_id));
+  return candidates.filter((ownerId) => !hasProject.has(ownerId));
+}
+
+/**
  * 期限を過ぎたデモ利用者のデータを消す。消した案件の数を返す。
  *
  * **デモは無ログインで、訪問ごとに `demo:<uuid>` が1つ増える。**
@@ -94,11 +140,10 @@ export async function purgeExpiredDemoData(
       .from("projects")
       .select("id, owner_id")
       .like("owner_id", `${DEMO_OWNER_PREFIX}%`)
-      .lt("created_at", cutoff),
+      .lt("created_at", cutoff)
+      .limit(PURGE_BATCH_SIZE),
     "期限切れのデモ案件の確認",
   ) as Array<{ id: string; owner_id: string }>;
-
-  if (expired.length === 0) return 0;
 
   const candidateIds = expired.map((row) => row.id);
 
@@ -107,41 +152,62 @@ export async function purgeExpiredDemoData(
   // **ストレージの削除に失敗した案件は、この回では消さない。** 行を先に消すと
   // storage_path が失われ、残ったオブジェクトを二度と回収できなくなる。
   // 行を残しておけば、次に誰かがデモを始めたときにもう一度やり直せる。
-  const photos = must(
-    await db
-      .from("photos")
-      .select("project_id, storage_path")
-      .in("project_id", candidateIds),
-    "期限切れのデモ写真の確認",
-  ) as Array<{ project_id: string; storage_path: string }>;
-
   const failedProjectIds = new Set<string>();
-  for (const photo of photos) {
-    if (!(await tryDeletePhotoObject(photo.storage_path))) {
-      failedProjectIds.add(photo.project_id);
+  if (candidateIds.length > 0) {
+    const photos = must(
+      await db
+        .from("photos")
+        .select("project_id, storage_path")
+        .in("project_id", candidateIds),
+      "期限切れのデモ写真の確認",
+    ) as Array<{ project_id: string; storage_path: string }>;
+
+    const pathsByProject = new Map<string, string[]>();
+    for (const photo of photos) {
+      const paths = pathsByProject.get(photo.project_id) ?? [];
+      paths.push(photo.storage_path);
+      pathsByProject.set(photo.project_id, paths);
+    }
+    for (const [projectId, paths] of pathsByProject) {
+      if (!(await tryDeletePhotoObjects(paths))) {
+        failedProjectIds.add(projectId);
+      }
     }
   }
 
   const projectIds = candidateIds.filter((id) => !failedProjectIds.has(id));
-  if (projectIds.length === 0) return 0;
-
   const removable = new Set(projectIds);
-  const ownerIds = await ownersWithNothingLeft(removable, expired);
 
-  // 見積・法定項目・依頼・回答・写真の行は on delete cascade で一緒に消える。
-  must(
-    await db.from("projects").delete().in("id", projectIds),
-    "期限切れのデモ案件の削除",
-  );
+  // **消す案件が無くても、ここは通る。** 前回の掃除が案件を消したあとで落ちていると、
+  // 下請と会社設定だけが取り残される。その所有者はもう案件を持たないので、
+  // 案件から辿る経路では二度と拾えない。毎回こちらからも探す。
+  const ownerIds = [
+    ...new Set([
+      ...(await ownersWithNothingLeft(removable, expired)),
+      ...(await orphanedDemoOwners(cutoff)),
+    ]),
+  ];
+
+  if (projectIds.length > 0) {
+    // 見積・法定項目・依頼・回答・写真の行は on delete cascade で一緒に消える。
+    must(
+      await db.from("projects").delete().in("id", projectIds),
+      "期限切れのデモ案件の削除",
+    );
+  }
+
   // 下請台帳と会社設定は案件に紐づかないので、owner_id で消す。
-  must(
-    await db.from("subcontractors").delete().in("owner_id", ownerIds),
-    "期限切れのデモ下請の削除",
-  );
-  must(
-    await db.from("company_profiles").delete().in("owner_id", ownerIds),
-    "期限切れのデモ会社設定の削除",
-  );
+  // 空で投げると、何にも当たらない削除を2回打つことになる。
+  if (ownerIds.length > 0) {
+    must(
+      await db.from("subcontractors").delete().in("owner_id", ownerIds),
+      "期限切れのデモ下請の削除",
+    );
+    must(
+      await db.from("company_profiles").delete().in("owner_id", ownerIds),
+      "期限切れのデモ会社設定の削除",
+    );
+  }
 
   return projectIds.length;
 }

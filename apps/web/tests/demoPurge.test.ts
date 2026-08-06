@@ -4,22 +4,26 @@ import { newDemoOwnerId } from "../lib/auth/demoOwner";
 import { DEFAULT_PHOTO_AREA } from "../lib/content";
 import { getCompanyProfile } from "../lib/db/companyProfiles";
 import { createPhoto } from "../lib/db/photos";
-import { createProject, getProjectForOwner } from "../lib/db/projects";
+import {
+  createProject,
+  deleteProjectForOwner,
+  getProjectForOwner,
+} from "../lib/db/projects";
 import { listSubcontractorsForOwner } from "../lib/db/subcontractors";
 
 // ストレージの失敗を作るためにモックする。この検査だけの都合なので、
 // 実 Supabase を使う他のDB検査（tests/demoSeed.test.ts）とはファイルを分ける。
-const tryDeletePhotoObject = vi.hoisted(() => vi.fn());
+const tryDeletePhotoObjects = vi.hoisted(() => vi.fn());
 vi.mock("../lib/db/photoStorage", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../lib/db/photoStorage")>()),
-  tryDeletePhotoObject,
+  tryDeletePhotoObjects,
 }));
 
 const { purgeExpiredDemoData } = await import("../lib/db/demoCleanup");
 const { seedDemoData } = await import("../lib/db/demoSeed");
 
 afterEach(() => {
-  vi.mocked(tryDeletePhotoObject).mockReset();
+  vi.mocked(tryDeletePhotoObjects).mockReset();
 });
 
 /**
@@ -36,7 +40,7 @@ describe("purgeExpiredDemoData と写真ストレージ", () => {
       ownerId,
     );
 
-    vi.mocked(tryDeletePhotoObject).mockResolvedValue(false);
+    vi.mocked(tryDeletePhotoObjects).mockResolvedValue(false);
     await purgeExpiredDemoData(new Date(Date.now() + 60_000));
 
     // 件数では見ない。掃除は他の期限切れデモも一緒に消すので安定しない。
@@ -52,7 +56,7 @@ describe("purgeExpiredDemoData と写真ストレージ", () => {
       ownerId,
     );
 
-    vi.mocked(tryDeletePhotoObject).mockResolvedValue(true);
+    vi.mocked(tryDeletePhotoObjects).mockResolvedValue(true);
     await purgeExpiredDemoData(new Date(Date.now() + 60_000));
 
     expect(await getProjectForOwner(projectId, ownerId)).toBeNull();
@@ -78,8 +82,10 @@ describe("purgeExpiredDemoData と写真ストレージ", () => {
     );
 
     // 片方の写真だけ消せない状況を作る。
-    vi.mocked(tryDeletePhotoObject).mockImplementation(
-      async (path: string) => !path.startsWith(keptProject),
+    // 案件単位で渡ってくる。片方の案件の写真だけ消せない状況を作る。
+    vi.mocked(tryDeletePhotoObjects).mockImplementation(
+      async (paths: readonly string[]) =>
+        !paths.some((path) => path.startsWith(keptProject)),
     );
     await purgeExpiredDemoData(new Date(Date.now() + 60_000));
 
@@ -103,7 +109,7 @@ describe("purgeExpiredDemoData と owner_id 単位のデータ", () => {
       ownerId,
     );
 
-    vi.mocked(tryDeletePhotoObject).mockResolvedValue(false);
+    vi.mocked(tryDeletePhotoObjects).mockResolvedValue(false);
     await purgeExpiredDemoData(new Date(Date.now() + 60_000));
 
     // 案件が残っているので、下請台帳も会社設定もそのまま。
@@ -129,7 +135,7 @@ describe("purgeExpiredDemoData と owner_id 単位のデータ", () => {
       { projectId: kept, area: DEFAULT_PHOTO_AREA, storagePath: `${kept}/a.jpg` },
       ownerId,
     );
-    vi.mocked(tryDeletePhotoObject).mockResolvedValue(false);
+    vi.mocked(tryDeletePhotoObjects).mockResolvedValue(false);
 
     await purgeExpiredDemoData(new Date(Date.now() + 60_000));
 
@@ -144,11 +150,47 @@ describe("purgeExpiredDemoData と owner_id 単位のデータ", () => {
     const ownerId = newDemoOwnerId();
     const demoProject = await seedDemoData(ownerId);
 
-    vi.mocked(tryDeletePhotoObject).mockResolvedValue(true);
+    vi.mocked(tryDeletePhotoObjects).mockResolvedValue(true);
     await purgeExpiredDemoData(new Date(Date.now() + 60_000));
 
     expect(await getProjectForOwner(demoProject, ownerId)).toBeNull();
     expect(await listSubcontractorsForOwner(ownerId)).toHaveLength(0);
     expect((await getCompanyProfile(ownerId)).contractorName).toBe("");
+  });
+});
+
+/**
+ * 掃除は「案件を消す → owner_id 単位の行を消す」の順で、トランザクションを張っていない。
+ * 前半だけ成功して後半で落ちると、案件から辿れない行が残る。
+ * **それは案件を起点にする掃除では二度と拾えない**ので、こちらから直接探して消す。
+ */
+describe("purgeExpiredDemoData と取り残された owner_id 単位の行", () => {
+  it("案件が消えたあとに残った下請台帳・会社設定を、次の掃除で拾って消す", async () => {
+    const ownerId = newDemoOwnerId();
+    const projectId = await seedDemoData(ownerId);
+
+    // 前回の掃除が案件だけ消して落ちた状態を作る。
+    await deleteProjectForOwner(projectId, ownerId);
+    expect(await listSubcontractorsForOwner(ownerId)).not.toHaveLength(0);
+
+    vi.mocked(tryDeletePhotoObjects).mockResolvedValue(true);
+    await purgeExpiredDemoData(new Date(Date.now() + 60_000));
+
+    expect(await listSubcontractorsForOwner(ownerId)).toHaveLength(0);
+    expect((await getCompanyProfile(ownerId)).contractorName).toBe("");
+  });
+
+  // 投入は案件と下請を同時に入れるので、その一瞬だけ「案件の無い所有者」に見える。
+  // 時刻で縛らないと、始めたばかりのデモの下請台帳を消してしまう。
+  it("始めたばかりのデモ（期限内）の下請台帳は消さない", async () => {
+    const ownerId = newDemoOwnerId();
+    const projectId = await seedDemoData(ownerId);
+    await deleteProjectForOwner(projectId, ownerId);
+
+    vi.mocked(tryDeletePhotoObjects).mockResolvedValue(true);
+    // 「1時間前より古いもの」を消す＝いま作ったものは対象外。
+    await purgeExpiredDemoData(new Date(Date.now() - 60 * 60 * 1000));
+
+    expect(await listSubcontractorsForOwner(ownerId)).not.toHaveLength(0);
   });
 });

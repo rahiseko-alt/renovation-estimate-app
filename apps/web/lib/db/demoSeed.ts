@@ -22,19 +22,9 @@ import {
   SITE_ADDRESS,
   SITE_CONDITIONS,
 } from "../demoFixture";
+import { computeResponseDueAt } from "../legalPeriod";
 import { getSupabaseClient } from "./client";
-
-/** エラーを握りつぶさない。半分だけ入った状態を「成功」と見せない。 */
-function must<T>(result: { data: T; error: unknown }, what: string): T {
-  if (result.error) {
-    const message =
-      result.error instanceof Error
-        ? result.error.message
-        : String((result.error as { message?: string })?.message ?? result.error);
-    throw new Error(`${what} に失敗: ${message}`);
-  }
-  return result.data;
-}
+import { must } from "./mustResult";
 
 /** まとめて入れた行を突き合わせるときに、取り違えを黙って通さないための確認。 */
 function requireValue<T>(value: T | undefined, what: string): T {
@@ -184,9 +174,11 @@ export async function seedDemoData(ownerId: string): Promise<string> {
       .then((result) => must(result, "依頼グループの作成") as { id: string }),
   ]);
 
-  // 500万円未満なので見積期間は1日以上（建設業法施行令第6条。lib/legalPeriod.ts と同じ）。
-  const responseDueAt = new Date(
-    new Date(presentedAt).getTime() + 24 * 60 * 60 * 1000,
+  // 見積期間は建設業法施行令第6条。日数の定義は lib/legalPeriod.ts が持つ。
+  // ここで日数を書き直すと、法令の解釈を2箇所に持つことになる。
+  const responseDueAt = computeResponseDueAt(
+    new Date(presentedAt),
+    "under_500man",
   ).toISOString();
 
   const subcontractorIdByEmail = new Map(

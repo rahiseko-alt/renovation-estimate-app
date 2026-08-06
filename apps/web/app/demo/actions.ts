@@ -67,8 +67,10 @@ export async function startDemoAction(): Promise<void> {
   after(async () => {
     try {
       await purgeExpiredDemoData(new Date(Date.now() - DEMO_TTL_SECONDS * 1000));
-    } catch {
-      // 記録先を持たないので握る。残っても次の機会に消える。
+    } catch (error) {
+      // デモは止めない。ただし黙って消すと、掃除が毎回失敗していても気付けない。
+      // 第一引数は固定の文字列にし、値は別引数で渡す（photoStorage.ts と同じ理由）。
+      console.error("期限切れデモの掃除に失敗した:", { error });
     }
   });
 

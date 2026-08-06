@@ -46,16 +46,32 @@ export async function deletePhotoObject(path: string): Promise<void> {
   }
 }
 
+/** Storage の remove に一度に渡す最大件数。 */
+const STORAGE_REMOVE_CHUNK = 1000;
+
 /**
- * ストレージのオブジェクトを削除し、消せたかどうかを返す。
+ * ストレージのオブジェクトをまとめて削除し、全部消せたかどうかを返す。
  *
  * `deletePhotoObject` と違い、失敗を呼び出し側に伝える。
  * **DB行を消す前に**ストレージを消す手順（デモの掃除がこれ）では、失敗を握ると
  * 行が消えたあとにオブジェクトの場所が分からなくなり、二度と回収できなくなる。
+ *
+ * どれが消せなかったかは返さない。呼び出し側は案件単位で渡し、
+ * 1つでも失敗したらその案件を丸ごと次回に回す（中途半端に消さない）。
  */
-export async function tryDeletePhotoObject(path: string): Promise<boolean> {
-  const { error } = await getSupabaseClient().storage.from(BUCKET).remove([path]);
-  return !error;
+export async function tryDeletePhotoObjects(
+  paths: readonly string[],
+): Promise<boolean> {
+  if (paths.length === 0) return true;
+  // Storage の remove は一度に受け取れる数に上限がある。分けて投げる。
+  for (let i = 0; i < paths.length; i += STORAGE_REMOVE_CHUNK) {
+    const chunk = paths.slice(i, i + STORAGE_REMOVE_CHUNK);
+    const { error } = await getSupabaseClient()
+      .storage.from(BUCKET)
+      .remove([...chunk]);
+    if (error) return false;
+  }
+  return true;
 }
 
 /** 表示用の署名付きURLを発行する。呼び出し側で対象写真の所有者確認を済ませた上で使う。 */

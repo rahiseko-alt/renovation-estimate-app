@@ -7,7 +7,8 @@ import { newDemoOwnerId } from "../lib/auth/demoOwner";
  *
  * 1件ずつ順に入れていた頃は実行時20往復あり、本番（Vercel → Supabase）で
  * 5〜10秒かかって関数のタイムアウト境界に張り付いた。商談で見せられる速さではない。
- * `docs/failures.md` 2026-08-06 の「デモが本番で遅すぎた」を見る。
+ * `docs/failures.md` 2026-08-06 の
+ * 「デモが本番で遅すぎて「動かん」状態だった（機能は動いていた）」を見る。
  *
  * ここは**上限**を置く。増やす向きの変更をしたら落ちる。
  * 落ちたら、まとめられる insert が残っていないかを先に疑う。
@@ -28,14 +29,17 @@ vi.mock("../lib/db/client", async (importOriginal) => {
     getSupabaseClient: () => {
       const client = original.getSupabaseClient();
       return new Proxy(client, {
-        get(target, property, receiver) {
-          if (property === "from") {
-            return (...args: unknown[]) => {
-              queryCount.value += 1;
-              return (target.from as (...a: unknown[]) => unknown)(...args);
-            };
-          }
-          return Reflect.get(target, property, receiver);
+        // receiver に Proxy を渡すと、プロトタイプ側のメソッドが this を見失う
+        // （SupabaseClient.from は this.rest を読む）。必ず target に束縛する。
+        get(target, property) {
+          const value = Reflect.get(target, property, target);
+          if (typeof value !== "function") return value;
+          const bound = (value as (...a: unknown[]) => unknown).bind(target);
+          if (property !== "from") return bound;
+          return (...args: unknown[]) => {
+            queryCount.value += 1;
+            return bound(...args);
+          };
         },
       });
     },
