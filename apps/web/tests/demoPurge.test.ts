@@ -4,8 +4,8 @@ import { newDemoOwnerId } from "../lib/auth/demoOwner";
 import { DEFAULT_PHOTO_AREA } from "../lib/content";
 import { getCompanyProfile } from "../lib/db/companyProfiles";
 import { createPhoto } from "../lib/db/photos";
+import { createProject, getProjectForOwner } from "../lib/db/projects";
 import { listSubcontractorsForOwner } from "../lib/db/subcontractors";
-import { getProjectForOwner } from "../lib/db/projects";
 
 // ストレージの失敗を作るためにモックする。この検査だけの都合なので、
 // 実 Supabase を使う他のDB検査（tests/demoSeed.test.ts）とはファイルを分ける。
@@ -109,6 +109,33 @@ describe("purgeExpiredDemoData と owner_id 単位のデータ", () => {
     expect(await getProjectForOwner(demoProject, ownerId)).not.toBeNull();
     expect(await listSubcontractorsForOwner(ownerId)).not.toHaveLength(0);
     // 未設定なら空文字が返る作りなので、請負者名が残っているかで見る。
+    expect((await getCompanyProfile(ownerId)).contractorName).not.toBe("");
+  });
+
+  // 直した不具合そのもの。**同じ所有者が案件を2件持ち、片方だけが消える**とき、
+  // 残る側から下請と請負者名が消えていた。
+  it("同じ所有者の案件が片方だけ消えるとき、下請台帳・会社設定を残す", async () => {
+    const ownerId = newDemoOwnerId();
+    const kept = await seedDemoData(ownerId);
+    // 同じデモ利用者が画面から作った2件目。写真が無いので掃除の対象になる。
+    const removed = await createProject(
+      { customerName: "見本 次郎", siteAddress: "東京都港区0-0-0" },
+      ownerId,
+    );
+
+    // 1件目だけ写真を消せない状況にして、残る側と消える側を作る。
+    await createPhoto(
+      { projectId: kept, area: DEFAULT_PHOTO_AREA, storagePath: `${kept}/a.jpg` },
+      ownerId,
+    );
+    vi.mocked(tryDeletePhotoObject).mockResolvedValue(false);
+
+    await purgeExpiredDemoData(new Date(Date.now() + 60_000));
+
+    expect(await getProjectForOwner(removed.id, ownerId)).toBeNull();
+    expect(await getProjectForOwner(kept, ownerId)).not.toBeNull();
+    // 残った案件の側から、下請と請負者名が消えていないこと。
+    expect(await listSubcontractorsForOwner(ownerId)).not.toHaveLength(0);
     expect((await getCompanyProfile(ownerId)).contractorName).not.toBe("");
   });
 
