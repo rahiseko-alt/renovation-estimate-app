@@ -1,11 +1,11 @@
 import type { LineKind, TaxCategory } from "../lib/calc";
 import {
-  ESTIMATE_COLUMNS,
   ESTIMATE_EDITOR_TEXT,
   LUMP_SUM_SPEC_HINT,
   TAX_CATEGORY_LABELS,
   UNITS,
 } from "../lib/content";
+import { ESTIMATE_COLUMN_HEADINGS } from "../lib/doc/templates/estimate";
 import { isValidNumberInput } from "../lib/estimateLineValidation";
 import { QuoteRequestButton } from "./QuoteRequestButton";
 
@@ -65,7 +65,7 @@ export function EstimateLineRow({
     <li className="flex flex-col gap-3 rounded border-2 border-gray-400 p-4">
       <div className="flex flex-col gap-2">
         <label htmlFor={kindId} className="text-sm font-bold">
-          {ESTIMATE_COLUMNS.kind}
+          {ESTIMATE_EDITOR_TEXT.columnKind}
         </label>
         <select
           id={kindId}
@@ -80,7 +80,7 @@ export function EstimateLineRow({
 
       <div className="flex flex-col gap-2">
         <label htmlFor={nameId} className="text-sm font-bold">
-          {ESTIMATE_COLUMNS.name}
+          {ESTIMATE_COLUMN_HEADINGS.name}
         </label>
         <input
           id={nameId}
@@ -93,7 +93,7 @@ export function EstimateLineRow({
 
       <div className="flex flex-col gap-2">
         <label htmlFor={specId} className="text-sm font-bold">
-          {ESTIMATE_COLUMNS.spec}
+          {ESTIMATE_COLUMN_HEADINGS.spec}
         </label>
         <input
           id={specId}
@@ -110,7 +110,7 @@ export function EstimateLineRow({
       <div className="grid grid-cols-3 gap-2">
         <div className="flex flex-col gap-2">
           <label htmlFor={quantityId} className="text-sm font-bold">
-            {ESTIMATE_COLUMNS.quantity}
+            {ESTIMATE_COLUMN_HEADINGS.quantity}
           </label>
           <input
             id={quantityId}
@@ -133,7 +133,7 @@ export function EstimateLineRow({
 
         <div className="flex flex-col gap-2">
           <label htmlFor={unitId} className="text-sm font-bold">
-            {ESTIMATE_COLUMNS.unit}
+            {ESTIMATE_COLUMN_HEADINGS.unit}
           </label>
           <select
             id={unitId}
@@ -151,7 +151,7 @@ export function EstimateLineRow({
 
         <div className="flex flex-col gap-2">
           <label htmlFor={unitPriceId} className="text-sm font-bold">
-            {ESTIMATE_COLUMNS.unitPrice}
+            {ESTIMATE_COLUMN_HEADINGS.unitPrice}
           </label>
           <input
             id={unitPriceId}
@@ -175,7 +175,7 @@ export function EstimateLineRow({
 
       <div className="flex flex-col gap-2">
         <label htmlFor={taxCategoryId} className="text-sm font-bold">
-          {ESTIMATE_COLUMNS.taxCategory}
+          {ESTIMATE_EDITOR_TEXT.columnTaxCategory}
         </label>
         <select
           id={taxCategoryId}

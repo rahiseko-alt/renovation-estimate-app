@@ -326,3 +326,66 @@ export type QuoteGroupRequestForSubcontractor = {
   lineItemIds: string[];
   status: QuoteGroupRequestStatus;
 };
+
+// ---------------------------------------------------------------------------
+// 明細ごとの採用（docs/design.md 7章「取り込みは『追加』ではなく『採用』にする」）。
+// 見積に明細行を足すのではなく、「この明細はどの社の依頼を採ったか」を
+// 1明細につき1件だけ持つ（排他）。テーブル定義は
+// supabase/migrations/20260806010000_line_adoptions.sql。
+// ---------------------------------------------------------------------------
+
+export type LineAdoption = {
+  id: string;
+  projectId: string;
+  ownerId: string;
+  /** 採用した明細行。PersistedEstimateLine.id を指す。 */
+  lineItemId: string;
+  /** 採用した社ごとの依頼。QuoteGroupRequest.id を指す。 */
+  quoteGroupRequestId: string;
+  adoptedAt: string;
+};
+
+export type AdoptLineInput = {
+  projectId: string;
+  lineItemId: string;
+  quoteGroupRequestId: string;
+};
+
+/**
+ * 下請が返す見積の必要経費の内訳（docs/design.md 3章「下請が返す見積書に
+ * 求められる内訳」）。建設業法第20条第1項を踏まえ、下請が最低限明示するよう
+ * **努める**べき項目。努力義務なので入力必須にしないが、欄は必ず出す。
+ *
+ * 「未入力」と「0と回答した」を区別するため null を許す（0で埋めない）。
+ */
+export type QuoteResponseCostBreakdown = {
+  materialCost: number | null;
+  laborCost: number | null;
+  legalWelfareCost: number | null;
+  safetyHealthCost: number | null;
+  retirementMutualAidCost: number | null;
+  workDays: number | null;
+  /** 元請が材料を支給する場合にその旨を書く欄。 */
+  materialSuppliedNote: string;
+};
+
+/** 回答の明細1行。明細ごとに数量と原価単価の両方を出させる。 */
+export type QuoteResponseLine = {
+  lineItemId: string;
+  quantity: number;
+  costUnitPrice: number;
+};
+
+export type QuoteGroupResponse = {
+  id: string;
+  quoteGroupRequestId: string;
+  breakdown: QuoteResponseCostBreakdown;
+  lines: QuoteResponseLine[];
+  respondedAt: string;
+};
+
+export type NewQuoteGroupResponseInput = {
+  token: string;
+  breakdown: QuoteResponseCostBreakdown;
+  lines: QuoteResponseLine[];
+};

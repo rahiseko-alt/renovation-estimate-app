@@ -98,6 +98,9 @@
 - 必須の環境変数（名前だけ。値は書かない）: `AUTH_SECRET` / `DEMO_USER_EMAIL` /
   `DEMO_USER_PASSWORD` / `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY`
   （`apps/web/.env.example` 参照）
+- デモ用データの投入（返信済みの下請3社ぶんを含む）:
+  `DEMO_USER_EMAIL=<ログインする利用者のメール> bash scripts/seed-demo.sh`
+  （ローカル Supabase 起動済みで。何度実行しても増えず、同じ内容に作り直す）
 - 共通の文言・値の置き場所: `apps/web/lib/content.ts`
 - 金額計算の置き場所: `apps/web/lib/calc.ts`（画面・PDF・API は必ずここを通す）
 
@@ -119,6 +122,11 @@
 - **squash マージ後に同じブランチへ積み足さない。** マージ完了の通知を受けたら、
   次の変更に着手する前に必ず `git fetch origin main && git checkout -B <branch> origin/main`
   でブランチを作り直す（`docs/failures.md` 2026-08-03 / 2026-08-04 に同じ失敗が2回ある）。
+- **利用者に画面を確認してもらうときは、本番に反映してから頼む。**
+  Vercel のプレビューURLを渡さない。プレビューはデプロイ保護が掛かっていて
+  スマホから開けず、確認してもらうために利用者へ設定変更を頼むことになる。
+  **利用者に設定変更を頼まない**（2026-08-06 に実際にこれをやって時間を溶かした。
+  利用者からの明示指示）。確認が要るものは main にマージして本番URLで見てもらう。
 - 規約: なし
 
 ## 結合を増やさない
