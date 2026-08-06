@@ -18,5 +18,10 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["tests/**/*.test.{ts,tsx}"],
+    // **ファイルを並行に走らせない。** デモの掃除（purgeExpiredDemoData）は
+    // owner_id が `demo:` で始まるものを**横断して**消す。並行に走らせると、
+    // 別のファイルが投入している最中のデモデータを消してしまい、
+    // 外部キー違反や件数のずれとして現れる（実際に起きた）。
+    fileParallelism: false,
   },
 });
