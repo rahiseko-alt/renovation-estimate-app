@@ -264,3 +264,57 @@ export async function getQuoteGroupRequestForSubcontractor(
     status: row.status,
   };
 }
+
+/**
+ * 下請の回答画面に出す明細。**金額を持たない**（id・工事項目・摘要・数量・単位だけ）。
+ * estimates.lines は元請の売価 unitPrice を持っているので、そのまま渡さない
+ * （docs/design.md 7章「下請に見せるもの・見せないもの」）。
+ */
+export type QuoteLineForSubcontractor = {
+  id: string;
+  name: string;
+  spec: string;
+  quantity: number;
+  unit: string;
+};
+
+/**
+ * token から、その依頼が対象にしている明細だけを、金額を落とした形で取る。
+ * 依頼の対象範囲（line_item_ids）に入っている明細だけを返す。範囲外の明細は
+ * 同じ案件のものでも返さない。
+ */
+export async function listQuoteLinesForSubcontractor(
+  token: string,
+): Promise<QuoteLineForSubcontractor[]> {
+  if (!isUuid(token)) return [];
+
+  const { data, error } = await getSupabaseClient()
+    .from("quote_group_requests")
+    .select(
+      `
+        line_item_ids,
+        quote_request_groups!inner ( project_id )
+      `,
+    )
+    .eq("token", token)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return [];
+
+  const row = data as unknown as {
+    line_item_ids: string[];
+    quote_request_groups: { project_id: string };
+  };
+
+  const estimate = await getOrCreateEstimate(row.quote_request_groups.project_id);
+  const requested = new Set(row.line_item_ids);
+  return estimate.lines
+    .filter((line) => requested.has(line.id))
+    .map((line) => ({
+      id: line.id,
+      name: line.name,
+      spec: line.spec,
+      quantity: line.quantity,
+      unit: line.unit,
+    }));
+}
