@@ -326,3 +326,27 @@ export type QuoteGroupRequestForSubcontractor = {
   lineItemIds: string[];
   status: QuoteGroupRequestStatus;
 };
+
+// ---------------------------------------------------------------------------
+// 明細ごとの採用（docs/design.md 7章「取り込みは『追加』ではなく『採用』にする」）。
+// 見積に明細行を足すのではなく、「この明細はどの社の依頼を採ったか」を
+// 1明細につき1件だけ持つ（排他）。テーブル定義は
+// supabase/migrations/20260806010000_line_adoptions.sql。
+// ---------------------------------------------------------------------------
+
+export type LineAdoption = {
+  id: string;
+  projectId: string;
+  ownerId: string;
+  /** 採用した明細行。PersistedEstimateLine.id を指す。 */
+  lineItemId: string;
+  /** 採用した社ごとの依頼。QuoteGroupRequest.id を指す。 */
+  quoteGroupRequestId: string;
+  adoptedAt: string;
+};
+
+export type AdoptLineInput = {
+  projectId: string;
+  lineItemId: string;
+  quoteGroupRequestId: string;
+};
