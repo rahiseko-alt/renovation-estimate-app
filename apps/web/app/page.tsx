@@ -1,6 +1,5 @@
 import { HomeScreen } from "../components/HomeScreen";
 import { getCurrentUser } from "../lib/auth/server";
-import { startDemoAction } from "./demo/actions";
 import { logout } from "./login/actions";
 
 export default async function Home() {
@@ -9,7 +8,6 @@ export default async function Home() {
     <HomeScreen
       loggedIn={user !== null}
       onLogout={logout}
-      onStartDemo={startDemoAction}
     />
   );
 }

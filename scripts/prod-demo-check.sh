@@ -51,20 +51,32 @@ else
 fi
 
 # ── デモ開始（1タップ目）──────────────────────────────────
-# Server Action の呼び出し先IDは、その時のビルドが埋め込んだ値をHTMLから拾う。
-ACTION_ID=$(grep -o '\$ACTION_ID_[0-9a-f]*' "${WORK}/home.html" | head -1 | sed 's/^\$ACTION_ID_//')
-if [ -z "${ACTION_ID}" ]; then
-  fail "デモ開始のアクションIDをHTMLから取れない（画面の作りが変わった可能性）"
+# 素のフォームが POST する先。**ビルドで変わらないURL**なので固定で叩ける
+# （以前は Server Action のIDをHTMLから拾っていた。IDはビルドごとに変わるため、
+#  古いページを開いたままのブラウザからは押しても無反応になった。
+#  apps/web/app/demo/start/route.ts の冒頭を見る）。
+# 値は apps/web/lib/demoText.ts の DEMO_START_PATH と同じ。
+START_PATH="/demo/start"
+# **method も一緒に見る。** action だけを見ると、GET のフォームでも通ってしまう
+# （/demo/start は POST しか受けないので、GET になった時点で経路が死ぬ）。
+# 属性の並び順はビルドで変わりうるので、同じ <form ...> の中に両方あることを見る。
+if tr '<' '\n' < "${WORK}/home.html" \
+  | grep -i '^form ' \
+  | grep -q "action=\"${START_PATH}\".*method=\"post\"\|method=\"post\".*action=\"${START_PATH}\""; then
+  ok "デモ開始のフォームが ${START_PATH} へ POST する"
+else
+  fail "トップに ${START_PATH} へ POST するフォームが無い（画面の作りが変わった可能性）"
   echo; echo "PROD DEMO CHECK FAILED"; exit 1
 fi
-ok "デモ開始のアクションIDを取得"
 
 PROJECT_ID=""
 for i in $(seq 1 "${ATTEMPTS}"); do
-  RESULT=$(curl -sS -X POST "${BASE}/" \
-    -H "Next-Action: ${ACTION_ID}" \
-    -H "Content-Type: text/plain;charset=UTF-8" \
-    --data '[]' --max-time 30 \
+  # Origin を付ける。ルートハンドラは同一オリジンからの POST しか通さない
+  # （Server Action が自前でやっていた判定を、こちらでも持っている）。
+  RESULT=$(curl -sS -X POST "${BASE}${START_PATH}" \
+    -H "Origin: ${BASE}" \
+    -H "Content-Type: application/x-www-form-urlencoded" \
+    --data '' --max-time 30 \
     -o /dev/null -D "${WORK}/start.h" \
     -w '%{http_code} %{time_total}' 2>/dev/null || echo "000 30")
   CODE="${RESULT% *}"
@@ -81,7 +93,7 @@ for i in $(seq 1 "${ATTEMPTS}"); do
   fi
 
   # 最後に成功したぶんの案件IDとCookieを、この先の検査に使う。
-  THIS_ID=$(grep -io 'x-action-redirect: /demo/[0-9a-f-]*' "${WORK}/start.h" | head -1 | sed 's|.*/demo/||')
+  THIS_ID=$(grep -io 'location:.*/demo/[0-9a-f-]*' "${WORK}/start.h" | head -1 | sed 's|.*/demo/||')
   if [ -n "${THIS_ID}" ]; then
     PROJECT_ID="${THIS_ID}"
     grep -io '^set-cookie: rea_session=[^;]*' "${WORK}/start.h" | head -1 \
@@ -186,8 +198,8 @@ else
   fail "デモ未開始の /demo/<uuid>/photo が ${CODE}"
 fi
 
-curl -sS -X POST "${BASE}/" -H "Next-Action: ${ACTION_ID}" \
-  -H "Content-Type: text/plain;charset=UTF-8" --data '[]' --max-time 30 \
+curl -sS -X POST "${BASE}${START_PATH}" -H "Origin: ${BASE}" \
+  -H "Content-Type: application/x-www-form-urlencoded" --data '' --max-time 30 \
   -o /dev/null -D "${WORK}/second.h" 2>/dev/null || true
 SECOND_COOKIE=$(grep -io '^set-cookie: rea_session=[^;]*' "${WORK}/second.h" | head -1 \
   | sed 's/^[Ss]et-[Cc]ookie: //')
