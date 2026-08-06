@@ -83,6 +83,10 @@
 - テスト（全件 / 1件だけ）: `pnpm --filter web test` / `pnpm --filter web test -- tests/calc.test.ts`
   （`lib/db/` のテストはローカル Supabase が要る。下記「データの保存先」参照）
 - lint / 型チェック: `pnpm --filter web lint` / `pnpm --filter web typecheck`
+- **本番のデモ経路を外から踏む**: `bash scripts/prod-demo-check.sh`
+  （3タップの経路と待ち時間を機械判定する。**「本番で動いています」と言う前にこれを通す。**
+  一度も踏まずにそう言って、実際には1タップ目が10秒かかって落ちていたことがある。
+  `docs/failures.md` 2026-08-06 参照）
 - 起動スモーク（受け入れ条件を HTTP で機械判定）: `bash scripts/smoke.sh`（先に `pnpm -r build`）
   （Docker が要る。ローカル Supabase の起動もこのスクリプトの中で行う）
 - E2E（実ブラウザで一連の操作を機械判定）: `bash scripts/e2e.sh`（先に `pnpm -r build` と、

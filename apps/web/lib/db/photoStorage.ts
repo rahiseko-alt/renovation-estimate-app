@@ -36,26 +36,45 @@ export async function uploadPhotoObject(
  * ストレージ削除の成否で覆さない）。
  */
 export async function deletePhotoObject(path: string): Promise<void> {
-  const { error } = await getSupabaseClient().storage.from(BUCKET).remove([path]);
-  if (error) {
-    // path を console.error の第一引数（フォーマット文字列扱いされる位置）に
-    // テンプレートリテラルで埋め込まない。path は最終的に projectId（URLパラメータ・
-    // 利用者が制御できる値）に由来するため、埋め込むと書式指定子として
-    // 解釈されうる（CWE-134）。第一引数は固定の文字列にし、値は別引数で渡す。
-    console.error("写真ストレージの削除に失敗した:", { path, error });
-  }
+  // 実体は tryDeletePhotoObjects に持たせる。バケット名と分割の規則を2箇所に置かない。
+  // ここは戻り値を捨てる＝失敗を握る側の入口（呼び出し順の都合。上のコメント参照）。
+  await tryDeletePhotoObjects([path]);
 }
 
+/** Storage の remove に一度に渡す最大件数。 */
+const STORAGE_REMOVE_CHUNK = 1000;
+
 /**
- * ストレージのオブジェクトを削除し、消せたかどうかを返す。
+ * ストレージのオブジェクトをまとめて削除し、全部消せたかどうかを返す。
  *
  * `deletePhotoObject` と違い、失敗を呼び出し側に伝える。
  * **DB行を消す前に**ストレージを消す手順（デモの掃除がこれ）では、失敗を握ると
  * 行が消えたあとにオブジェクトの場所が分からなくなり、二度と回収できなくなる。
+ *
+ * どれが消せなかったかは返さない。呼び出し側は案件単位で渡し、
+ * 1つでも失敗したらその案件を丸ごと次回に回す（中途半端に消さない）。
  */
-export async function tryDeletePhotoObject(path: string): Promise<boolean> {
-  const { error } = await getSupabaseClient().storage.from(BUCKET).remove([path]);
-  return !error;
+export async function tryDeletePhotoObjects(
+  paths: readonly string[],
+): Promise<boolean> {
+  if (paths.length === 0) return true;
+  // Storage の remove は一度に受け取れる数に上限がある。分けて投げる。
+  for (let i = 0; i < paths.length; i += STORAGE_REMOVE_CHUNK) {
+    const chunk = paths.slice(i, i + STORAGE_REMOVE_CHUNK);
+    const { error } = await getSupabaseClient()
+      .storage.from(BUCKET)
+      .remove([...chunk]);
+    if (error) {
+      // path は projectId（利用者が制御できる値）に由来する。第一引数は固定の
+      // 文字列にし、値は別引数で渡す（書式指定子として解釈されうる。CWE-134）。
+      console.error("写真ストレージの削除に失敗した:", {
+        count: chunk.length,
+        error,
+      });
+      return false;
+    }
+  }
+  return true;
 }
 
 /** 表示用の署名付きURLを発行する。呼び出し側で対象写真の所有者確認を済ませた上で使う。 */

@@ -2,6 +2,7 @@
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 
 import { isDemoOwner, newDemoOwnerId } from "../../lib/auth/demoOwner";
 import {
@@ -13,8 +14,8 @@ import {
 import {
   findDemoProject,
   purgeExpiredDemoData,
-  seedDemoData,
-} from "../../lib/db/demoSeed";
+} from "../../lib/db/demoCleanup";
+import { seedDemoData } from "../../lib/db/demoSeed";
 
 /**
  * デモの有効期間。商談1回ぶんが収まればよいので短く取る
@@ -58,16 +59,20 @@ export async function startDemoAction(): Promise<void> {
     sessionCookieOptions(DEMO_TTL_SECONDS),
   );
 
-  // ②掃除は失敗しても始めさせる。商談の場でデモが開かない方が損失が大きい。
-  try {
-    await purgeExpiredDemoData(
-      new Date(Date.now() - DEMO_TTL_SECONDS * 1000),
-    );
-  } catch {
-    // 次に誰かが始めたときに、また掃除の機会がある。
-  }
-
   const projectId = await seedDemoData(ownerId);
+
+  // ②掃除は**応答を返したあとに**回す。利用者の待ち時間に足さない。
+  // 失敗しても始めさせる（商談の場でデモが開かない方が損失が大きい。
+  // 次に誰かが始めたときに、また掃除の機会がある）。
+  after(async () => {
+    try {
+      await purgeExpiredDemoData(new Date(Date.now() - DEMO_TTL_SECONDS * 1000));
+    } catch (error) {
+      // デモは止めない。ただし黙って消すと、掃除が毎回失敗していても気付けない。
+      // 第一引数は固定の文字列にし、値は別引数で渡す（photoStorage.ts と同じ理由）。
+      console.error("期限切れデモの掃除に失敗した:", { error });
+    }
+  });
 
   // redirect は例外で制御を移すので、try/catch の外に置く。
   redirect(`/demo/${projectId}/photo`);
