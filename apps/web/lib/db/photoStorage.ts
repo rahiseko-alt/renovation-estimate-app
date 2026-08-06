@@ -36,14 +36,9 @@ export async function uploadPhotoObject(
  * ストレージ削除の成否で覆さない）。
  */
 export async function deletePhotoObject(path: string): Promise<void> {
-  const { error } = await getSupabaseClient().storage.from(BUCKET).remove([path]);
-  if (error) {
-    // path を console.error の第一引数（フォーマット文字列扱いされる位置）に
-    // テンプレートリテラルで埋め込まない。path は最終的に projectId（URLパラメータ・
-    // 利用者が制御できる値）に由来するため、埋め込むと書式指定子として
-    // 解釈されうる（CWE-134）。第一引数は固定の文字列にし、値は別引数で渡す。
-    console.error("写真ストレージの削除に失敗した:", { path, error });
-  }
+  // 実体は tryDeletePhotoObjects に持たせる。バケット名と分割の規則を2箇所に置かない。
+  // ここは戻り値を捨てる＝失敗を握る側の入口（呼び出し順の都合。上のコメント参照）。
+  await tryDeletePhotoObjects([path]);
 }
 
 /** Storage の remove に一度に渡す最大件数。 */
@@ -69,7 +64,15 @@ export async function tryDeletePhotoObjects(
     const { error } = await getSupabaseClient()
       .storage.from(BUCKET)
       .remove([...chunk]);
-    if (error) return false;
+    if (error) {
+      // path は projectId（利用者が制御できる値）に由来する。第一引数は固定の
+      // 文字列にし、値は別引数で渡す（書式指定子として解釈されうる。CWE-134）。
+      console.error("写真ストレージの削除に失敗した:", {
+        count: chunk.length,
+        error,
+      });
+      return false;
+    }
   }
   return true;
 }

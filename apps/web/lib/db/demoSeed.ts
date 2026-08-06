@@ -213,21 +213,28 @@ export async function seedDemoData(ownerId: string): Promise<string> {
     requests.map((row) => [row.subcontractor_id, row.id]),
   );
 
+  /**
+   * 社 → その社あての依頼ID。波5と波6が同じ引き当てをするので、1箇所に置く。
+   * 2箇所に書くと、片方だけ直したときに回答と回答明細が別の社に付く。
+   */
+  const requestIdOf = (company: (typeof COMPANIES)[number]): string =>
+    requireValue(
+      requestIdBySubcontractorId.get(
+        requireValue(
+          subcontractorIdByEmail.get(company.email),
+          `${company.companyName} の下請ID`,
+        ),
+      ),
+      `${company.companyName} の依頼ID`,
+    );
+
   // 波5：回答をまとめて1回で。
   const responses = must(
     await db
       .from("quote_group_responses")
       .insert(
         COMPANIES.map((company) => ({
-          quote_group_request_id: requireValue(
-            requestIdBySubcontractorId.get(
-              requireValue(
-                subcontractorIdByEmail.get(company.email),
-                `${company.companyName} の下請ID`,
-              ),
-            ),
-            `${company.companyName} の依頼ID`,
-          ),
+          quote_group_request_id: requestIdOf(company),
           ...company.breakdown,
         })),
       )
@@ -243,15 +250,7 @@ export async function seedDemoData(ownerId: string): Promise<string> {
   must(
     await db.from("quote_group_response_lines").insert(
       COMPANIES.flatMap((company) => {
-        const requestId = requireValue(
-          requestIdBySubcontractorId.get(
-            requireValue(
-              subcontractorIdByEmail.get(company.email),
-              `${company.companyName} の下請ID`,
-            ),
-          ),
-          `${company.companyName} の依頼ID`,
-        );
+        const requestId = requestIdOf(company);
         const responseId = requireValue(
           responseIdByRequestId.get(requestId),
           `${company.companyName} の回答ID`,

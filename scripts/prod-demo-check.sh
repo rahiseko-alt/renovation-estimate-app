@@ -141,6 +141,14 @@ if grep -q "見積書PDFを出力" "${WORK}/cmp.html"; then
 else
   fail "見積書へのボタンが比較表に無い"
 fi
+
+# 3タップ目（見積書PDF）は、ここでは押していない。
+# **ボタンの存在しか見ていない。** アクションIDがHTMLに載らない
+# （クライアント部品から呼ぶのでIDはJSチャンク側にある）ため、bash から
+# 素直に叩けない。かわりに、**比較表に採用済みの合計を出して、その数字が
+# 0円でないことをこの下で見る**形にする（PDFのバイト列から金額は読めないが、
+# 同じ計算を通った合計なら画面から読める）。合計の表示は別PRで入れる。
+
 if grep -q "法定項目 21 件" "${WORK}/cmp.html"; then
   ok "法定項目が済んでいることを見せている"
 else
@@ -148,12 +156,37 @@ else
 fi
 
 # ── 他人のデモを開けないこと ──────────────────────────────
+# **存在しないIDで404になっても、分離の検査にはならない。** 実在する他人の案件を
+# 開こうとして404になることを見る。商談が2件同時に走る状況がこれ。
 CODE=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 30 \
   "${BASE}/demo/00000000-0000-4000-8000-000000000000/photo" || echo 000)
 if [ "${CODE}" = "404" ]; then
   ok "デモ未開始で /demo/<uuid>/photo は 404"
 else
   fail "デモ未開始の /demo/<uuid>/photo が ${CODE}"
+fi
+
+curl -sS -X POST "${BASE}/" -H "Next-Action: ${ACTION_ID}" \
+  -H "Content-Type: text/plain;charset=UTF-8" --data '[]' --max-time 30 \
+  -o /dev/null -D "${WORK}/second.h" 2>/dev/null || true
+SECOND_COOKIE=$(grep -io '^set-cookie: rea_session=[^;]*' "${WORK}/second.h" | head -1 \
+  | sed 's/^[Ss]et-[Cc]ookie: //')
+if [ -z "${SECOND_COOKIE}" ]; then
+  fail "2つ目のデモを始められない（分離の検査ができない）"
+else
+  ok "2つ目のデモを始めた"
+  for PATH_UNDER_TEST in \
+    "/demo/${PROJECT_ID}/photo" \
+    "/projects/${PROJECT_ID}" \
+    "/projects/${PROJECT_ID}/comparison"; do
+    CODE=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 30 \
+      -H "Cookie: ${SECOND_COOKIE}" "${BASE}${PATH_UNDER_TEST}" || echo 000)
+    if [ "${CODE}" = "404" ]; then
+      ok "2つ目のデモから ${PATH_UNDER_TEST} は 404"
+    else
+      fail "2つ目のデモから ${PATH_UNDER_TEST} が ${CODE}（他人の案件が見えている）"
+    fi
+  done
 fi
 
 echo

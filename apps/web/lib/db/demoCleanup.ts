@@ -103,11 +103,13 @@ async function orphanedDemoOwners(cutoff: string): Promise<string[]> {
       .then((r) => must(r, "取り残されたデモ会社設定の確認") as Array<{ owner_id: string }>),
   ]);
 
+  // 2つの問い合わせをまとめると上限の2倍になる。**混ぜたあとで区切り直す。**
+  // 区切らないと `.in(...)` のURLが長くなりすぎて、掃除そのものが通らなくなる。
   const candidates = [
     ...new Set(
       [...fromSubcontractors, ...fromProfiles].map((row) => row.owner_id),
     ),
-  ];
+  ].slice(0, PURGE_BATCH_SIZE);
   if (candidates.length === 0) return [];
 
   const owned = must(
@@ -181,12 +183,14 @@ export async function purgeExpiredDemoData(
   // **消す案件が無くても、ここは通る。** 前回の掃除が案件を消したあとで落ちていると、
   // 下請と会社設定だけが取り残される。その所有者はもう案件を持たないので、
   // 案件から辿る経路では二度と拾えない。毎回こちらからも探す。
+  // 2つの出どころを混ぜると、それぞれの上限の合計まで膨らむ。ここでも区切る。
+  // あふれたぶんは、次にデモが始まったときに続きを消す。
   const ownerIds = [
     ...new Set([
       ...(await ownersWithNothingLeft(removable, expired)),
       ...(await orphanedDemoOwners(cutoff)),
     ]),
-  ];
+  ].slice(0, PURGE_BATCH_SIZE);
 
   if (projectIds.length > 0) {
     // 見積・法定項目・依頼・回答・写真の行は on delete cascade で一緒に消える。
