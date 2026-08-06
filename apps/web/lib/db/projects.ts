@@ -77,3 +77,24 @@ export async function createProject(
   if (error) throw error;
   return toProject(data as ProjectRow);
 }
+
+/**
+ * 案件を消す。`ownerId` の持ち物のときだけ消える（他人のIDを渡しても何も起きない）。
+ *
+ * 用途は**作りかけの後始末**。案件を作った直後の処理が失敗したとき、中途半端な案件を
+ * 残さず消すために使う（`app/projects/new/actions.ts`）。写真・見積・依頼などは
+ * すべて `on delete cascade` で一緒に消える。
+ */
+export async function deleteProjectForOwner(
+  id: string,
+  ownerId: string,
+): Promise<void> {
+  if (!isUuid(id)) return;
+
+  const { error } = await getSupabaseClient()
+    .from("projects")
+    .delete()
+    .eq("id", id)
+    .eq("owner_id", ownerId);
+  if (error) throw error;
+}
