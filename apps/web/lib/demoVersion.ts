@@ -17,15 +17,12 @@ import "server-only";
 
 import { createHash } from "node:crypto";
 
-import {
-  COMPANIES,
-  COMPANY_PROFILE,
-  CUSTOMER_NAME,
-  LEGAL_SLOTS,
-  LINE_SOURCE,
-  SITE_ADDRESS,
-  SITE_CONDITIONS,
-} from "./demoFixture";
+// **名前を並べずに、モジュールごと材料にする。**
+// 個別に import して並べると、fixture に値を足したときに必ずここへ足し忘れる
+// （実際に `DEMO_WORK_NAME` が漏れていた。CodeRabbit の指摘）。
+// 漏れた値を直しても版が変わらず、古い案件が返り続ける＝この仕組みが無い状態に戻る。
+// 名前空間ごと取れば、export を足した時点で自動的に材料に入る。
+import * as DEMO_FIXTURE from "./demoFixture";
 
 /** Cookie の名前。セッションとは別に持つ（署名の中身を変えると認証に波及するため）。 */
 export const DEMO_VERSION_COOKIE_NAME = "rea_demo_ver";
@@ -40,17 +37,9 @@ export function demoContentVersion(content: unknown): string {
 }
 
 /**
- * いま投入されるデモの版。
+ * いま投入されるデモの版。**`lib/demoFixture.ts` の export 全部から作る。**
  *
- * **`seedDemoData` が書き込む値をすべて含めること。** 含め漏れた値を直しても
- * 版が変わらず、古い案件が返り続ける（この仕組みが無かった時と同じ状態になる）。
+ * `import * as` で取れる名前空間オブジェクトは、キーが名前順に並ぶことが
+ * 仕様で決まっているので、同じ中身なら毎回同じ版になる。
  */
-export const DEMO_CONTENT_VERSION = demoContentVersion({
-  CUSTOMER_NAME,
-  SITE_ADDRESS,
-  COMPANY_PROFILE,
-  LINE_SOURCE,
-  COMPANIES,
-  LEGAL_SLOTS,
-  SITE_CONDITIONS,
-});
+export const DEMO_CONTENT_VERSION = demoContentVersion({ ...DEMO_FIXTURE });

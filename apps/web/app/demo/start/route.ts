@@ -51,6 +51,10 @@ const DEMO_TTL_SECONDS = 60 * 60 * 6;
  * 素のフォームの POST には Origin が付く。付いていないものは通さない。
  * 公開URLの判定には転送元のホスト（x-forwarded-host）を優先する
  * （Vercel の前段を通ると host は内部の値になりうる）。
+ *
+ * **この判定は、前段（Vercel）が `x-forwarded-host` を必ず上書きすることを前提にする。**
+ * 上書きされない環境に載せ替えるなら、攻撃者がこのヘッダを自分で付けて
+ * Origin と一致させられるので、ここは信頼できる値の比較に直すこと。
  */
 function isSameOrigin(request: Request): boolean {
   const origin = request.headers.get("origin");
