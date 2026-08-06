@@ -16,6 +16,11 @@ name: prod-demo-check
 #    push で走るワークフローにこのジョブを置かないこと。**
 #
 # 秘密情報は扱わない。無ログインで誰でも踏める経路だけを見る。
+# このジョブがすることは「公開URLを curl する」だけ。書き込みは一切しない。
+# 明示しないと、リポジトリ既定の権限（書き込みを含みうる）がそのまま渡る。
+permissions:
+  contents: read
+
 on:
   workflow_dispatch:
   schedule:
