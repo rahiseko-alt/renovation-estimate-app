@@ -228,8 +228,10 @@ test("下請の回答画面に施主名と金額が出ず、施工場所は出�
 
     // 法定②施工場所は出す義務がある（C4）。
     await expect(subcontractorPage.getByText("施工場所")).toBeVisible();
+    // 完全一致で探す。seed の工事名称は「<現場住所> リフォーム工事」なので、
+    // 部分一致だと工事名称の欄にも当たって2要素になる。
     await expect(
-      subcontractorPage.getByText(DEMO_SITE_ADDRESS),
+      subcontractorPage.getByText(DEMO_SITE_ADDRESS, { exact: true }),
     ).toBeVisible();
 
     // 見えている文字だけでなく、返ってきたHTML全体を見る（C2）。
@@ -248,9 +250,12 @@ test("下請の回答画面に施主名と金額が出ず、施工場所は出�
   expect(browserErrors, browserErrors.join("\n")).toEqual([]);
 });
 
-// @mobile: このテストだけモバイル幅（iPhone 13）でも流す
-// （playwright.config.ts の mobile プロジェクトが grep で拾う）。
-// 縮小した書類の上で行ブロックを押す経路は、実機に近い幅でしか意味を持たない。
+// @mobile: このテストだけモバイル幅でも流す（playwright.config.ts の mobile
+// プロジェクトが grep で拾う）。縮小した書類の上で行ブロックを押す経路は、
+// 実機に近い幅でしか意味を持たない。
+// ここで見るのは「モバイル幅で操作が成立するか」に絞る。iOS Safari 固有の挙動
+// （入力欄が16px未満のときの自動ズーム等）はエミュレータでは再現できないので、
+// 実機確認（docs/plan-rebuild.md B-1 の S3）が引き受ける。
 test("書類の行を押すとシートで数量を入れられ、閉じると書類に反映される @mobile", async ({
   page,
 }) => {
