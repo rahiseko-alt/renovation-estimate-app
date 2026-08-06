@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 
+import { AdoptedTotal } from "../../../../components/AdoptedTotal";
 import { ComparisonTable } from "../../../../components/ComparisonTable";
 import { DemoBanner } from "../../../../components/DemoBanner";
 import { DownloadPdfButton } from "../../../../components/DownloadPdfButton";
@@ -56,6 +57,9 @@ export default async function ComparisonPage({
         comparison={comparison}
         cheapestByLineId={cheapestByLineId}
       />
+
+      {/* 採用しているぶんの合計。見積書を押す前に金額が見える（部品側にその理由を書いた）。 */}
+      <AdoptedTotal totals={comparison.adoptedTotals} />
 
       {demo ? (
         <div className="mt-8 flex flex-col gap-3">

@@ -13,11 +13,18 @@ import { newDemoOwnerId } from "../lib/auth/demoOwner";
  * ここは**上限**を置く。増やす向きの変更をしたら落ちる。
  * 落ちたら、まとめられる insert が残っていないかを先に疑う。
  *
- * 回数そのものより、**直列に待つ回数（波の数）**が効く。いまは6波：
- * 後始末2 → 会社設定・案件・下請3社（同時3）→ 見積・法定・条件・依頼グループ（同時4）
- * → 依頼 → 回答 → 回答明細。同じ表への複数行は1回の insert にまとめてある。
+ * 回数そのものより、**直列に待つ回数（波の数）**が効く。デモの1タップ目はいま5波：
+ * 会社設定・案件・下請3社（同時3）→ 見積・法定・条件・依頼グループ（同時4）
+ * → 依頼 → 回答・採用（同時2）→ 回答明細。同じ表への複数行は1回の insert にまとめてある。
+ * 後始末は、使い捨ての owner_id を発行した直後で消す対象が無いため飛ばしている。
  */
-const MAX_QUERIES = 12;
+const MAX_QUERIES = 11;
+
+/**
+ * CLI（scripts/seed-demo.sh）は実在の利用者に入れ直すので後始末が要る。
+ * こちらは商談の待ち時間に乗らないが、青天井にはしない。
+ */
+const MAX_QUERIES_WITH_CLEANUP = MAX_QUERIES + 2;
 
 // 実クライアントを包んで、クエリの起点（.from）が何回呼ばれたかを数える。
 const queryCount = vi.hoisted(() => ({ value: 0 }));
@@ -49,12 +56,20 @@ vi.mock("../lib/db/client", async (importOriginal) => {
 const { seedDemoData } = await import("../lib/db/demoSeed");
 
 describe("seedDemoData のDB往復回数", () => {
-  it(`初めての利用者で ${MAX_QUERIES} 回以下に収まっている`, async () => {
+  it(`デモの1タップ目（後始末なし）で ${MAX_QUERIES} 回以下に収まっている`, async () => {
     queryCount.value = 0;
-    await seedDemoData(newDemoOwnerId());
+    await seedDemoData(newDemoOwnerId(), { ownerIsNew: true });
 
     expect(queryCount.value).toBeLessThanOrEqual(MAX_QUERIES);
     // 0 だと数えられていないだけなので、数えられていること自体も見る。
+    expect(queryCount.value).toBeGreaterThan(0);
+  });
+
+  it(`CLI（後始末あり）で ${MAX_QUERIES_WITH_CLEANUP} 回以下に収まっている`, async () => {
+    queryCount.value = 0;
+    await seedDemoData(newDemoOwnerId());
+
+    expect(queryCount.value).toBeLessThanOrEqual(MAX_QUERIES_WITH_CLEANUP);
     expect(queryCount.value).toBeGreaterThan(0);
   });
 });

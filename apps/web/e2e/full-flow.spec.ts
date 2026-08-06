@@ -3,6 +3,8 @@ import { join } from "node:path";
 
 import { expect, test, type Page } from "@playwright/test";
 
+import { DEFAULT_PHOTO_AREA } from "../lib/content";
+
 // scripts/e2e.sh がこの検査の中だけで使い捨てる値を用意する（本物の秘密情報ではない。
 // AGENTS.md「秘密情報」対象外1）。無ければ検査そのものが無意味なので、先に落とす。
 const DEMO_USER_EMAIL = process.env.DEMO_USER_EMAIL;
@@ -48,9 +50,11 @@ async function uploadPhoto(page: Page): Promise<void> {
   await page.getByLabel("写真を撮る・選ぶ").setInputFiles(PHOTO_FIXTURE);
   await page.getByRole("button", { name: "追加する" }).click();
   // クライアント側で圧縮してから送るため、送信完了まで少し待つ必要がある。
-  await expect(page.getByRole("heading", { name: "キッチン", level: 3 })).toBeVisible({
-    timeout: 20_000,
-  });
+  // 箇所を選ばずに送るので、見出しは初期値の箇所になる。名前を直接書かない
+  // （WORK_AREAS の並び順を変えたときに、ここだけ古い名前が残る）。
+  await expect(
+    page.getByRole("heading", { name: DEFAULT_PHOTO_AREA, level: 3 }),
+  ).toBeVisible({ timeout: 20_000 });
 }
 
 /** 見積エディタで明細を1行追加し、保存する。追加した行（li）を返す。 */

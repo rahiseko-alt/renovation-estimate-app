@@ -38,7 +38,8 @@ function requireValue<T>(value: T | undefined, what: string): T {
  * この利用者のデモ案件と、デモが作った下請3社を消す。
  * 同じ内容に作り直すための前処理なので、会社設定は消さない（upsert で上書きする）。
  *
- * 初めての利用者（デモの1タップ目）では案件が無いので、往復は2回で済む。
+ * **デモの1タップ目はここを通らない**（`seedDemoData` の `ownerIsNew` を見る）。
+ * 通るのは、実在の利用者に入れ直す CLI（`scripts/seed-demo.sh`）のほう。
  */
 async function removeExistingDemoData(ownerId: string): Promise<void> {
   const db = getSupabaseClient();
@@ -82,13 +83,22 @@ async function removeExistingDemoData(ownerId: string): Promise<void> {
  * **DBへの往復回数がそのまま1タップ目の待ち時間になる。**
  * 1件ずつ順に入れると実行時20往復になり、本番（Vercel → Supabase）で5〜10秒かかって
  * 関数のタイムアウト境界に張り付いた。**依存の無いものは同時に、同じ表への複数行は
- * 1回の insert にまとめる。** 下の「波」の数が往復の回数で、増やさないこと。
+ * 1回の insert にまとめる。** 下の「波」の数が直列に待つ回数で、増やさないこと。
+ *
+ * @param options.ownerIsNew この owner_id でまだ何も書いていないと呼び出し側が
+ *   保証できるとき true。後始末（往復2回）を丸ごと飛ばす。**デモの1タップ目が
+ *   これにあたる**（`newDemoOwnerId()` を発行した直後に呼ぶので、消す対象が必ず無い）。
+ *   本番は往復1回が0.5秒前後かかるため、確実に空振りする2往復でも待ち時間に効く。
+ *   既定は false（実在の利用者に入れる CLI は作り直しになるので後始末が要る）。
  */
-export async function seedDemoData(ownerId: string): Promise<string> {
+export async function seedDemoData(
+  ownerId: string,
+  options: { readonly ownerIsNew?: boolean } = {},
+): Promise<string> {
   const db = getSupabaseClient();
 
-  // 波1：後始末。
-  await removeExistingDemoData(ownerId);
+  // 波1：後始末（新しい owner_id なら消す対象が無いので飛ばす）。
+  if (!options.ownerIsNew) await removeExistingDemoData(ownerId);
 
   const lines = LINE_SOURCE.map((line) => ({
     id: randomUUID(),
@@ -214,23 +224,27 @@ export async function seedDemoData(ownerId: string): Promise<string> {
   );
 
   /**
-   * 社 → その社あての依頼ID。波5と波6が同じ引き当てをするので、1箇所に置く。
-   * 2箇所に書くと、片方だけ直したときに回答と回答明細が別の社に付く。
+   * 社のメールアドレス → その社あての依頼ID。波5（回答・採用）と波6（回答明細）が
+   * 同じ引き当てをするので、1箇所に置く。2箇所に書くと、片方だけ直したときに
+   * 回答と回答明細が別の社に付く。
    */
-  const requestIdOf = (company: (typeof COMPANIES)[number]): string =>
+  const requestIdOfEmail = (email: string, what: string): string =>
     requireValue(
       requestIdBySubcontractorId.get(
-        requireValue(
-          subcontractorIdByEmail.get(company.email),
-          `${company.companyName} の下請ID`,
-        ),
+        requireValue(subcontractorIdByEmail.get(email), `${what} の下請ID`),
       ),
-      `${company.companyName} の依頼ID`,
+      `${what} の依頼ID`,
     );
 
-  // 波5：回答をまとめて1回で。
-  const responses = must(
-    await db
+  const requestIdOf = (company: (typeof COMPANIES)[number]): string =>
+    requestIdOfEmail(company.email, company.companyName);
+
+  // 波5：回答と、明細ごとの採用を同時に。どちらも波4の依頼IDだけに依存する。
+  //
+  // **採用を入れないと見積書が0円になる。** 3タップの経路に「採用」のタップが無いので、
+  // ここで採ってある状態にしておく（どの社を採るかは lib/demoFixture.ts が持つ）。
+  const [responses] = await Promise.all([
+    db
       .from("quote_group_responses")
       .insert(
         COMPANIES.map((company) => ({
@@ -238,9 +252,30 @@ export async function seedDemoData(ownerId: string): Promise<string> {
           ...company.breakdown,
         })),
       )
-      .select("id, quote_group_request_id"),
-    "回答の作成",
-  ) as Array<{ id: string; quote_group_request_id: string }>;
+      .select("id, quote_group_request_id")
+      .then(
+        (result) =>
+          must(result, "回答の作成") as Array<{
+            id: string;
+            quote_group_request_id: string;
+          }>,
+      ),
+    db
+      .from("line_adoptions")
+      .insert(
+        LINE_SOURCE.map((source, index) => ({
+          project_id: project.id,
+          owner_id: ownerId,
+          line_item_id: requireValue(lines[index], `${source.name} の明細`).id,
+          quote_group_request_id: requestIdOfEmail(
+            source.adoptedBy,
+            `${source.name} の採用先`,
+          ),
+          adopted_at: respondedAt,
+        })),
+      )
+      .then((result) => must(result, "採用の作成")),
+  ]);
 
   const responseIdByRequestId = new Map(
     responses.map((row) => [row.quote_group_request_id, row.id]),

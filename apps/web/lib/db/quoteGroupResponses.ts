@@ -165,29 +165,65 @@ export async function createQuoteGroupResponse(
 }
 
 
-/** 依頼IDから回答を引く（元請の比較表が使う）。回答がなければ null。 */
-export async function getQuoteGroupResponseForRequest(
-  quoteGroupRequestId: string,
-): Promise<QuoteGroupResponse | null> {
-  if (!isUuid(quoteGroupRequestId)) return null;
+/**
+ * 依頼IDの一覧から回答をまとめて引く（元請の比較表・見積書が使う）。
+ * 依頼IDの順ではなく、DBが返した順で返す。呼び出し側は
+ * `quoteGroupRequestId` で引き当てる。
+ *
+ * **1件ずつ引かない。** 社ごとに引くと、社の数だけ直列に往復する。
+ * 本番（Vercel → Supabase）は往復1回が0.5秒前後かかるため、3社で6往復＝約3秒が
+ * 比較表の表示時間に乗っていた（`docs/failures.md` 2026-08-06）。
+ * ここでは社が何社でも「回答」と「回答明細」の2往復に畳む。
+ *
+ * 渡す依頼IDは1案件ぶん（＝その案件で頼んだ社の数）を想定する。PostgREST の
+ * `in` はリクエストURLに載るので、案件をまたいで際限なく渡さない。
+ */
+export async function listQuoteGroupResponsesForRequests(
+  quoteGroupRequestIds: readonly string[],
+): Promise<QuoteGroupResponse[]> {
+  const ids = quoteGroupRequestIds.filter(isUuid);
+  if (ids.length === 0) return [];
 
   const client = getSupabaseClient();
   const { data, error } = await client
     .from("quote_group_responses")
     .select(RESPONSE_COLUMNS)
-    .eq("quote_group_request_id", quoteGroupRequestId)
-    .maybeSingle();
+    .in("quote_group_request_id", ids);
   if (error) throw error;
-  if (!data) return null;
-  const row = data as ResponseRow;
+  const rows = data as ResponseRow[];
+  if (rows.length === 0) return [];
 
   const { data: lineData, error: lineError } = await client
     .from("quote_group_response_lines")
-    .select(LINE_COLUMNS)
-    .eq("response_id", row.id);
+    .select(`response_id, ${LINE_COLUMNS}`)
+    .in(
+      "response_id",
+      rows.map((row) => row.id),
+    );
   if (lineError) throw lineError;
 
-  return toResponse(row, lineData as ResponseLineRow[]);
+  const lineRowsByResponseId = new Map<string, ResponseLineRow[]>();
+  for (const line of lineData as Array<ResponseLineRow & { response_id: string }>) {
+    const bucket = lineRowsByResponseId.get(line.response_id);
+    if (bucket) bucket.push(line);
+    else lineRowsByResponseId.set(line.response_id, [line]);
+  }
+
+  return rows.map((row) => toResponse(row, lineRowsByResponseId.get(row.id) ?? []));
+}
+
+/**
+ * 依頼IDから回答を引く（1社ぶん）。回答がなければ null。
+ * 実体は listQuoteGroupResponsesForRequests に持たせる
+ * （AGENTS.md「結合を増やさない」2：同じ処理を呼ぶ入口は1つにする）。
+ */
+export async function getQuoteGroupResponseForRequest(
+  quoteGroupRequestId: string,
+): Promise<QuoteGroupResponse | null> {
+  const [response] = await listQuoteGroupResponsesForRequests([
+    quoteGroupRequestId,
+  ]);
+  return response ?? null;
 }
 
 /** 明細ごとの原価単価を引く（比較表が「1明細を各社が何円で見たか」を並べるのに使う）。 */

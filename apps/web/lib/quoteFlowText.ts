@@ -64,6 +64,16 @@ export const COMPARISON_TEXT = {
   cheapestNote:
     "最安の印は目安です。自動では選びません。明細ごとに1社だけ選べます。",
   adoptFailed: "採用できませんでした。もう一度お試しください。",
+  /**
+   * いま採用しているぶんの合計。**この画面から出す見積書と同じ金額**になる
+   * （どちらも lib/db/pricedEstimate.ts を通る）。
+   *
+   * 見積書を押す前に金額が見えること自体が体感になる。同時に、ここが 0円 でないことを
+   * 外から機械判定できる唯一の場所でもある（PDFのバイト列から金額は読めない）。
+   * scripts/prod-demo-check.sh がこのラベルを探す。
+   */
+  adoptedTotalLabel: "採用中の合計（税込）",
+  adoptedTotalNote: "この金額で見積書ができます。",
   back: "もどる",
 } as const;
 

@@ -3,8 +3,10 @@ import { describe, expect, it } from "vitest";
 import { newDemoOwnerId } from "../lib/auth/demoOwner";
 import { getComparisonForProject } from "../lib/db/comparison";
 import { DEMO_SUBCONTRACTOR_COUNT } from "../lib/demoFixture";
+import { DEFAULT_DISPOSAL_ITEM_NAME } from "../lib/doc/templates/estimate";
 import { findDemoProject, purgeExpiredDemoData } from "../lib/db/demoCleanup";
 import { seedDemoData } from "../lib/db/demoSeed";
+import { getPricedEstimate } from "../lib/db/pricedEstimate";
 import { createProject, getProjectForOwner } from "../lib/db/projects";
 import { checkSubmissionGate } from "../lib/db/submissionGate";
 
@@ -30,6 +32,49 @@ describe("seedDemoData", () => {
       expect(Object.keys(column.costUnitPriceByLineId)).toHaveLength(
         comparison.rows.length,
       );
+    }
+  });
+
+  /**
+   * 3タップ目に出る見積書が全行0円だった。比較表には3社の単価（数十万）が並ぶので、
+   * 落差がそのまま「作りかけ」に見える（`docs/failures.md` 2026-08-06）。
+   * 原因は2つあり、**両方そろわないと直らない**：
+   * ①見積書が採用単価を読んでいなかった ②デモが採用を1件も作っていなかった。
+   * ここは②を含めて、投入直後に金額が出ることを直接見る。
+   */
+  it("投入した直後に、見積書の全明細に単価が入っていて合計が0円でない", async () => {
+    const ownerId = newDemoOwnerId();
+    const projectId = await seedDemoData(ownerId);
+
+    const priced = await getPricedEstimate(projectId, ownerId);
+
+    expect(priced.lines.length).toBeGreaterThan(0);
+    for (const line of priced.lines) {
+      expect(line.unitPrice, `${line.name} の単価`).toBeGreaterThan(0);
+    }
+    expect(priced.totals.grandTotal).toBeGreaterThan(0);
+
+    // 比較表に出す合計と一致していること（画面と書類で金額が違うと商談が終わる）。
+    const comparison = await getComparisonForProject(projectId, ownerId);
+    expect(comparison.adoptedTotals.grandTotal).toBe(priced.totals.grandTotal);
+  });
+
+  it("投入した直後に、明細の「式」は解体・廃棄物処理費の1行だけ", async () => {
+    // 「現場で打つのは数量だけ」がこの製品の主張。デモの明細が全部「式」（数量は常に1）だと
+    // デモ自身がその反例になる。単位の割り当ては lib/demoFixture.ts が持つ。
+    const ownerId = newDemoOwnerId();
+    const projectId = await seedDemoData(ownerId);
+
+    const priced = await getPricedEstimate(projectId, ownerId);
+    const lumpSumLines = priced.lines.filter((line) => line.unit === "式");
+
+    expect(lumpSumLines.map((line) => line.name)).toEqual([
+      DEFAULT_DISPOSAL_ITEM_NAME,
+    ]);
+    // 「式」でない行は、数量が1でない実数になっていること。
+    for (const line of priced.lines) {
+      if (line.unit === "式") continue;
+      expect(line.quantity, `${line.name} の数量`).toBeGreaterThan(1);
     }
   });
 

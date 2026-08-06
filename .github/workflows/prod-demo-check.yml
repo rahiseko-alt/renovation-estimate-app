@@ -1,0 +1,51 @@
+name: prod-demo-check
+
+# 商談で見せる3タップの経路を、本番そのものを外から踏んで機械判定する
+# （scripts/prod-demo-check.sh）。
+#
+# **prod-smoke.yml とは別のファイルにしてある。理由は2つ。**
+#
+# 1. **push では走らせない。** auto-merge の直後は Vercel のデプロイが終わっておらず、
+#    古いビルドを測ることになる。そもそも「本番が今どうなっているか」は
+#    コミットごとに見るものではない。
+# 2. **push で走るワークフローに `if:` で条件を付けて逃げると、auto-merge が止まる。**
+#    `auto-merge.yml` は「skipped は緑扱いしない」（必須 check を skip させて素通りさせる
+#    裏口を塞ぐため）。push で走るワークフローに skipped になるジョブを1つでも足すと、
+#    以後すべてのPRが永久にマージされない。実際に一度そうなった
+#    （docs/failures.md 2026-08-06）。**検査を緩めずに済ませるには、
+#    push で走るワークフローにこのジョブを置かないこと。**
+#
+# 秘密情報は扱わない。無ログインで誰でも踏める経路だけを見る。
+# このジョブがすることは「公開URLを curl する」だけ。書き込みは一切しない。
+# 明示しないと、リポジトリ既定の権限（書き込みを含みうる）がそのまま渡る。
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+  schedule:
+    # 毎日 22:00 UTC（日本時間 翌 07:00）。
+    - cron: "0 22 * * *"
+
+# 本番URL（Vercel production alias）。prod-smoke.yml と同じ値だが、
+# ワークフローをまたいで参照する手段が無いためここにも置く。
+# 本番URLを変えるときは両方を直す。
+env:
+  PROD_URL: "https://renovation-estimate-app-web.vercel.app"
+
+jobs:
+  demo-three-taps:
+    name: demo 3タップを本番で実際に踏む
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # 検査スクリプトは Git 認証を使わない（公開URLを curl するだけ）。
+          # 既定のままだと GITHUB_TOKEN が .git/config に残る（zizmor: artipacked）。
+          persist-credentials: false
+
+      - name: bash scripts/prod-demo-check.sh
+        run: |
+          # 「動いています」と一度も踏まずに言って、実際には1タップ目が10秒かかって
+          # 落ちていたことがある（docs/failures.md 2026-08-06）。
+          BASE="${PROD_URL}" bash scripts/prod-demo-check.sh
