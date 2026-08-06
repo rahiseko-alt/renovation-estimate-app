@@ -257,6 +257,40 @@ export async function findDemoProject(ownerId: string): Promise<string | null> {
 }
 
 /**
+ * 案件を消したあとに1件も案件が残らない所有者だけを返す。
+ *
+ * 下請台帳と会社設定は案件に紐づかず `owner_id` 単位で消すしかない。
+ * **デモ利用者も画面から2件目の案件を作れる**ので、所有者の案件が1件でも残るなら
+ * これらを消してはいけない（残った案件から下請と請負者名が消える）。
+ * まだ期限が来ていない案件を持つ所有者も、同じ理由で対象外になる。
+ */
+async function ownersWithNothingLeft(
+  removable: ReadonlySet<string>,
+  expired: ReadonlyArray<{ id: string; owner_id: string }>,
+): Promise<string[]> {
+  const candidates = [
+    ...new Set(
+      expired.filter((row) => removable.has(row.id)).map((row) => row.owner_id),
+    ),
+  ];
+  if (candidates.length === 0) return [];
+
+  // 消す前に数える。消したあとでは「残るはずだった案件」が分からない。
+  const owned = must(
+    await getSupabaseClient()
+      .from("projects")
+      .select("id, owner_id")
+      .in("owner_id", candidates),
+    "デモ所有者の案件の確認",
+  ) as Array<{ id: string; owner_id: string }>;
+
+  const stillHasProject = new Set(
+    owned.filter((row) => !removable.has(row.id)).map((row) => row.owner_id),
+  );
+  return candidates.filter((ownerId) => !stillHasProject.has(ownerId));
+}
+
+/**
  * 期限を過ぎたデモ利用者のデータを消す。消した案件の数を返す。
  *
  * **デモは無ログインで、訪問ごとに `demo:<uuid>` が1つ増える。**
@@ -309,11 +343,7 @@ export async function purgeExpiredDemoData(
   if (projectIds.length === 0) return 0;
 
   const removable = new Set(projectIds);
-  const ownerIds = [
-    ...new Set(
-      expired.filter((row) => removable.has(row.id)).map((row) => row.owner_id),
-    ),
-  ];
+  const ownerIds = await ownersWithNothingLeft(removable, expired);
 
   // 見積・法定項目・依頼・回答・写真の行は on delete cascade で一緒に消える。
   must(

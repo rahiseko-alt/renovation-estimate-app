@@ -2,7 +2,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { newDemoOwnerId } from "../lib/auth/demoOwner";
 import { DEFAULT_PHOTO_AREA } from "../lib/content";
+import { getCompanyProfile } from "../lib/db/companyProfiles";
 import { createPhoto } from "../lib/db/photos";
+import { listSubcontractorsForOwner } from "../lib/db/subcontractors";
 import { getProjectForOwner } from "../lib/db/projects";
 
 // ストレージの失敗を作るためにモックする。この検査だけの都合なので、
@@ -82,5 +84,43 @@ describe("purgeExpiredDemoData と写真ストレージ", () => {
 
     expect(await getProjectForOwner(keptProject, keptOwner)).not.toBeNull();
     expect(await getProjectForOwner(removedProject, removedOwner)).toBeNull();
+  });
+});
+
+/**
+ * 下請台帳と会社設定は案件に紐づかず `owner_id` 単位で消すしかない。
+ * **デモ利用者も画面から2件目の案件を作れる**ので、案件が1件でも残る所有者の
+ * これらを消すと、残った案件から下請と請負者名が消える。
+ */
+describe("purgeExpiredDemoData と owner_id 単位のデータ", () => {
+  it("案件が残る所有者の下請台帳・会社設定は消さない", async () => {
+    const ownerId = newDemoOwnerId();
+    const demoProject = await seedDemoData(ownerId);
+    // 同じデモ利用者が画面から作った2件目。写真が消せず残る状況にする。
+    await createPhoto(
+      { projectId: demoProject, area: DEFAULT_PHOTO_AREA, storagePath: `${demoProject}/a.jpg` },
+      ownerId,
+    );
+
+    vi.mocked(tryDeletePhotoObject).mockResolvedValue(false);
+    await purgeExpiredDemoData(new Date(Date.now() + 60_000));
+
+    // 案件が残っているので、下請台帳も会社設定もそのまま。
+    expect(await getProjectForOwner(demoProject, ownerId)).not.toBeNull();
+    expect(await listSubcontractorsForOwner(ownerId)).not.toHaveLength(0);
+    // 未設定なら空文字が返る作りなので、請負者名が残っているかで見る。
+    expect((await getCompanyProfile(ownerId)).contractorName).not.toBe("");
+  });
+
+  it("案件が1件も残らない所有者の下請台帳・会社設定は消す", async () => {
+    const ownerId = newDemoOwnerId();
+    const demoProject = await seedDemoData(ownerId);
+
+    vi.mocked(tryDeletePhotoObject).mockResolvedValue(true);
+    await purgeExpiredDemoData(new Date(Date.now() + 60_000));
+
+    expect(await getProjectForOwner(demoProject, ownerId)).toBeNull();
+    expect(await listSubcontractorsForOwner(ownerId)).toHaveLength(0);
+    expect((await getCompanyProfile(ownerId)).contractorName).toBe("");
   });
 });
