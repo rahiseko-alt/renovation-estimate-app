@@ -6,14 +6,12 @@ import {
   HOME_HEADING,
   HOME_DESTINATIONS,
 } from "../lib/content";
-import { DEMO_ENTRY_TEXT } from "../lib/demoText";
+import { DEMO_ENTRY_TEXT, DEMO_START_PATH } from "../lib/demoText";
 
 type Props = {
   loggedIn: boolean;
   /** ログアウトの実処理。画面はどう実現しているかを知らない。 */
   onLogout: () => Promise<void>;
-  /** デモの開始。画面は何が起きるかを知らない（識別子の発行もデータ投入も呼び先の仕事）。 */
-  onStartDemo: () => Promise<void>;
 };
 
 /**
@@ -27,7 +25,7 @@ type Props = {
  * アカウントを持っていないので、ログインを先頭に出すと必ずそこで止まる。
  * ログインは「アカウントをお持ちの方」として下に置く。
  */
-export function HomeScreen({ loggedIn, onLogout, onStartDemo }: Props) {
+export function HomeScreen({ loggedIn, onLogout }: Props) {
   return (
     <main className="mx-auto w-full max-w-md px-5 py-8">
       <h1 className="text-2xl font-bold">{HOME_HEADING}</h1>
@@ -62,7 +60,11 @@ export function HomeScreen({ loggedIn, onLogout, onStartDemo }: Props) {
         </>
       ) : (
         <>
-          <form action={onStartDemo} className="mt-8">
+          {/*
+            素のフォームとして POST する（Server Action にしない）。
+            理由は lib/demoText.ts の DEMO_START_PATH を見る。
+          */}
+          <form method="post" action={DEMO_START_PATH} className="mt-8">
             <button
               type="submit"
               className="tap flex w-full items-center justify-center rounded bg-blue-800 px-6 py-5 text-lg font-bold text-white"

@@ -159,3 +159,66 @@ test("同時に走る2つのデモは、互いの案件を開けない", async (
     await Promise.all([contextA.close(), contextB.close()]);
   }
 });
+
+test("デモの中身を直したあと、古いデモを開いていた人にも新しいものが出る", async ({
+  context,
+  page,
+}) => {
+  // デモは「既にデモ中なら作り直さない」ので、中身を直しても古い案件を返し続けていた
+  // （有効期間は6時間。直した当日に触った人ほど古いものを見る）。
+  // 版が変わったことを、版のCookieを別の値に差し替えて再現する。
+  await page.goto("/");
+  await page.getByRole("button", { name: TAPS[0] }).click();
+  await expect(page).toHaveURL(/\/demo\/[0-9a-f-]{36}\/photo$/);
+  const origin = new URL(page.url()).origin;
+  const first = new URL(page.url()).pathname.split("/")[2];
+
+  /**
+   * 入口をもう一度叩く。**トップのボタンは使えない。** デモ中はセッションを持つので
+   * トップがログイン後の表示になり、デモの入口が出ない（そういう画面にしてある）。
+   * フォームと同じ POST を、同じ Cookie で送る。
+   */
+  async function startAgain(): Promise<string> {
+    const response = await context.request.post(`${origin}/demo/start`, {
+      headers: { origin },
+      maxRedirects: 0,
+    });
+    expect(response.status()).toBe(303);
+    const location = response.headers()["location"];
+    expect(location, "リダイレクト先が無い").toBeTruthy();
+    const id = new URL(location!, origin).pathname.split("/")[2];
+    if (!id) throw new Error(`案件IDを取れない: ${location}`);
+    return id;
+  }
+
+  // 同じ版のままなら作り直さない（連打で書き込みが増えない、が保たれている）。
+  expect(await startAgain()).toBe(first);
+
+  // 版だけを古い値にする。セッションはそのまま＝「デモ中の人」のまま。
+  const version = (await context.cookies()).find(
+    (cookie) => cookie.name === "rea_demo_ver",
+  );
+  expect(version, "版のCookieが発行されていない").toBeTruthy();
+  await context.addCookies([{ ...version!, value: "outdated" }]);
+
+  const rebuilt = await startAgain();
+  expect(rebuilt, "古い版のまま同じ案件が返っている").not.toBe(first);
+
+  // 作り直したあとも、比較表の合計は出ている（作り直しが中途半端でない）。
+  await page.goto(`/projects/${rebuilt}/comparison`);
+  await expect(
+    page.getByRole("region", { name: COMPARISON_TEXT.adoptedTotalLabel }),
+  ).toBeVisible();
+});
+
+test("他所のサイトからデモを開始させられない（セッションを貼り替えられない）", async ({
+  request,
+}) => {
+  // ルートハンドラは素のURLなので、Server Action と違って自動では守られない。
+  // ここが通ると、ログイン中の利用者のセッションを外部サイトから貼り替えられる。
+  const response = await request.post("/demo/start", {
+    headers: { Origin: "https://example.com" },
+    maxRedirects: 0,
+  });
+  expect(response.status()).toBe(403);
+});

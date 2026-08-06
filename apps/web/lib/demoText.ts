@@ -20,6 +20,15 @@ export const DEMO_LEGAL_ITEM_COUNT =
   Object.keys(LEGAL_ITEM_SLOT_LABELS).length +
   Object.keys(SITE_CONDITION_LABELS).length;
 
+/**
+ * デモを始める入口のURL。トップ画面のフォームがここへ POST する。
+ *
+ * **Server Action にしない。** 呼び出し先IDがビルドごとに変わるため、
+ * 古いページを開いたままのブラウザから押すと無反応になる（実際に起きた。
+ * `app/demo/start/route.ts` の冒頭を見る）。URL はビルドで変わらない。
+ */
+export const DEMO_START_PATH = "/demo/start";
+
 /** トップ画面に置くデモの入口。未ログインの人が最初に押すのはこれ1つ。 */
 export const DEMO_ENTRY_TEXT = {
   start: "デモを触ってみる",
