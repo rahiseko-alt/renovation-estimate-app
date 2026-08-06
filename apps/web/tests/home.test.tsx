@@ -3,20 +3,21 @@ import { describe, expect, it } from "vitest";
 
 import { HomeScreen } from "../components/HomeScreen";
 import { AUTH_TEXT, HOME_DESTINATIONS, HOME_HEADING } from "../lib/content";
+import { DEMO_ENTRY_TEXT } from "../lib/demoText";
 
 async function noop(): Promise<void> {}
 
 describe("HomeScreen", () => {
   it("見出しを出す（CI スモークが本文で探すマーカー）", () => {
     const html = renderToStaticMarkup(
-      <HomeScreen loggedIn={false} onLogout={noop} />,
+      <HomeScreen loggedIn={false} onLogout={noop} onStartDemo={noop} />,
     );
     expect(html).toContain(HOME_HEADING);
   });
 
   it("未ログインなら行き先を見せず、ログインへ誘導する", () => {
     const html = renderToStaticMarkup(
-      <HomeScreen loggedIn={false} onLogout={noop} />,
+      <HomeScreen loggedIn={false} onLogout={noop} onStartDemo={noop} />,
     );
     expect(html).toContain('href="/login"');
     for (const destination of HOME_DESTINATIONS) {
@@ -24,8 +25,27 @@ describe("HomeScreen", () => {
     }
   });
 
+  // 商談で見せる相手はアカウントを持っていない。ログインが最初に来ると必ず止まる。
+  it("未ログインならデモの入口を出す", () => {
+    const html = renderToStaticMarkup(
+      <HomeScreen loggedIn={false} onLogout={noop} onStartDemo={noop} />,
+    );
+    expect(html).toContain(DEMO_ENTRY_TEXT.start);
+    // デモの入口がログインより先に出る（押す順が逆だとデモにたどり着けない）。
+    expect(html.indexOf(DEMO_ENTRY_TEXT.start)).toBeLessThan(
+      html.indexOf(AUTH_TEXT.submit),
+    );
+  });
+
+  it("ログイン済みにはデモの入口を出さない（実データの画面に混ぜない）", () => {
+    const html = renderToStaticMarkup(
+      <HomeScreen loggedIn onLogout={noop} onStartDemo={noop} />,
+    );
+    expect(html).not.toContain(DEMO_ENTRY_TEXT.start);
+  });
+
   it("ログイン済みなら行き先とログアウトを出す", () => {
-    const html = renderToStaticMarkup(<HomeScreen loggedIn onLogout={noop} />);
+    const html = renderToStaticMarkup(<HomeScreen loggedIn onLogout={noop} onStartDemo={noop} />);
     for (const destination of HOME_DESTINATIONS) {
       expect(html).toContain(destination.label);
       expect(html).toContain(`href="${destination.href}"`);

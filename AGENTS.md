@@ -101,6 +101,8 @@
 - デモ用データの投入（返信済みの下請3社ぶんを含む）:
   `DEMO_USER_EMAIL=<ログインする利用者のメール> bash scripts/seed-demo.sh`
   （ローカル Supabase 起動済みで。何度実行しても増えず、同じ内容に作り直す）
+  中身は `apps/web/lib/db/demoSeed.ts` が持ち、**アプリの「デモを触ってみる」と
+  このCLIが同じ関数を通る**。デモの内容を変えるときはこのファイルだけを直す。
 - **本番DBへのマイグレーション適用（スキーマを変えたPRでは必須）**:
   `supabase/migrations/` は**自動では本番に適用されない**。CIにもデプロイにも
   その工程が無く、手元から流す。マージしただけでは本番のテーブルは増えないので、
@@ -118,6 +120,11 @@
 注意（値が結合している箇所）: トップページの見出し `HOME_HEADING` は、CI の起動スモークが
 本文から探すマーカーでもある。`apps/web/lib/content.ts` と `scripts/smoke.sh` の `MARKER`、
 `.github/workflows/prod-smoke.yml` の3箇所を同時に直す。
+
+同じ理由で、デモの入口の文言 `DEMO_ENTRY_TEXT.start`（`apps/web/lib/demoText.ts`）は
+`scripts/smoke.sh` と `apps/web/e2e/demo-three-taps.spec.ts` の `TAPS` が探す文字列でもある。
+**この3タップは商談で見せる経路そのものなので、ボタンを1つ増やしたら E2E が落ちる**
+（落ちたら実装を直す。検査のほうを緩めない）。
 
 ## 実装の進め方
 

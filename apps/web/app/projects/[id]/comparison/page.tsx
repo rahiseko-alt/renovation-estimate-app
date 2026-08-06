@@ -2,8 +2,15 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 
 import { ComparisonTable } from "../../../../components/ComparisonTable";
+import { DemoBanner } from "../../../../components/DemoBanner";
+import { DownloadPdfButton } from "../../../../components/DownloadPdfButton";
+import { isDemoOwner } from "../../../../lib/auth/demoOwner";
 import { getCurrentUser } from "../../../../lib/auth/server";
 import { COMPARISON_TEXT } from "../../../../lib/content";
+import {
+  DEMO_COMPARISON_TEXT,
+  DEMO_LEGAL_ITEM_COUNT,
+} from "../../../../lib/demoText";
 import {
   cheapestRequestIdByLineId,
   getComparisonForProject,
@@ -29,16 +36,41 @@ export default async function ComparisonPage({
   const comparison = await getComparisonForProject(id, ownerId);
   const cheapestByLineId = cheapestRequestIdByLineId(comparison);
 
+  // デモは3タップ目でここから見積書へ抜ける。実利用者の画面には足さない
+  // （案件詳細に同じボタンが既にあり、2箇所に増やす理由が無い）。
+  const demo = isDemoOwner(ownerId);
+
   return (
     <main className="mx-auto w-full max-w-2xl px-5 py-8">
-      <h1 className="text-2xl font-bold">{COMPARISON_TEXT.heading}</h1>
+      {demo ? <DemoBanner /> : null}
+      <h1 className={`text-2xl font-bold${demo ? " mt-4" : ""}`}>
+        {demo ? DEMO_COMPARISON_TEXT.heading : COMPARISON_TEXT.heading}
+      </h1>
       <p className="mt-1 text-gray-700">{project.workName}</p>
+      {demo ? (
+        <p className="mt-2 text-gray-700">{DEMO_COMPARISON_TEXT.description}</p>
+      ) : null}
 
       <ComparisonTable
         projectId={id}
         comparison={comparison}
         cheapestByLineId={cheapestByLineId}
       />
+
+      {demo ? (
+        <div className="mt-8 flex flex-col gap-3">
+          <DownloadPdfButton projectId={id} />
+          <p className="text-gray-700">
+            {DEMO_COMPARISON_TEXT.legalNote(DEMO_LEGAL_ITEM_COUNT)}
+            <Link
+              href={`/projects/${id}/legal`}
+              className="tap ml-2 inline-flex items-center text-blue-700 underline"
+            >
+              {DEMO_COMPARISON_TEXT.legalLink}
+            </Link>
+          </p>
+        </div>
+      ) : null}
 
       <Link href={`/projects/${id}`} className="tap mt-8 inline-flex items-center text-blue-700 underline">
         {COMPARISON_TEXT.back}
