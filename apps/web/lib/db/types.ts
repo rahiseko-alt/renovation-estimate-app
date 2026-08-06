@@ -350,3 +350,42 @@ export type AdoptLineInput = {
   lineItemId: string;
   quoteGroupRequestId: string;
 };
+
+/**
+ * 下請が返す見積の必要経費の内訳（docs/design.md 3章「下請が返す見積書に
+ * 求められる内訳」）。建設業法第20条第1項を踏まえ、下請が最低限明示するよう
+ * **努める**べき項目。努力義務なので入力必須にしないが、欄は必ず出す。
+ *
+ * 「未入力」と「0と回答した」を区別するため null を許す（0で埋めない）。
+ */
+export type QuoteResponseCostBreakdown = {
+  materialCost: number | null;
+  laborCost: number | null;
+  legalWelfareCost: number | null;
+  safetyHealthCost: number | null;
+  retirementMutualAidCost: number | null;
+  workDays: number | null;
+  /** 元請が材料を支給する場合にその旨を書く欄。 */
+  materialSuppliedNote: string;
+};
+
+/** 回答の明細1行。明細ごとに数量と原価単価の両方を出させる。 */
+export type QuoteResponseLine = {
+  lineItemId: string;
+  quantity: number;
+  costUnitPrice: number;
+};
+
+export type QuoteGroupResponse = {
+  id: string;
+  quoteGroupRequestId: string;
+  breakdown: QuoteResponseCostBreakdown;
+  lines: QuoteResponseLine[];
+  respondedAt: string;
+};
+
+export type NewQuoteGroupResponseInput = {
+  token: string;
+  breakdown: QuoteResponseCostBreakdown;
+  lines: QuoteResponseLine[];
+};
