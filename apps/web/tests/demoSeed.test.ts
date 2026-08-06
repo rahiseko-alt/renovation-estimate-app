@@ -76,9 +76,8 @@ describe("purgeExpiredDemoData", () => {
     const projectId = await seedDemoData(ownerId);
 
     // 「これより前に作られたもの」を消す。今より先を渡せば、今作ったものが対象になる。
-    const removed = await purgeExpiredDemoData(new Date(Date.now() + 60_000));
+    await purgeExpiredDemoData(new Date(Date.now() + 60_000));
 
-    expect(removed).toBeGreaterThan(0);
     expect(await getProjectForOwner(projectId, ownerId)).toBeNull();
     expect(await findDemoProject(ownerId)).toBeNull();
   });

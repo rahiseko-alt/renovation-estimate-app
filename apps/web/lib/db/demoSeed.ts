@@ -24,7 +24,7 @@ import {
   SITE_CONDITIONS,
 } from "../demoFixture";
 import { getSupabaseClient } from "./client";
-import { deletePhotoObject } from "./photoStorage";
+import { tryDeletePhotoObject } from "./photoStorage";
 
 /** エラーを握りつぶさない。半分だけ入った状態を「成功」と見せない。 */
 function must<T>(result: { data: T; error: unknown }, what: string): T {
@@ -283,18 +283,37 @@ export async function purgeExpiredDemoData(
 
   if (expired.length === 0) return 0;
 
-  const projectIds = expired.map((row) => row.id);
-  const ownerIds = [...new Set(expired.map((row) => row.owner_id))];
+  const candidateIds = expired.map((row) => row.id);
 
-  // 写真の実体は Storage にあり、案件を消しても道連れにはならない。
-  // 先に消す（順序が逆だと、参照の無いオブジェクトの場所が分からなくなる）。
+  // 写真の実体は Storage にあり、案件を消しても道連れにはならない。先に消す。
+  //
+  // **ストレージの削除に失敗した案件は、この回では消さない。** 行を先に消すと
+  // storage_path が失われ、残ったオブジェクトを二度と回収できなくなる。
+  // 行を残しておけば、次に誰かがデモを始めたときにもう一度やり直せる。
   const photos = must(
-    await db.from("photos").select("storage_path").in("project_id", projectIds),
+    await db
+      .from("photos")
+      .select("project_id, storage_path")
+      .in("project_id", candidateIds),
     "期限切れのデモ写真の確認",
-  ) as Array<{ storage_path: string }>;
+  ) as Array<{ project_id: string; storage_path: string }>;
+
+  const failedProjectIds = new Set<string>();
   for (const photo of photos) {
-    await deletePhotoObject(photo.storage_path);
+    if (!(await tryDeletePhotoObject(photo.storage_path))) {
+      failedProjectIds.add(photo.project_id);
+    }
   }
+
+  const projectIds = candidateIds.filter((id) => !failedProjectIds.has(id));
+  if (projectIds.length === 0) return 0;
+
+  const removable = new Set(projectIds);
+  const ownerIds = [
+    ...new Set(
+      expired.filter((row) => removable.has(row.id)).map((row) => row.owner_id),
+    ),
+  ];
 
   // 見積・法定項目・依頼・回答・写真の行は on delete cascade で一緒に消える。
   must(

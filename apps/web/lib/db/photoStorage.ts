@@ -46,6 +46,18 @@ export async function deletePhotoObject(path: string): Promise<void> {
   }
 }
 
+/**
+ * ストレージのオブジェクトを削除し、消せたかどうかを返す。
+ *
+ * `deletePhotoObject` と違い、失敗を呼び出し側に伝える。
+ * **DB行を消す前に**ストレージを消す手順（デモの掃除がこれ）では、失敗を握ると
+ * 行が消えたあとにオブジェクトの場所が分からなくなり、二度と回収できなくなる。
+ */
+export async function tryDeletePhotoObject(path: string): Promise<boolean> {
+  const { error } = await getSupabaseClient().storage.from(BUCKET).remove([path]);
+  return !error;
+}
+
 /** 表示用の署名付きURLを発行する。呼び出し側で対象写真の所有者確認を済ませた上で使う。 */
 export async function createPhotoSignedUrl(
   path: string,
