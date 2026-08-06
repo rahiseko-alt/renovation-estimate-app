@@ -42,3 +42,6 @@ http://localhost:3000 を開く。
 
 この製品が何であるか（誰が使うか・差別化点・出す書類・調査で確定した業界様式と法令要件）は
 `docs/design.md` にまとめてある。実装に入る前にこれを読む。
+
+利用者に渡す操作説明書は `docs/manual.md`。画面に出ている文言をそのまま引用しているので、
+`apps/web/lib/content.ts` や `apps/web/lib/quoteFlowText.ts` のラベルを変えたらここも直す。
