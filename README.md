@@ -44,4 +44,7 @@ http://localhost:3000 を開く。
 `docs/design.md` にまとめてある。実装に入る前にこれを読む。
 
 利用者に渡す操作説明書は `docs/manual.md`。画面に出ている文言をそのまま引用しているので、
-`apps/web/lib/content.ts` や `apps/web/lib/quoteFlowText.ts` のラベルを変えたらここも直す。
+`apps/web/lib/content.ts`・`apps/web/lib/quoteFlowText.ts`・`apps/web/lib/demoText.ts` の
+ラベルを変えたらここも直す。とくに `DEMO_ENTRY_TEXT.start`（デモの入口のボタン名）は、
+`scripts/smoke.sh` と `apps/web/e2e/demo-three-taps.spec.ts` の `TAPS` も同じ文字列を探すので、
+同時に直す。

@@ -2,8 +2,13 @@ import { describe, expect, it } from "vitest";
 
 import { newDemoOwnerId } from "../lib/auth/demoOwner";
 import { getComparisonForProject } from "../lib/db/comparison";
-import { DEMO_SUBCONTRACTOR_COUNT, seedDemoData } from "../lib/db/demoSeed";
-import { getProjectForOwner } from "../lib/db/projects";
+import { DEMO_SUBCONTRACTOR_COUNT } from "../lib/demoFixture";
+import {
+  findDemoProject,
+  purgeExpiredDemoData,
+  seedDemoData,
+} from "../lib/db/demoSeed";
+import { createProject, getProjectForOwner } from "../lib/db/projects";
 import { checkSubmissionGate } from "../lib/db/submissionGate";
 
 /**
@@ -58,5 +63,58 @@ describe("seedDemoData", () => {
     const projectId = await seedDemoData(ownerA);
 
     expect(await getProjectForOwner(projectId, ownerB)).toBeNull();
+  });
+});
+
+/**
+ * デモは無ログインで、訪問ごとに `demo:<uuid>` が1つ増える。
+ * Cookie の有効期間はDBの行を消さないので、掃除が要る。
+ */
+describe("purgeExpiredDemoData", () => {
+  it("期限を過ぎたデモのデータを消す", async () => {
+    const ownerId = newDemoOwnerId();
+    const projectId = await seedDemoData(ownerId);
+
+    // 「これより前に作られたもの」を消す。今より先を渡せば、今作ったものが対象になる。
+    const removed = await purgeExpiredDemoData(new Date(Date.now() + 60_000));
+
+    expect(removed).toBeGreaterThan(0);
+    expect(await getProjectForOwner(projectId, ownerId)).toBeNull();
+    expect(await findDemoProject(ownerId)).toBeNull();
+  });
+
+  it("期限内のデモは消さない", async () => {
+    const ownerId = newDemoOwnerId();
+    const projectId = await seedDemoData(ownerId);
+
+    await purgeExpiredDemoData(new Date(Date.now() - 60 * 60 * 1000));
+
+    expect(await getProjectForOwner(projectId, ownerId)).not.toBeNull();
+  });
+
+  // 掃除が実利用者のデータに手を出したら、その時点で事故になる。
+  it("実利用者（メールアドレスの owner_id）のデータには触れない", async () => {
+    const realOwner = "owner-not-demo@example.com";
+    const project = await createProject(
+      { customerName: "実在しない施主", siteAddress: "東京都千代田区0-0-0" },
+      realOwner,
+    );
+
+    await purgeExpiredDemoData(new Date(Date.now() + 60_000));
+
+    expect(await getProjectForOwner(project.id, realOwner)).not.toBeNull();
+  });
+});
+
+describe("findDemoProject", () => {
+  // 「デモを触ってみる」を連打しても、そのたびに十数回の書き込みを走らせない。
+  it("既にデモ中なら、その案件のIDを返す", async () => {
+    const ownerId = newDemoOwnerId();
+    const projectId = await seedDemoData(ownerId);
+    expect(await findDemoProject(ownerId)).toBe(projectId);
+  });
+
+  it("デモを始めていなければ null", async () => {
+    expect(await findDemoProject(newDemoOwnerId())).toBeNull();
   });
 });

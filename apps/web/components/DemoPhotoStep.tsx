@@ -27,12 +27,14 @@ export function DemoPhotoStep({ projectId, nextHref }: Props) {
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
+  /** 写真を付けずに次へ進む。 */
   function goNext(): void {
     startTransition(() => {
       router.push(nextHref);
     });
   }
 
+  /** 撮った写真を圧縮して案件に付け、成否によらず次の画面へ進む。 */
   function handleFile(event: React.ChangeEvent<HTMLInputElement>): void {
     const file = event.target.files?.[0];
     if (!file) return;

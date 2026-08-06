@@ -96,3 +96,47 @@ test("デモの利用者に、実データの画面は空で見える", async ({
   await page.goto("/subcontractors");
   await expect(page.getByText("サンプル内装工業")).toBeVisible();
 });
+
+test("同時に走る2つのデモは、互いの案件を開けない", async ({ browser }) => {
+  // 商談が2件同時に走る状況を作る。Cookie を共有しない2つの文脈を使う。
+  const [contextA, contextB] = await Promise.all([
+    browser.newContext(),
+    browser.newContext(),
+  ]);
+
+  async function startDemo(context: (typeof contextA)): Promise<string> {
+    const page = await context.newPage();
+    await page.goto("/");
+    await page.getByRole("button", { name: TAPS[0] }).click();
+    await expect(page).toHaveURL(/\/demo\/[0-9a-f-]{36}\/photo$/);
+    const projectId = new URL(page.url()).pathname.split("/")[2];
+    if (!projectId) throw new Error("デモ案件のIDを取れない");
+    await page.close();
+    return projectId;
+  }
+
+  try {
+    const [projectA, projectB] = await Promise.all([
+      startDemo(contextA),
+      startDemo(contextB),
+    ]);
+    expect(projectA).not.toBe(projectB);
+
+    // A の文脈から B の案件を開こうとする。案件IDが正しくても通らない。
+    const pageA = await contextA.newPage();
+    for (const path of [
+      `/projects/${projectB}/comparison`,
+      `/projects/${projectB}`,
+      `/demo/${projectB}/photo`,
+    ]) {
+      const response = await pageA.goto(path);
+      expect(response?.status(), `${path} は 404 でなければならない`).toBe(404);
+    }
+
+    // 自分の案件は開ける（上の404が「全部落ちている」せいでないことを示す）。
+    const own = await pageA.goto(`/projects/${projectA}/comparison`);
+    expect(own?.status()).toBe(200);
+  } finally {
+    await Promise.all([contextA.close(), contextB.close()]);
+  }
+});

@@ -62,11 +62,20 @@ async function hmac(message: string): Promise<Uint8Array> {
   return new Uint8Array(signature);
 }
 
-/** 署名付きのセッション値を作る。戻り値をそのまま Cookie に入れる。 */
-export async function createSessionValue(userId: string): Promise<string> {
+/**
+ * 署名付きのセッション値を作る。戻り値をそのまま Cookie に入れる。
+ *
+ * **有効期間は署名の中に入れる。** Cookie の maxAge だけを短くしても、
+ * 値を控えておいた相手には効かない（Cookie は相手の持ち物なので、
+ * 消す約束を守らせられない）。短い寿命で発行したいときは ttlSeconds を渡す。
+ */
+export async function createSessionValue(
+  userId: string,
+  ttlSeconds: number = SESSION_TTL_SECONDS,
+): Promise<string> {
   const payload: SessionPayload = {
     sub: userId,
-    exp: Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS,
+    exp: Math.floor(Date.now() / 1000) + ttlSeconds,
   };
   const body = toBase64Url(encoder.encode(JSON.stringify(payload)));
   const signature = toBase64Url(await hmac(body));
