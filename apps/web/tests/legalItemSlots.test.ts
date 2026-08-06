@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import { LEGAL_ITEM_SLOT_KEYS } from "../lib/db/types";
 import {
+  MAX_LEGAL_ITEM_SLOT_VALUE_LENGTH,
   listLegalItemSlots,
   setLegalItemSlot,
+  setLegalItemSlots,
 } from "../lib/db/legalItemSlots";
 import { createProject } from "../lib/db/projects";
 
@@ -135,5 +137,128 @@ describe("legalItemSlots", () => {
 
     const asOwnerA = await listLegalItemSlots(mine.id, OWNER_A);
     expect(asOwnerA.special_parts.status).toBe("filled");
+  });
+});
+
+describe("legalItemSlots の一括保存", () => {
+  it("画面の1回の保存で9スロット全部が入る（1件ずつの往復に戻らない）", async () => {
+    const project = await createProject(
+      { customerName: "一括1", siteAddress: "テスト" },
+      OWNER_A,
+    );
+
+    const saved = await setLegalItemSlots(
+      project.id,
+      OWNER_A,
+      LEGAL_ITEM_SLOT_KEYS.map((slotKey, index) =>
+        index % 2 === 0
+          ? { slotKey, status: "filled" as const, value: `値-${slotKey}` }
+          : { slotKey, status: "undetermined" as const, value: null },
+      ),
+    );
+    expect(saved).toHaveLength(LEGAL_ITEM_SLOT_KEYS.length);
+
+    const slots = await listLegalItemSlots(project.id, OWNER_A);
+    for (const [index, slotKey] of LEGAL_ITEM_SLOT_KEYS.entries()) {
+      expect(slots[slotKey].status).toBe(index % 2 === 0 ? "filled" : "undetermined");
+    }
+  });
+
+  it("同じ内容をもう一度保存しても行が二重にならず、上書きされる", async () => {
+    const project = await createProject(
+      { customerName: "一括2", siteAddress: "テスト" },
+      OWNER_A,
+    );
+    const input = [
+      { slotKey: "quote_conditions" as const, status: "filled" as const, value: "一度目" },
+    ];
+
+    await setLegalItemSlots(project.id, OWNER_A, input);
+    await setLegalItemSlots(project.id, OWNER_A, [
+      { ...input[0]!, value: "二度目" },
+    ]);
+
+    const slots = await listLegalItemSlots(project.id, OWNER_A);
+    expect(slots.quote_conditions.value).toBe("二度目");
+  });
+
+  it("同じスロットを2件渡したら保存せずに落とす（DBのupsertが落ちる前に理由を返す）", async () => {
+    const project = await createProject(
+      { customerName: "一括3", siteAddress: "テスト" },
+      OWNER_A,
+    );
+
+    await expect(
+      setLegalItemSlots(project.id, OWNER_A, [
+        { slotKey: "overall_schedule", status: "filled", value: "A" },
+        { slotKey: "overall_schedule", status: "filled", value: "B" },
+      ]),
+    ).rejects.toThrow(/重複/);
+
+    // 落ちた保存の一部だけが残っていないこと。
+    const slots = await listLegalItemSlots(project.id, OWNER_A);
+    expect(slots.overall_schedule.status).toBe("unset");
+  });
+
+  it("「記入する」なのに本文が空なら、同じ保存の他のスロットも書き込まない", async () => {
+    const project = await createProject(
+      { customerName: "一括4", siteAddress: "テスト" },
+      OWNER_A,
+    );
+
+    await expect(
+      setLegalItemSlots(project.id, OWNER_A, [
+        { slotKey: "trade_boundary", status: "undetermined", value: null },
+        // 空白だけは「書いた」に数えない。
+        { slotKey: "special_parts", status: "filled", value: "   " },
+      ]),
+    ).rejects.toThrow();
+
+    const slots = await listLegalItemSlots(project.id, OWNER_A);
+    expect(slots.trade_boundary.status).toBe("unset");
+    expect(slots.special_parts.status).toBe("unset");
+  });
+
+  it("本文は上限ちょうどなら通り、1文字超えたら投げる", async () => {
+    const project = await createProject(
+      { customerName: "一括5", siteAddress: "テスト" },
+      OWNER_A,
+    );
+    const atLimit = "あ".repeat(MAX_LEGAL_ITEM_SLOT_VALUE_LENGTH);
+
+    await setLegalItemSlots(project.id, OWNER_A, [
+      { slotKey: "material_cost_burden", status: "filled", value: atLimit },
+    ]);
+    const slots = await listLegalItemSlots(project.id, OWNER_A);
+    expect(slots.material_cost_burden.value).toHaveLength(
+      MAX_LEGAL_ITEM_SLOT_VALUE_LENGTH,
+    );
+
+    await expect(
+      setLegalItemSlots(project.id, OWNER_A, [
+        { slotKey: "material_cost_burden", status: "filled", value: `${atLimit}あ` },
+      ]),
+    ).rejects.toThrow();
+  });
+
+  it("「未定」を選んだら、画面に残っていた本文は保存しない", async () => {
+    const project = await createProject(
+      { customerName: "一括6", siteAddress: "テスト" },
+      OWNER_A,
+    );
+
+    await setLegalItemSlots(project.id, OWNER_A, [
+      {
+        slotKey: "safety_measures_burden",
+        status: "undetermined",
+        // 「記入する」から「未定」に切り替えたとき、入力欄の文字が残っていても
+        // 保存してはいけない（後で filled と誤読される余地を作らない）。
+        value: "切り替える前に書いていた内容",
+      },
+    ]);
+
+    const slots = await listLegalItemSlots(project.id, OWNER_A);
+    expect(slots.safety_measures_burden.status).toBe("undetermined");
+    expect(slots.safety_measures_burden.value).toBeNull();
   });
 });

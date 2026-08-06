@@ -96,6 +96,56 @@ export const SITE_CONDITION_LABELS = {
   safety: "安全",
 } as const;
 
+/** 下請台帳の画面の文言（docs/design.md 7章「画面は5つ」）。 */
+export const SUBCONTRACTORS_TEXT = {
+  heading: "下請台帳",
+  description: "見積依頼の送り先は、ここに登録した会社から選びます。",
+  empty: "まだ1社も登録されていません。",
+  newHeading: "会社を登録する",
+  companyNameLabel: "会社名",
+  emailLabel: "メールアドレス",
+  submit: "登録する",
+  delete: "削除",
+  failed: "会社名とメールアドレスを入力してください。",
+  back: "もどる",
+} as const;
+
+/**
+ * 法定項目・施工条件の入力画面の文言（建設業法第20条第1項の④⑤⑥⑧と、
+ * ⑦にあたる施工条件・範囲リスト）。ここが埋まらないと依頼を送れない。
+ */
+export const LEGAL_ITEMS_TEXT = {
+  heading: "法定項目・施工条件",
+  description:
+    "見積依頼に添える項目です。すべての項目に「記入する」か「未定」を選ぶと、依頼を送れるようになります。",
+  slotsHeading: "法定項目",
+  slotsNote:
+    "内容が決まっていない項目は「未定」を選びます。「未定」と「未入力」は別のものとして扱い、「未定」は書類にそのまま印字されます。",
+  conditionsHeading: "施工条件・範囲リスト",
+  conditionsNote:
+    "この依頼に含める区分に○、含めない区分に×を付けます。どちらか必ず選びます。",
+  valueLabel: "内容",
+  /** スロットの3状態の表示名。DBの status と1対1で対応する。 */
+  statusLabels: {
+    filled: "記入する",
+    undetermined: "未定",
+    unset: "未入力",
+  } as const,
+  /** 施工条件の印の表示名。一次情報の○×の使い方に合わせる。 */
+  markLabels: {
+    include: "○ 含める",
+    exclude: "× 含めない",
+    unset: "未検討",
+  } as const,
+  save: "保存する",
+  saving: "保存中…",
+  saved: "保存しました。",
+  needValue: "「記入する」を選んだ項目には内容を入力してください。",
+  failed: "保存できませんでした。もう一度お試しください。",
+  remainingHeading: "まだ選んでいない項目があります。",
+  back: "もどる",
+} as const;
+
 /** 依頼グループの送信画面の文言。 */
 export const SEND_REQUEST_TEXT = {
   heading: "見積依頼を出す",
@@ -104,8 +154,11 @@ export const SEND_REQUEST_TEXT = {
   gateNgHeading: "次の項目が未記入のため、まだ送れません。",
   gateNgSlots: "法定項目",
   gateNgConditions: "施工条件・範囲リスト",
+  /** 足りない項目を出すだけで終わらせず、直しに行ける導線を同じ場所に置く。 */
+  gateNgLink: "法定項目・施工条件を入力する",
   subcontractorsHeading: "送り先",
   subcontractorsEmpty: "下請が登録されていません。先に下請台帳に登録してください。",
+  subcontractorsLink: "下請台帳を開く",
   priceBandHeading: "予定価格帯",
   /** 3帯の表示名。見積期間（建設業法施行令第6条）の根拠になる。 */
   priceBandLabels: {

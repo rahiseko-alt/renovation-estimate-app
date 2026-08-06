@@ -8,7 +8,12 @@ import { buildContentSecurityPolicy, createNonce } from "./lib/security/csp";
  * トップページとログイン画面は誰でも開ける。下請の回答画面 /q/[token] は
  * 相手にログインさせないので、ここには入れない。
  */
-const PROTECTED_PREFIXES = ["/projects", "/estimates", "/masters"];
+const PROTECTED_PREFIXES = [
+  "/projects",
+  "/estimates",
+  "/masters",
+  "/subcontractors",
+];
 
 /**
  * 画面の応答すべてを通す。CSP をリクエストごとの nonce 付きで付けるため、
