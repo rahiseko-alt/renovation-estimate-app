@@ -68,6 +68,8 @@ const FORBIDDEN_ON_SUBCONTRACTOR_PAGE = [
 /** 書類画面（スパイク）でシートに入れる数量。書類側の「数量：12 式」と対になる。 */
 const SHEET_QUANTITY = "12";
 /** 書類画面の固定データの単位（app/projects/spike-document/page.tsx の BASE_DATA）。 */
+/** スパイクの書類にある唯一の明細名（apps/web/app/projects/spike-document/page.tsx）。 */
+const SHEET_LINE_NAME = "キッチン工事";
 const SHEET_UNIT = "式";
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
@@ -273,12 +275,13 @@ test("書類の行を押すとシートで数量を入れられ、閉じると�
   await expect(page.getByText("工事名称")).toBeVisible();
   await expect(page.getByText("数量未入力")).toBeVisible();
 
-  // 書類の行ブロックを押す。画面上部の操作ボタンと同じアクセシブル名を持つので、
-  // 書類の中身（表題）を含む方だけに絞る。
-  await page
-    .getByRole("button", { name: "写真・数量を入れる" })
-    .filter({ hasText: "御見積依頼書" })
-    .click();
+  // 書類の行ブロックを押す。
+  // ここで getByRole("button") を使わない。**書類はボタンではない**（ARIA は
+  // button の子孫を presentational として扱うため、role を付けると書類の見出しや
+  // 表の意味が支援技術から消える）。指で押せることだけを持たせているので、
+  // 書類の中の文字を掴んで押す。この時点でシートはまだ開いていないので、
+  // 「キッチン工事」は書類側にしか無い。
+  await page.getByText(SHEET_LINE_NAME).first().click();
 
   // シートは等倍で開く。数量を入れて閉じる。
   const quantity = page.getByLabel(`数量（${SHEET_UNIT}）`);

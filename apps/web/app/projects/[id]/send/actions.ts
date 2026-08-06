@@ -38,7 +38,10 @@ export async function sendQuoteRequestGroupAction(
     throw new Error("案件が見つかりません。");
   }
 
-  if (subcontractorIds.length === 0) {
+  // 画面のチェックボックスでは重複しないが、Server Action は直接叩ける。
+  // 重複したまま回すと、同じ社に2本のトークンが出て比較表に同じ社が2列並ぶ。
+  const uniqueSubcontractorIds = [...new Set(subcontractorIds)];
+  if (uniqueSubcontractorIds.length === 0) {
     throw new Error("送り先を1社以上選んでください。");
   }
   if (!PRICE_BAND_SET.has(plannedPriceBand)) {
@@ -55,7 +58,7 @@ export async function sendQuoteRequestGroupAction(
   const lineItemIds = estimate.lines.map((line) => line.id);
 
   const group = await createQuoteRequestGroup({ projectId }, ownerId);
-  for (const subcontractorId of subcontractorIds) {
+  for (const subcontractorId of uniqueSubcontractorIds) {
     await createQuoteGroupRequest(
       {
         groupId: group.id,

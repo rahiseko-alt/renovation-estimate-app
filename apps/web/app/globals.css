@@ -193,7 +193,7 @@ textarea {
  * 0 にして二重に効かせない）。書類だけを紙に出し、画面用のUIは全部落とす。
  */
 @page {
-  size: A4 portrait;
+  size: a4 portrait;
   margin: 0;
 }
 
@@ -211,6 +211,11 @@ textarea {
     inset: 0;
   }
   /* 画面では幅に合わせて縮小しているが、紙では実寸で出す */
+  .doc-print-root {
+    /* 画面では縮小後の高さを親に持たせている（DocumentCanvas）。紙では外す */
+    height: auto !important;
+    overflow: visible !important;
+  }
   .doc-print-root .doc-scaler {
     transform: none !important;
     width: auto !important;

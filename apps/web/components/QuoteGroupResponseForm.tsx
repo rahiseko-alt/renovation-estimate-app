@@ -64,6 +64,9 @@ export function QuoteGroupResponseForm({
   });
   const [materialSuppliedNote, setMaterialSuppliedNote] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  // 送信を試みるまでエラーを出さない（初期表示では単価が空なのが当たり前で、
+  // それを role="alert" で読み上げるのは誤り）。
+  const [submitAttempted, setSubmitAttempted] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSubmitting, startSubmitting] = useTransition();
 
@@ -81,6 +84,7 @@ export function QuoteGroupResponseForm({
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>): void {
     event.preventDefault();
+    setSubmitAttempted(true);
     if (!canSubmit) return;
     setErrorMessage(null);
     startSubmitting(async () => {
@@ -235,7 +239,7 @@ export function QuoteGroupResponseForm({
         </div>
       </section>
 
-      {!linesValid ? (
+      {submitAttempted && !linesValid ? (
         <p role="alert" className="text-red-900">
           {QUOTE_GROUP_RESPONSE_TEXT.needAllLines}
         </p>

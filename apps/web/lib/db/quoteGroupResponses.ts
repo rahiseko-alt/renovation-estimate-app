@@ -139,40 +139,31 @@ export async function createQuoteGroupResponse(
     throw new Error("同じ明細が2行あります。");
   }
 
+  // 3つの書き込み（回答・明細・依頼の状態）を1つのトランザクションで適用する。
+  // 分けて書くと、途中で失敗したときに回答だけが残り、依頼は pending のままになる。
+  // その状態では下請が再送しても quote_group_request_id の unique 制約に当たって
+  // 必ず失敗し、**永久に回答できなくなる**（比較表にはその社の欄が空で残る）。
+  // Supabase の JS クライアントにトランザクションのAPIが無いので、DB側の関数に寄せる
+  // （supabase/migrations/20260806020100_response_atomic.sql）。
   const client = getSupabaseClient();
-  const { data: responseData, error: responseError } = await client
-    .from("quote_group_responses")
-    .insert({
-      quote_group_request_id: request.id,
-      ...breakdownColumns(input.breakdown),
-    })
-    .select(RESPONSE_COLUMNS)
-    .single();
-  if (responseError) throw responseError;
-  const responseRow = responseData as ResponseRow;
+  const { error: rpcError } = await client.rpc("create_quote_group_response", {
+    p_request_id: request.id,
+    p_breakdown: breakdownColumns(input.breakdown),
+    p_lines: input.lines.map((line) => ({
+      line_item_id: line.lineItemId,
+      quantity: line.quantity,
+      cost_unit_price: line.costUnitPrice,
+    })),
+  });
+  if (rpcError) throw rpcError;
 
-  const { data: lineData, error: lineError } = await client
-    .from("quote_group_response_lines")
-    .insert(
-      input.lines.map((line) => ({
-        response_id: responseRow.id,
-        line_item_id: line.lineItemId,
-        quantity: line.quantity,
-        cost_unit_price: line.costUnitPrice,
-      })),
-    )
-    .select(LINE_COLUMNS);
-  if (lineError) throw lineError;
-
-  // 依頼の状態を「回答あり」に進める。元請の比較表はこの状態を見る。
-  const { error: statusError } = await client
-    .from("quote_group_requests")
-    .update({ status: "responded", responded_at: new Date().toISOString() })
-    .eq("id", request.id);
-  if (statusError) throw statusError;
-
-  return toResponse(responseRow, lineData as ResponseLineRow[]);
+  const stored = await getQuoteGroupResponseForRequest(request.id);
+  if (!stored) {
+    throw new Error("回答を保存できませんでした。");
+  }
+  return stored;
 }
+
 
 /** 依頼IDから回答を引く（元請の比較表が使う）。回答がなければ null。 */
 export async function getQuoteGroupResponseForRequest(

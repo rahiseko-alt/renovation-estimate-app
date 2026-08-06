@@ -293,7 +293,8 @@ async function seed() {
       "回答明細の作成",
     );
 
-    console.log(`回答済みの依頼を作成: ${company.companyName} /q/${request.token}`);
+    // トークンは /q の唯一の資格情報なので出力しない（端末履歴・ログに残る）。
+    console.log(`回答済みの依頼を作成: ${company.companyName}`);
   }
 
   console.log(`デモ案件を作成しました: ${WORK_NAME}`);

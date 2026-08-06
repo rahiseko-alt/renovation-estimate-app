@@ -19,6 +19,11 @@ import type {
 const MAX_BREAKDOWN_AMOUNT = MAX_UNIT_PRICE;
 /** 作業日数の上限。1件のリフォーム工事として現実的な範囲に収める。 */
 const MAX_WORK_DAYS = 3_650;
+/**
+ * 元請支給材料の付記の上限。ログインしていない相手から届く自由文なので、
+ * 際限なく受け取らない（DBの check 制約でも同じ値で止める）。
+ */
+const MAX_NOTE_LENGTH = 2_000;
 
 function assertOptionalAmount(value: number | null, max: number): void {
   if (value === null) return;
@@ -62,6 +67,10 @@ export async function submitQuoteGroupResponseAction(
   assertOptionalAmount(breakdown.safetyHealthCost, MAX_BREAKDOWN_AMOUNT);
   assertOptionalAmount(breakdown.retirementMutualAidCost, MAX_BREAKDOWN_AMOUNT);
   assertOptionalAmount(breakdown.workDays, MAX_WORK_DAYS);
+
+  if (breakdown.materialSuppliedNote.length > MAX_NOTE_LENGTH) {
+    throw new Error("元請支給の材料の記載が長すぎます。");
+  }
 
   await createQuoteGroupResponse({ token, lines, breakdown });
   return { ok: true };

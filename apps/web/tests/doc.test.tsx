@@ -91,6 +91,8 @@ describe("①見積依頼書", () => {
     );
     expect(html).not.toContain("秘密 花子");
     expect(html).not.toContain("987,654");
+    // 書類そのものは描かれている（空を返しても通る検査にしない）。
+    expect(html).toContain(data.workName);
   });
 
   it("写真枠は1明細につき1つ（B8）", () => {
@@ -172,6 +174,8 @@ describe("②御見積書", () => {
       />,
     );
     expect(html).not.toContain("見積 太郎");
+    // 施主名の欄だけが落ちる。書類は描かれている。
+    expect(html).toContain(ESTIMATE_DOCUMENT_TEXT.title);
   });
 
   it("明細の行が、渡した順に表へ出る（B7）", () => {
