@@ -101,6 +101,15 @@
 - デモ用データの投入（返信済みの下請3社ぶんを含む）:
   `DEMO_USER_EMAIL=<ログインする利用者のメール> bash scripts/seed-demo.sh`
   （ローカル Supabase 起動済みで。何度実行しても増えず、同じ内容に作り直す）
+- **本番DBへのマイグレーション適用（スキーマを変えたPRでは必須）**:
+  `supabase/migrations/` は**自動では本番に適用されない**。CIにもデプロイにも
+  その工程が無く、手元から流す。マージしただけでは本番のテーブルは増えないので、
+  **新しいテーブル・列を使うコードを出すと本番が 500 になる**
+  （2026-08-06 に実際に起きた。`docs/failures.md` 参照）。
+  接続情報は運用の秘密情報なので、エージェントは受け取らず、利用者が自分の手元で実行する:
+  `pnpm exec supabase login` → `pnpm exec supabase link --project-ref <本番のref>` →
+  `pnpm exec supabase db push`
+  適用できたかは prod-smoke の「DBに到達する経路 /q/<uuid> が 200」で確かめる。
 - 共通の文言・値の置き場所: `apps/web/lib/content.ts`
 - 金額計算の置き場所: `apps/web/lib/calc.ts`（画面・PDF・API は必ずここを通す）
 
