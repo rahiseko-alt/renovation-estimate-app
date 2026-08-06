@@ -3,11 +3,8 @@ import { describe, expect, it } from "vitest";
 import { newDemoOwnerId } from "../lib/auth/demoOwner";
 import { getComparisonForProject } from "../lib/db/comparison";
 import { DEMO_SUBCONTRACTOR_COUNT } from "../lib/demoFixture";
-import {
-  findDemoProject,
-  purgeExpiredDemoData,
-  seedDemoData,
-} from "../lib/db/demoSeed";
+import { findDemoProject, purgeExpiredDemoData } from "../lib/db/demoCleanup";
+import { seedDemoData } from "../lib/db/demoSeed";
 import { createProject, getProjectForOwner } from "../lib/db/projects";
 import { checkSubmissionGate } from "../lib/db/submissionGate";
 

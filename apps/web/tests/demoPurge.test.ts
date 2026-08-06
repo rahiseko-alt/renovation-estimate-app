@@ -15,7 +15,8 @@ vi.mock("../lib/db/photoStorage", async (importOriginal) => ({
   tryDeletePhotoObject,
 }));
 
-const { purgeExpiredDemoData, seedDemoData } = await import("../lib/db/demoSeed");
+const { purgeExpiredDemoData } = await import("../lib/db/demoCleanup");
+const { seedDemoData } = await import("../lib/db/demoSeed");
 
 afterEach(() => {
   vi.mocked(tryDeletePhotoObject).mockReset();
