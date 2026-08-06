@@ -3,32 +3,29 @@
 import { useState, useTransition } from "react";
 
 import { saveEstimateAction } from "../app/projects/[id]/estimate/actions";
-import {
-  calcEstimate,
-  formatYen,
-  type EstimateLine,
-  type EstimateTotals,
-} from "../lib/calc";
+import { calcEstimate, formatYen, type EstimateTotals } from "../lib/calc";
 import {
   ESTIMATE_EDITOR_TEXT,
   ESTIMATE_TOTALS_TEXT,
   OVERHEAD_TEXT,
   UNITS,
 } from "../lib/content";
-import type { PriceMasterItem } from "../lib/db/types";
+import type { PersistedEstimateLine, PriceMasterItem } from "../lib/db/types";
 import { isValidNumberInput } from "../lib/estimateLineValidation";
 import { EstimateLineRow, type EditableLine } from "./EstimateLineRow";
 import { PriceMasterPicker } from "./PriceMasterPicker";
 
-let nextKey = 0;
-function newKey(): string {
-  nextKey += 1;
-  return `line-${nextKey}`;
+// EditableLine.key は、既存行では明細行の安定ID（PersistedEstimateLine.id）を、
+// 新規行では crypto.randomUUID() をそのまま使う。React の一覧キーと保存先のIDを
+// 分けて2つの状態を持つより、1つのIDに寄せるほうが「保存・再読込でIDが変わらない」を
+// 素直に守れる（docs/design.md 7章「明細行に安定したIDを持たせる」）。
+function newLineId(): string {
+  return crypto.randomUUID();
 }
 
-function toEditableLine(line: EstimateLine): EditableLine {
+function toEditableLine(line: PersistedEstimateLine): EditableLine {
   return {
-    key: newKey(),
+    key: line.id,
     kind: line.kind,
     name: line.name,
     spec: line.spec,
@@ -40,8 +37,9 @@ function toEditableLine(line: EstimateLine): EditableLine {
 }
 
 /** isValidNumberInput（lib/estimateLineValidation）で確かめた後にだけ呼ぶ。数値化できる前提で変換する。 */
-function parseEstimateLine(line: EditableLine): EstimateLine {
+function parseEstimateLine(line: EditableLine): PersistedEstimateLine {
   return {
+    id: line.key,
     kind: line.kind,
     name: line.name,
     spec: line.spec,
@@ -54,7 +52,7 @@ function parseEstimateLine(line: EditableLine): EstimateLine {
 
 function emptyLine(): EditableLine {
   return {
-    key: newKey(),
+    key: newLineId(),
     kind: "item",
     name: "",
     spec: "",
@@ -67,7 +65,7 @@ function emptyLine(): EditableLine {
 
 function lineFromMasterItem(item: PriceMasterItem): EditableLine {
   return {
-    key: newKey(),
+    key: newLineId(),
     kind: "item",
     name: item.name,
     spec: item.spec,
@@ -95,7 +93,7 @@ const TOTALS_ROWS: {
 
 type Props = {
   projectId: string;
-  initialLines: EstimateLine[];
+  initialLines: PersistedEstimateLine[];
   initialOverheadRatePercent: number;
   /** 呼び出せる単価マスタの一覧（この案件の持ち主のもの）。 */
   priceMasterItems: PriceMasterItem[];

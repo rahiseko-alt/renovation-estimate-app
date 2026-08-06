@@ -12,7 +12,7 @@ import {
   InvalidPhotoTypeError,
   PhotoTooLargeError,
 } from "../lib/photo/compress";
-import { PHOTO_AREAS, PHOTO_TEXT } from "../lib/content";
+import { DEFAULT_PHOTO_AREA, PHOTO_AREAS, PHOTO_TEXT } from "../lib/content";
 
 type Props = {
   projectId: string;
@@ -28,7 +28,7 @@ function errorMessageFor(error: unknown): string {
 /** 案件詳細画面の写真セクション。追加フォームと、箇所ごとにグループ化した一覧を持つ。 */
 export function PhotosSection({ projectId, initialPhotos }: Props) {
   const [photos, setPhotos] = useState<PhotoWithUrl[]>(initialPhotos);
-  const [area, setArea] = useState<string>(PHOTO_AREAS[0]);
+  const [area, setArea] = useState<string>(DEFAULT_PHOTO_AREA);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [isUploading, startUpload] = useTransition();

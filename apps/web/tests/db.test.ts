@@ -69,6 +69,30 @@ describe("estimates", () => {
     expect(estimate.overheadRatePercent).toBe(0);
   });
 
+  it("明細行の安定IDは、保存・再読込のたびに変わらない（A1）", async () => {
+    const project = await createProject(
+      { customerName: "テスト1-ID", siteAddress: "テスト1-ID" },
+      OWNER_A,
+    );
+    const created = await getOrCreateEstimate(project.id);
+    const firstId = created.lines[0]?.id;
+    expect(firstId).toBeTruthy();
+
+    const reloaded = await getOrCreateEstimate(project.id);
+    expect(reloaded.lines[0]?.id).toBe(firstId);
+
+    // appendEstimateLine で足した行にも新しい安定IDが付き、既存行のIDは変わらない。
+    const appended = await appendEstimateLine(project.id, itemLine("追加行"));
+    expect(appended.lines[0]?.id).toBe(firstId);
+    const newLineId = appended.lines[1]?.id;
+    expect(newLineId).toBeTruthy();
+    expect(newLineId).not.toBe(firstId);
+
+    const reloadedAfterAppend = await getOrCreateEstimate(project.id);
+    expect(reloadedAfterAppend.lines[0]?.id).toBe(firstId);
+    expect(reloadedAfterAppend.lines[1]?.id).toBe(newLineId);
+  });
+
   it("同じ案件で2回呼んでも同じ見積を返す（作り直さない）", async () => {
     const project = await createProject(
       { customerName: "テスト2", siteAddress: "テスト2" },
@@ -90,6 +114,7 @@ describe("estimates", () => {
       project.id,
       [
         {
+          id: "11111111-1111-1111-1111-111111111111",
           kind: "item",
           name: "クロス張替え",
           spec: "量産品",
@@ -107,6 +132,34 @@ describe("estimates", () => {
     const reloaded = await getOrCreateEstimate(project.id);
     expect(reloaded.lines[0]?.name).toBe("クロス張替え");
     expect(reloaded.overheadRatePercent).toBe(10);
+  });
+
+  it("空のIDを持つ明細は保存できない", async () => {
+    const project = await createProject(
+      { customerName: "テスト3-空ID", siteAddress: "テスト3-空ID" },
+      OWNER_A,
+    );
+    await expect(
+      saveEstimate(project.id, [{ ...itemLine("空ID"), id: "" }], 0),
+    ).rejects.toThrow();
+  });
+
+  it("同じIDを持つ明細を2行は保存できない（React key・写真の紐づけ・単価採用が事故るため）", async () => {
+    const project = await createProject(
+      { customerName: "テスト3-重複ID", siteAddress: "テスト3-重複ID" },
+      OWNER_A,
+    );
+    const duplicateId = "22222222-2222-2222-2222-222222222222";
+    await expect(
+      saveEstimate(
+        project.id,
+        [
+          { ...itemLine("行A"), id: duplicateId },
+          { ...itemLine("行B"), id: duplicateId },
+        ],
+        0,
+      ),
+    ).rejects.toThrow();
   });
 
   function itemLine(name: string) {

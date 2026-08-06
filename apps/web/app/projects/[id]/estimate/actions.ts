@@ -1,10 +1,10 @@
 "use server";
 
-import { calcEstimate, type EstimateLine } from "../../../../lib/calc";
+import { calcEstimate } from "../../../../lib/calc";
 import { getCurrentUser } from "../../../../lib/auth/server";
 import { saveEstimate } from "../../../../lib/db/estimates";
 import { getProjectForOwner } from "../../../../lib/db/projects";
-import type { Estimate } from "../../../../lib/db/types";
+import type { Estimate, PersistedEstimateLine } from "../../../../lib/db/types";
 
 /**
  * 見積エディタ（クライアント部品）から直接呼ばれる保存アクション。
@@ -19,7 +19,7 @@ import type { Estimate } from "../../../../lib/db/types";
  */
 export async function saveEstimateAction(
   projectId: string,
-  lines: EstimateLine[],
+  lines: PersistedEstimateLine[],
   overheadRatePercent: number,
 ): Promise<Estimate> {
   const user = await getCurrentUser();
