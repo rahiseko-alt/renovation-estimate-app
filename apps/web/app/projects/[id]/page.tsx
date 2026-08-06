@@ -50,10 +50,19 @@ export default async function ProjectDetailPage({
       </Link>
 
       {/*
-        新設計の導線。依頼を出す → 下請の回答を比較して採用する、の順に並べる
-        （docs/design.md 7章「業務フロー」）。ここに置かないと、作った画面に
+        新設計の導線。法定項目を埋める → 依頼を出す → 下請の回答を比較して採用する、の
+        順に並べる（docs/design.md 7章「業務フロー」）。ここに置かないと、作った画面に
         URLを直打ちしないと辿り着けない。
+        法定項目を先頭に置くのは、これが埋まらないと次の「見積依頼を出す」で
+        送信ゲートに止められるため。
       */}
+      <Link
+        href={`/projects/${project.id}/legal`}
+        className="tap mt-4 flex items-center justify-center rounded border-2 border-blue-800 px-6 py-4 text-lg font-bold text-blue-800"
+      >
+        {PROJECT_DETAIL_TEXT.legalLink}
+      </Link>
+
       <Link
         href={`/projects/${project.id}/send`}
         className="tap mt-4 flex items-center justify-center rounded bg-blue-800 px-6 py-4 text-lg font-bold text-white"

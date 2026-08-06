@@ -254,6 +254,14 @@ else
   FAILURES=$((FAILURES + 1))
 fi
 
+echo "== 下請台帳 =="
+# 依頼の送り先はこの画面からしか増やせない。ここが落ちると、法定項目を全部埋めても
+# 「送り先が1社も無い」で送信まで到達できなくなる。
+check "GET /subcontractors（Cookie 無し）" 307 "$(curl -s -o /dev/null -w '%{http_code}' "${BASE}/subcontractors")"
+SUBCONTRACTORS_HEADERS=$(curl -s -D - -o "${WORK}/subcontractors.html" -H "Cookie: rea_session=${VALID}" "${BASE}/subcontractors")
+check "GET /subcontractors（正しいセッション）" 200 "$(printf '%s' "${SUBCONTRACTORS_HEADERS}" | head -1 | grep -o '[0-9]\{3\}')"
+expect_contains "下請台帳に登録フォームが出る" "会社名" "${WORK}/subcontractors.html"
+
 echo "== 下請の回答画面（第三者が触る唯一の画面） =="
 # /q は**ログインしていない第三者が開く唯一の画面**なので、CSP と nonce を必ず検査する
 # （docs/plan-rebuild.md B3。これまで / と /projects にしか掛けていなかった）。

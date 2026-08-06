@@ -1,8 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { setLegalItemSlot } from "../lib/db/legalItemSlots";
+import {
+  setLegalItemSlot,
+  setLegalItemSlots,
+} from "../lib/db/legalItemSlots";
 import { createProject } from "../lib/db/projects";
-import { setSiteConditionCheck } from "../lib/db/siteConditionChecks";
+import {
+  setSiteConditionCheck,
+  setSiteConditionChecks,
+} from "../lib/db/siteConditionChecks";
 import { checkSubmissionGate } from "../lib/db/submissionGate";
 import {
   LEGAL_ITEM_SLOT_KEYS,
@@ -127,5 +133,41 @@ describe("submissionGate", () => {
 
     expect((await checkSubmissionGate(project.id, OWNER_A)).ok).toBe(true);
     expect((await checkSubmissionGate(project.id, OWNER_B)).ok).toBe(false);
+  });
+
+  it("入力画面の1回の保存だけでゲートが開く（画面から一周できることの最小条件）", async () => {
+    // 法定項目・施工条件の入力画面（app/projects/[id]/legal）は、9スロットと12区分を
+    // まとめて1回で保存する。その保存の形そのままでゲートが開くことを確かめる。
+    // 1件ずつ埋める経路（上の projectReadyToSubmit）が通っても、画面が使う
+    // 一括保存の経路に穴があれば利用者はいつまでも送信できない。
+    const project = await createProject(
+      { customerName: "送信ゲート8", siteAddress: "テスト" },
+      OWNER_A,
+    );
+    expect((await checkSubmissionGate(project.id, OWNER_A)).ok).toBe(false);
+
+    await setLegalItemSlots(
+      project.id,
+      OWNER_A,
+      LEGAL_ITEM_SLOT_KEYS.map((slotKey) => ({
+        slotKey,
+        // 内容が決まっていない項目は「未定」で通る。
+        status: "undetermined" as const,
+        value: null,
+      })),
+    );
+    await setSiteConditionChecks(
+      project.id,
+      OWNER_A,
+      SITE_CONDITION_CATEGORIES.map((category) => ({
+        category,
+        mark: "include" as const,
+      })),
+    );
+
+    const result = await checkSubmissionGate(project.id, OWNER_A);
+    expect(result.ok).toBe(true);
+    expect(result.unsetSlotKeys).toEqual([]);
+    expect(result.unsetCategories).toEqual([]);
   });
 });

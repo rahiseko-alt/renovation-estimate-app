@@ -6,6 +6,7 @@
 // 本当の門は Server Action 側にある（クライアントの検証はバイパスできる）。
 // 「何が足りないか」を隠さずそのまま出す。
 
+import Link from "next/link";
 import { unstable_rethrow } from "next/navigation";
 import { useState, useTransition } from "react";
 
@@ -98,6 +99,13 @@ export function SendRequestForm({
                 </ul>
               </>
             ) : null}
+            {/* 足りない項目を並べるだけで終わらせず、直しに行ける導線を同じ場所に置く。 */}
+            <Link
+              href={`/projects/${projectId}/legal`}
+              className="tap mt-4 flex items-center justify-center rounded border-2 border-red-700 px-5 py-3 font-bold text-red-900"
+            >
+              {SEND_REQUEST_TEXT.gateNgLink}
+            </Link>
           </div>
         )}
       </section>
@@ -107,9 +115,17 @@ export function SendRequestForm({
           {SEND_REQUEST_TEXT.subcontractorsHeading}
         </h2>
         {subcontractors.length === 0 ? (
-          <p className="mt-2 text-gray-700">
-            {SEND_REQUEST_TEXT.subcontractorsEmpty}
-          </p>
+          <>
+            <p className="mt-2 text-gray-700">
+              {SEND_REQUEST_TEXT.subcontractorsEmpty}
+            </p>
+            <Link
+              href="/subcontractors"
+              className="tap mt-3 flex items-center justify-center rounded border-2 border-blue-800 px-5 py-3 font-bold text-blue-800"
+            >
+              {SEND_REQUEST_TEXT.subcontractorsLink}
+            </Link>
+          </>
         ) : (
           <ul className="mt-2 flex flex-col gap-2">
             {subcontractors.map((subcontractor) => (

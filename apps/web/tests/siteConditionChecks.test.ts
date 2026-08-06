@@ -4,6 +4,7 @@ import { SITE_CONDITION_CATEGORIES } from "../lib/db/types";
 import {
   listSiteConditionChecks,
   setSiteConditionCheck,
+  setSiteConditionChecks,
 } from "../lib/db/siteConditionChecks";
 import { createProject } from "../lib/db/projects";
 
@@ -64,5 +65,45 @@ describe("siteConditionChecks", () => {
 
     const asOwnerB = await listSiteConditionChecks(mine.id, OWNER_B);
     expect(asOwnerB.equipment.mark).toBe("unset");
+  });
+});
+
+describe("siteConditionChecks の一括保存", () => {
+  it("画面の1回の保存で12区分全部に印が付く", async () => {
+    const project = await createProject(
+      { customerName: "施工条件一括1", siteAddress: "テスト" },
+      OWNER_A,
+    );
+
+    await setSiteConditionChecks(
+      project.id,
+      OWNER_A,
+      SITE_CONDITION_CATEGORIES.map((category, index) => ({
+        category,
+        mark: index % 2 === 0 ? ("include" as const) : ("exclude" as const),
+      })),
+    );
+
+    const checks = await listSiteConditionChecks(project.id, OWNER_A);
+    for (const [index, category] of SITE_CONDITION_CATEGORIES.entries()) {
+      expect(checks[category].mark).toBe(index % 2 === 0 ? "include" : "exclude");
+    }
+  });
+
+  it("同じ区分を2件渡したら保存せずに落とす", async () => {
+    const project = await createProject(
+      { customerName: "施工条件一括2", siteAddress: "テスト" },
+      OWNER_A,
+    );
+
+    await expect(
+      setSiteConditionChecks(project.id, OWNER_A, [
+        { category: "curing", mark: "include" },
+        { category: "curing", mark: "exclude" },
+      ]),
+    ).rejects.toThrow(/重複/);
+
+    const checks = await listSiteConditionChecks(project.id, OWNER_A);
+    expect(checks.curing.mark).toBe("unset");
   });
 });
