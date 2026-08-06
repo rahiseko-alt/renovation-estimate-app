@@ -4,7 +4,7 @@ import {
   AUTH_TEXT,
   HOME_DESCRIPTION,
   HOME_HEADING,
-  HOME_STEPS,
+  HOME_DESTINATIONS,
 } from "../lib/content";
 
 type Props = {
@@ -16,6 +16,9 @@ type Props = {
 /**
  * トップ画面。行き先を選ぶだけの画面にする（1画面1タスク）。
  * ログイン状態の判定は呼び出し側が行い、ここは受け取った真偽値で出し分けるだけ。
+ *
+ * 番号は振らない。並んでいるのは手順ではなく行き先で、案件を開くのに
+ * 下請台帳や会社設定を先に通る必要は無い。
  */
 export function HomeScreen({ loggedIn, onLogout }: Props) {
   return (
@@ -26,16 +29,16 @@ export function HomeScreen({ loggedIn, onLogout }: Props) {
       {loggedIn ? (
         <>
           <ul className="mt-8 flex flex-col gap-3">
-            {HOME_STEPS.map((step, index) => (
-              <li key={step.label}>
+            {HOME_DESTINATIONS.map((destination) => (
+              <li key={destination.href}>
                 <Link
-                  href={step.href}
+                  href={destination.href}
                   className="tap flex flex-col justify-center rounded border-2 border-gray-400 px-5 py-4"
                 >
-                  <span className="text-lg font-bold">
-                    {index + 1}. {step.label}
+                  <span className="text-lg font-bold">{destination.label}</span>
+                  <span className="mt-1 text-gray-700">
+                    {destination.description}
                   </span>
-                  <span className="mt-1 text-gray-700">{step.description}</span>
                 </Link>
               </li>
             ))}
