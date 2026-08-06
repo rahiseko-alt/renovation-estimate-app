@@ -122,8 +122,11 @@ export const LEGAL_ITEMS_TEXT = {
   slotsNote:
     "内容が決まっていない項目は「未定」を選びます。「未定」と「未入力」は別のものとして扱い、「未定」は書類にそのまま印字されます。",
   conditionsHeading: "施工条件・範囲リスト",
+  // 選べる印は3つある（○・×・未検討）。「未検討」が初期状態であることと、
+  // 残っていると送れないことを書く。「どちらか選ぶ」とだけ書くと、画面に並ぶ
+  // 3つのラジオボタンと食い違う。
   conditionsNote:
-    "この依頼に含める区分に○、含めない区分に×を付けます。どちらか必ず選びます。",
+    "この依頼に含める区分に○、含めない区分に×を付けます。「未検討」が1つでも残っていると依頼を送れません。",
   valueLabel: "内容",
   /** スロットの3状態の表示名。DBの status と1対1で対応する。 */
   statusLabels: {
@@ -142,9 +145,15 @@ export const LEGAL_ITEMS_TEXT = {
   saved: "保存しました。",
   needValue: "「記入する」を選んだ項目には内容を入力してください。",
   failed: "保存できませんでした。もう一度お試しください。",
-  remainingHeading: "まだ選んでいない項目があります。",
   back: "もどる",
 } as const;
+
+/**
+ * 法定項目・施工条件の入力画面へ誘導するリンクの文言。
+ * 案件詳細と送信画面の2箇所から同じ画面へ行くので、文言はここに1つだけ置く
+ * （`AGENTS.md`「結合を増やさない」1：同じ文言を2箇所以上に書かない）。
+ */
+export const LEGAL_ITEMS_LINK_LABEL = `${LEGAL_ITEMS_TEXT.heading}を入力する`;
 
 /** 依頼グループの送信画面の文言。 */
 export const SEND_REQUEST_TEXT = {
@@ -154,8 +163,6 @@ export const SEND_REQUEST_TEXT = {
   gateNgHeading: "次の項目が未記入のため、まだ送れません。",
   gateNgSlots: "法定項目",
   gateNgConditions: "施工条件・範囲リスト",
-  /** 足りない項目を出すだけで終わらせず、直しに行ける導線を同じ場所に置く。 */
-  gateNgLink: "法定項目・施工条件を入力する",
   subcontractorsHeading: "送り先",
   subcontractorsEmpty: "下請が登録されていません。先に下請台帳に登録してください。",
   subcontractorsLink: "下請台帳を開く",

@@ -162,7 +162,26 @@ export type LegalItemSlotKey = (typeof LEGAL_ITEM_SLOT_KEYS)[number];
  * スロットの状態。「未定」は利用者が明示的に選んだ場合にだけ使い、入力し忘れとは
  * 区別する（docs/design.md 7章）。
  */
-export type LegalItemSlotStatus = "filled" | "undetermined" | "unset";
+export const LEGAL_ITEM_SLOT_STATUSES = [
+  "filled",
+  "undetermined",
+  "unset",
+] as const;
+
+/**
+ * 1スロットの本文の上限。DBには長さの制約が無い（この列を書けるのはログイン済みの
+ * 所有者だけで、第三者の入口ではないため移行を足さない）。それでも際限なく受け取ると
+ * 書類が破綻するので、境界はアプリ側で止める。
+ *
+ * **この定数はこのファイルが持つ。** 入力欄（`components/LegalItemsForm.tsx`）と
+ * 保存（`lib/db/legalItemSlots.ts`）の両方が同じ値を要るが、前者はクライアント側の
+ * 部品なので、`lib/db/legalItemSlots.ts` から値として import すると
+ * Supabase クライアント（`lib/db/client.ts`）ごとブラウザ側の束に入り、ビルドが落ちる。
+ * このファイルは型と語彙だけなので、どちらからでも安全に引ける。
+ */
+export const MAX_LEGAL_ITEM_SLOT_VALUE_LENGTH = 2_000;
+
+export type LegalItemSlotStatus = (typeof LEGAL_ITEM_SLOT_STATUSES)[number];
 
 export type LegalItemSlot = {
   id: string;
@@ -200,7 +219,9 @@ export const SITE_CONDITION_CATEGORIES = [
 export type SiteConditionCategory = (typeof SITE_CONDITION_CATEGORIES)[number];
 
 /** ○（条件内）／×（条件外）／未検討。一次情報の指示欄の使い方に合わせる。 */
-export type SiteConditionMark = "include" | "exclude" | "unset";
+export const SITE_CONDITION_MARKS = ["include", "exclude", "unset"] as const;
+
+export type SiteConditionMark = (typeof SITE_CONDITION_MARKS)[number];
 
 export type SiteConditionCheck = {
   id: string;

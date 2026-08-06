@@ -9,6 +9,7 @@ import { listPhotosForProject } from "../../../lib/db/photos";
 import { getProjectForOwner } from "../../../lib/db/projects";
 import type { Photo } from "../../../lib/db/types";
 import {
+  LEGAL_ITEMS_LINK_LABEL,
   PHOTO_SIGNED_URL_EXPIRES_SECONDS,
   PROJECT_DETAIL_TEXT,
   PROJECTS_TEXT,
@@ -60,7 +61,7 @@ export default async function ProjectDetailPage({
         href={`/projects/${project.id}/legal`}
         className="tap mt-4 flex items-center justify-center rounded border-2 border-blue-800 px-6 py-4 text-lg font-bold text-blue-800"
       >
-        {PROJECT_DETAIL_TEXT.legalLink}
+        {LEGAL_ITEMS_LINK_LABEL}
       </Link>
 
       <Link

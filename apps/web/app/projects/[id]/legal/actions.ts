@@ -12,24 +12,14 @@ import {
 } from "../../../../lib/db/siteConditionChecks";
 import {
   LEGAL_ITEM_SLOT_KEYS,
+  LEGAL_ITEM_SLOT_STATUSES,
   SITE_CONDITION_CATEGORIES,
-  type LegalItemSlotStatus,
-  type SiteConditionMark,
+  SITE_CONDITION_MARKS,
 } from "../../../../lib/db/types";
 
 const SLOT_KEY_SET: ReadonlySet<string> = new Set(LEGAL_ITEM_SLOT_KEYS);
 const CATEGORY_SET: ReadonlySet<string> = new Set(SITE_CONDITION_CATEGORIES);
-const SLOT_STATUSES: readonly LegalItemSlotStatus[] = [
-  "filled",
-  "undetermined",
-  "unset",
-];
-const SITE_CONDITION_MARKS: readonly SiteConditionMark[] = [
-  "include",
-  "exclude",
-  "unset",
-];
-const STATUS_SET: ReadonlySet<string> = new Set(SLOT_STATUSES);
+const STATUS_SET: ReadonlySet<string> = new Set(LEGAL_ITEM_SLOT_STATUSES);
 const MARK_SET: ReadonlySet<string> = new Set(SITE_CONDITION_MARKS);
 
 /**

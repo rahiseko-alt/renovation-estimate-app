@@ -13,6 +13,7 @@ import { useState, useTransition } from "react";
 import { sendQuoteRequestGroupAction } from "../app/projects/[id]/send/actions";
 import {
   LEGAL_ITEM_SLOT_LABELS,
+  LEGAL_ITEMS_LINK_LABEL,
   SEND_REQUEST_TEXT,
   SITE_CONDITION_LABELS,
 } from "../lib/content";
@@ -104,7 +105,7 @@ export function SendRequestForm({
               href={`/projects/${projectId}/legal`}
               className="tap mt-4 flex items-center justify-center rounded border-2 border-red-700 px-5 py-3 font-bold text-red-900"
             >
-              {SEND_REQUEST_TEXT.gateNgLink}
+              {LEGAL_ITEMS_LINK_LABEL}
             </Link>
           </div>
         )}

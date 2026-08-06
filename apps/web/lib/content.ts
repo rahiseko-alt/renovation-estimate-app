@@ -44,8 +44,10 @@ export const NEW_PROJECT_TEXT = {
 /** 案件詳細画面の文言。 */
 export const PROJECT_DETAIL_TEXT = {
   estimateLink: "見積をつくる",
-  /** 新設計の導線（法定項目を埋める → 依頼を出す → 比較して採用する）。 */
-  legalLink: "法定項目・施工条件を入力する",
+  /**
+   * 新設計の導線（法定項目を埋める → 依頼を出す → 比較して採用する）。
+   * 法定項目へのリンクは送信画面からも出すので、文言は LEGAL_ITEMS_LINK_LABEL が持つ。
+   */
   sendLink: "見積依頼を出す",
   comparisonLink: "見積を比較する",
   pdfLink: "見積書PDFを出力",
@@ -363,6 +365,7 @@ export const PHOTO_TEXT = {
 export {
   COMPARISON_TEXT,
   LEGAL_ITEM_SLOT_LABELS,
+  LEGAL_ITEMS_LINK_LABEL,
   LEGAL_ITEMS_TEXT,
   QUOTE_GROUP_RESPONSE_TEXT,
   SEND_REQUEST_TEXT,
