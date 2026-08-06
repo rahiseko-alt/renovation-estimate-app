@@ -742,7 +742,11 @@ UTCなので、**日本時間の夜に出すと作成日が前日で印字され
 
 - **`HOME_HEADING` は3箇所結合**（`content.ts` / `scripts/smoke.sh` / `prod-smoke.yml`）。
   トップ画面を作り替えると smoke・prod-smoke・`tests/home.test.tsx` が同時に落ちる。
-  `HOME_STEPS` の4ステップも旧設計のまま。
+  ~~`HOME_STEPS` の4ステップも旧設計のまま。~~
+  **解消（2026-08-06）**：4ステップは4つとも `/projects` を指しており、作り直しで
+  増えた画面がトップからは1つも見えなかった。`HOME_DESTINATIONS`（案件／下請台帳／
+  会社設定の3つの行き先）に置き換えた。見出し `HOME_HEADING` の3箇所結合は残っている。
+  経緯は `docs/failures.md` 2026-08-06 の5件目。
 - **本番監視のDB到達検査が `/q/<uuid>` の200に依存している。** 作り直しで早期returnを
   入れると**DBに触らず200を返し、監視が何も検証しなくなる**。
   `docs/failures.md` 2026-08-05 に記録した事故の再発になる。

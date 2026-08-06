@@ -245,6 +245,15 @@ echo "== 正しいセッションなら通す =="
 VALID=$(make_session "${DEMO_USER_EMAIL}" 600)
 check "GET /projects（正しいセッション）" 200 "$(curl -s -o /dev/null -w '%{http_code}' -H "Cookie: rea_session=${VALID}" "${BASE}/projects")"
 
+# ログイン後のトップ画面が、作り直しで増えた画面へ繋がっているか。
+# **未ログインの本文だけを見ていると、ここは検査されない**（未ログインでは行き先を
+# 出さないため）。以前ここに並んでいた4ステップは4つとも /projects を指したままで、
+# 下請台帳も会社設定も出てこない旧設計の画面が本番に残っていた。
+curl -s -o "${WORK}/home-logged-in.html" -H "Cookie: rea_session=${VALID}" "${BASE}/" >/dev/null
+expect_contains "トップ（ログイン後）から下請台帳へ行ける" 'href="/subcontractors"' "${WORK}/home-logged-in.html"
+expect_contains "トップ（ログイン後）から会社設定へ行ける" 'href="/settings/company"' "${WORK}/home-logged-in.html"
+expect_contains "トップ（ログイン後）から案件へ行ける" 'href="/projects"' "${WORK}/home-logged-in.html"
+
 # ログイン後の画面こそ CSP を確かめる価値がある。ここが nonce を受け取れないと、
 # ログインした利用者の画面で JS が一切動かない。
 PROJECTS_HEADERS=$(curl -s -D - -o "${WORK}/projects.html" -H "Cookie: rea_session=${VALID}" "${BASE}/projects")
