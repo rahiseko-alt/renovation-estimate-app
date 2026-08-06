@@ -762,3 +762,20 @@
   2. **「DB層とテストが緑」は「利用者が使える」ではない。**
      書き込む関数に対して、それを呼ぶ画面があるかを別に確かめる。
   3. **機能を削るときは「デモで見せない」と「アプリが持たない」を区別して書く。**
+
+## 2026-08-06 クライアント部品から `lib/db/` の値を import してビルドを壊した
+
+- **何が起きたか**：レビュー指摘（入力欄に `maxLength` を付ける）に従い、
+  `components/LegalItemsForm.tsx`（`"use client"`）から
+  `lib/db/legalItemSlots.ts` の `MAX_LEGAL_ITEM_SLOT_VALUE_LENGTH` を
+  **値として** import した。`next build` が落ちた。
+- **なぜ落ちたか**：`lib/db/legalItemSlots.ts` は `lib/db/client.ts` を import しており、
+  そこが起動時に環境変数（`SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY`）を読む。
+  型だけの import（`import type`）はコンパイルで消えるが、**値の import は消えない**ので、
+  Supabase クライアントごとブラウザ側の束に入る。
+- **どう直したか**：定数を `lib/db/types.ts`（型と語彙だけを持ち、`client.ts` を
+  import しないファイル）へ移し、保存側と入力欄の両方がそこから引くようにした。
+- **教訓**：**クライアント部品が `lib/db/` から引いてよいのは型だけ**。
+  値（定数・関数）が要るなら、`lib/db/client.ts` に依存しないファイルへ置く。
+  レビューの提案どおりに書いても壊れることはある。**提案を入れたら検証を全部通す**
+  （今回はローカルの `pnpm -r build` が捕まえた。typecheck と lint は通っていた）。

@@ -12,6 +12,7 @@ import { expect, test, type Page } from "@playwright/test";
 
 import {
   LEGAL_ITEM_SLOT_LABELS,
+  LEGAL_ITEMS_LINK_LABEL,
   LEGAL_ITEMS_TEXT,
   SEND_REQUEST_TEXT,
   SITE_CONDITION_LABELS,
@@ -32,10 +33,17 @@ if (!DEMO_USER_EMAIL || !DEMO_USER_PASSWORD) {
   );
 }
 
-/** この検査が登録する下請。実在する会社・実在するメールアドレスは使わない。 */
+/**
+ * この検査が登録する下請。実在する会社・実在するメールアドレスは使わない。
+ *
+ * **実行ごとに違う名前にする。** `scripts/seed-demo.sh` は自分が作る3社しか消さないので、
+ * 固定名だと前回の実行で残った行が台帳に居座る。すると「登録が失敗しても、古い行が
+ * 見つかって検査が通る」ことになり、登録の動作を確かめたことにならない。
+ */
+const RUN_SUFFIX = `${Date.now().toString(36)}-${process.pid}`;
 const NEW_SUBCONTRACTOR = {
-  companyName: "台帳テスト建設",
-  email: "ledger-test@example.com",
+  companyName: `台帳テスト建設-${RUN_SUFFIX}`,
+  email: `ledger-test-${RUN_SUFFIX}@example.com`,
 } as const;
 
 /** 「記入する」を試す1スロットと、その本文。残りは「未定」で通す。 */
@@ -126,7 +134,7 @@ test("下請を登録し法定項目を埋めると、画面の操作だけで�
   ).toBeDisabled();
 
   // 足りない項目の案内から、直しに行ける（行き止まりにしない）。
-  await page.getByRole("link", { name: SEND_REQUEST_TEXT.gateNgLink }).click();
+  await page.getByRole("link", { name: LEGAL_ITEMS_LINK_LABEL }).click();
   await page.waitForURL(`**/projects/${projectId}/legal`);
 
   // --- 4. 法定項目9スロットと施工条件12区分を埋める ----------------------

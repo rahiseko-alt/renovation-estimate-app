@@ -9,17 +9,11 @@
 import { getSupabaseClient } from "./client";
 import {
   LEGAL_ITEM_SLOT_KEYS,
+  MAX_LEGAL_ITEM_SLOT_VALUE_LENGTH,
   type LegalItemSlot,
   type LegalItemSlotKey,
   type LegalItemSlotStatus,
 } from "./types";
-
-/**
- * 1スロットの本文の上限。DBには長さの制約が無い（この列を書けるのはログイン済みの
- * 所有者だけで、第三者の入口ではないため移行を足さない）。それでも際限なく受け取ると
- * 書類が破綻するので、境界はここで止める。
- */
-export const MAX_LEGAL_ITEM_SLOT_VALUE_LENGTH = 2_000;
 
 /** 一括保存の入力1件。画面はスロットの3状態をそのまま渡す。 */
 export type LegalItemSlotInput = {

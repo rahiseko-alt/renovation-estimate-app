@@ -22,7 +22,10 @@ import type { LegalItemSlotInput } from "../lib/db/legalItemSlots";
 import type { SiteConditionCheckInput } from "../lib/db/siteConditionChecks";
 import {
   LEGAL_ITEM_SLOT_KEYS,
+  LEGAL_ITEM_SLOT_STATUSES,
+  MAX_LEGAL_ITEM_SLOT_VALUE_LENGTH,
   SITE_CONDITION_CATEGORIES,
+  SITE_CONDITION_MARKS,
   type LegalItemSlot,
   type LegalItemSlotKey,
   type LegalItemSlotStatus,
@@ -30,14 +33,6 @@ import {
   type SiteConditionCheck,
   type SiteConditionMark,
 } from "../lib/db/types";
-
-/** 画面に並べる順。DBの語彙と1対1で、表示名は lib/content.ts が持つ。 */
-const SLOT_STATUS_ORDER: readonly LegalItemSlotStatus[] = [
-  "filled",
-  "undetermined",
-  "unset",
-];
-const MARK_ORDER: readonly SiteConditionMark[] = ["include", "exclude", "unset"];
 
 type SlotDraft = { status: LegalItemSlotStatus; value: string };
 
@@ -137,7 +132,7 @@ export function LegalItemsForm({
                   {LEGAL_ITEM_SLOT_LABELS[key]}
                 </legend>
                 <div className="flex flex-wrap gap-x-5 gap-y-2">
-                  {SLOT_STATUS_ORDER.map((status) => (
+                  {LEGAL_ITEM_SLOT_STATUSES.map((status) => (
                     <label key={status} className="tap flex items-center gap-2">
                       <input
                         type="radio"
@@ -160,6 +155,9 @@ export function LegalItemsForm({
                     <textarea
                       id={`slot-value-${key}`}
                       rows={3}
+                      // 上限は lib/db/types.ts が唯一の正。入力の時点で
+                      // 止めないと、9スロット書き終えた保存でまとめて弾かれる。
+                      maxLength={MAX_LEGAL_ITEM_SLOT_VALUE_LENGTH}
                       value={slotDrafts[key].value}
                       onChange={(event) =>
                         updateSlot(key, { value: event.target.value })
@@ -188,7 +186,7 @@ export function LegalItemsForm({
                   {SITE_CONDITION_LABELS[category]}
                 </legend>
                 <div className="flex flex-wrap gap-x-5 gap-y-2">
-                  {MARK_ORDER.map((mark) => (
+                  {SITE_CONDITION_MARKS.map((mark) => (
                     <label key={mark} className="tap flex items-center gap-2">
                       <input
                         type="radio"

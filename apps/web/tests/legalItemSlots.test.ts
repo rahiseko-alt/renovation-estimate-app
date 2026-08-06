@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { LEGAL_ITEM_SLOT_KEYS } from "../lib/db/types";
 import {
+  LEGAL_ITEM_SLOT_KEYS,
   MAX_LEGAL_ITEM_SLOT_VALUE_LENGTH,
+} from "../lib/db/types";
+import {
   listLegalItemSlots,
   setLegalItemSlot,
   setLegalItemSlots,
