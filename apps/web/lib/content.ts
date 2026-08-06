@@ -217,15 +217,21 @@ export const PRICE_MASTER_TEXT = {
  *
  * 工事項目名と単位の割り当ては**こちらの裁量**で決めたもので、業界の定めではない。
  * 実務者レビュー（docs/design.md 8章）で見直す前提の初期値として扱う。
+ *
+ * **並び順は、単位が「式」でない箇所を先に置く。** 先頭が写真を撮るときの初期値
+ * （DEFAULT_PHOTO_AREA）になるため、ここが「式」だと、何も選ばずに撮った写真が
+ * 数量の要らない箇所に付く。この製品が現場で打たせるのは数量だけなので、
+ * 既定はその数量が意味を持つ箇所にする。**単位そのものは変えない**
+ * （どの箇所が「式」かは実務者レビューでしか決められない層）。
  */
 export const WORK_AREAS = [
+  { area: "内装", itemName: "内装工事", unit: "㎡" },
+  { area: "外壁", itemName: "外壁工事", unit: "㎡" },
+  { area: "屋根", itemName: "屋根工事", unit: "㎡" },
   { area: "キッチン", itemName: "キッチン工事", unit: "式" },
   { area: "浴室", itemName: "浴室工事", unit: "式" },
   { area: "洗面", itemName: "洗面工事", unit: "式" },
   { area: "トイレ", itemName: "トイレ工事", unit: "式" },
-  { area: "内装", itemName: "内装工事", unit: "㎡" },
-  { area: "外壁", itemName: "外壁工事", unit: "㎡" },
-  { area: "屋根", itemName: "屋根工事", unit: "㎡" },
   { area: "その他", itemName: "その他工事", unit: "式" },
 ] as const;
 

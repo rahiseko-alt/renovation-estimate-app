@@ -1,9 +1,8 @@
 "use server";
 
 import { getCurrentUser } from "../../../lib/auth/server";
-import { calcEstimate } from "../../../lib/calc";
 import { getCompanyProfile } from "../../../lib/db/companyProfiles";
-import { getOrCreateEstimate } from "../../../lib/db/estimates";
+import { getPricedEstimate } from "../../../lib/db/pricedEstimate";
 import { getProjectForOwner } from "../../../lib/db/projects";
 import { generateEstimatePdf } from "../../../lib/pdf/estimateDocument";
 
@@ -40,21 +39,19 @@ export async function generateEstimatePdfAction(
     throw new Error("案件が見つかりません。");
   }
 
-  const [estimate, company] = await Promise.all([
-    getOrCreateEstimate(projectId),
+  // **保存された単価だけを見ない。** 比較表で採用した下請の単価を重ねた見積を使う
+  // （lib/db/pricedEstimate.ts の冒頭を見る）。ここを getOrCreateEstimate に戻すと、
+  // 比較表に各社の単価が並んでいるのに見積書は全行0円になる。
+  const [priced, company] = await Promise.all([
+    getPricedEstimate(projectId, user),
     getCompanyProfile(user),
   ]);
-  const totals = calcEstimate({
-    lines: estimate.lines,
-    overheadRatePercent: estimate.overheadRatePercent,
-    overheadTaxCategory: estimate.overheadTaxCategory,
-  });
 
   const pdfBytes = await generateEstimatePdf({
     customerName: project.customerName,
     siteAddress: project.siteAddress,
-    lines: estimate.lines,
-    totals,
+    lines: priced.lines,
+    totals: priced.totals,
     issuedAt: new Date(),
     // 請負者ボックス（様式に印字されている欄）。会社設定が空なら空文字で渡り、
     // PDF 側が欄ごと出さない。

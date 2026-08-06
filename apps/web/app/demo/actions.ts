@@ -59,7 +59,9 @@ export async function startDemoAction(): Promise<void> {
     sessionCookieOptions(DEMO_TTL_SECONDS),
   );
 
-  const projectId = await seedDemoData(ownerId);
+  // 発行したばかりの識別子なので、この owner_id にはまだ1行も無い。
+  // 後始末（往復2回）を飛ばす（seedDemoData の ownerIsNew を見る）。
+  const projectId = await seedDemoData(ownerId, { ownerIsNew: true });
 
   // ②掃除は**応答を返したあとに**回す。利用者の待ち時間に足さない。
   // 失敗しても始めさせる（商談の場でデモが開かない方が損失が大きい。

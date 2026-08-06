@@ -38,16 +38,20 @@ const DEMO_CUSTOMER_NAME = "見本 太郎";
 const DEMO_SITE_ADDRESS = "東京都新宿区西新宿0-0-0 サンプルマンション101";
 /** seed の明細は4行。採用しても行が増えないことの基準値（C8）。 */
 const DEMO_LINE_COUNT = 4;
-/** 比較に使う明細。seed の LINES の1行目。 */
-const DEMO_LINE_NAME = "キッチン工事";
+/** 比較に使う明細。seed の LINE_SOURCE の1行目（apps/web/lib/demoFixture.ts）。 */
+const DEMO_LINE_NAME = "内装工事";
 /**
  * seed の3社と、その社が DEMO_LINE_NAME に付けた原価単価。
  * 表示は formatYen（toLocaleString("ja-JP")）なので3桁区切りになる。
+ *
+ * 先頭の2社は、この明細を**採用済みでない**社であること。
+ * 下でこの2社を順に採用して排他を見るので、最初から採用中だと「採用する」が出ない
+ * （どの社を採用済みにするかは lib/demoFixture.ts の LINE_SOURCE[].adoptedBy）。
  */
 const DEMO_QUOTES = [
-  { companyName: "サンプル内装工業", unitPrice: 820_000, displayed: "820,000" },
-  { companyName: "テスト住宅設備", unitPrice: 760_000, displayed: "760,000" },
-  { companyName: "ダミー工務店", unitPrice: 880_000, displayed: "880,000" },
+  { companyName: "サンプル内装工業", unitPrice: 3_200, displayed: "3,200" },
+  { companyName: "テスト住宅設備", unitPrice: 3_500, displayed: "3,500" },
+  { companyName: "ダミー工務店", unitPrice: 2_980, displayed: "2,980" },
 ] as const;
 
 /**

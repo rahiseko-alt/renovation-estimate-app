@@ -10,12 +10,34 @@ export const SITE_ADDRESS = "東京都新宿区西新宿0-0-0 サンプルマン
 /** 同じ内容に作り直すための目印。同じ owner_id で2回実行しても増えない。 */
 export const DEMO_WORK_NAME = `${SITE_ADDRESS} リフォーム工事`;
 
-/** 明細。単価は下請が埋めるので0で置く（元請は金額を知らないのが正しい前提）。 */
+/**
+ * 下請3社の識別に使うメールアドレス。明細の「どの社を採ったか」と社の定義を
+ * この定数で結ぶ（AGENTS.md「結合を増やさない」1：同じ値を2箇所以上に書かない）。
+ */
+const NAISO = "sample-naiso@example.com";
+const SETSUBI = "test-setsubi@example.com";
+const KOUMUTEN = "dummy-koumuten@example.com";
+
+/**
+ * 明細。単価は下請が埋めるので0で置く（元請は金額を知らないのが正しい前提）。
+ *
+ * **「式」は解体・廃棄物処理費（様式に印字済みの費目）の1行だけにしてある。**
+ * この製品が言えることは「現場で打つのは数量だけ」なのに、デモの明細が全部「式」だと
+ * 数量が常に1になり、その主張がデモ自身の反例になる。数量が実数で成立する項目に寄せる。
+ * 単位は `lib/content.ts` の `UNITS` にあるものだけを使う。
+ *
+ * `adoptedBy` は、比較表で**どの社を採った状態で見せるか**。3タップの経路に
+ * 「採用」のタップが無いので、投入の時点で採ってある状態にする。
+ * 最安を計算で選ばない（「安い順に自動で採らない」は製品の姿勢で、
+ * `lib/db/comparison.ts` の `cheapestRequestIdByLineId` にも同じ注記がある）。
+ * 3社に散らしてあるのは、「工事の項目ごとに、別々の社を選べます」という画面の説明を
+ * データの側でも成り立たせるため。
+ */
 export const LINE_SOURCE = [
-  { name: "キッチン工事", unit: "式", quantity: 1 },
-  { name: "浴室工事", unit: "式", quantity: 1 },
-  { name: "内装工事", unit: "㎡", quantity: 42 },
-  { name: "解体・廃棄物処理費", unit: "式", quantity: 1 },
+  { name: "内装工事", unit: "㎡", quantity: 42, adoptedBy: KOUMUTEN },
+  { name: "外壁工事", unit: "㎡", quantity: 68, adoptedBy: SETSUBI },
+  { name: "給排水設備工事", unit: "箇所", quantity: 3, adoptedBy: NAISO },
+  { name: "解体・廃棄物処理費", unit: "式", quantity: 1, adoptedBy: KOUMUTEN },
 ];
 
 /** 法定④⑤⑥⑧の9スロット。会社設定の定型文が入っている想定の初期値。 */
@@ -54,48 +76,58 @@ export const COMPANY_PROFILE = {
   address: "東京都千代田区丸の内0-0-0 サンプルビル5階",
 };
 
-/** 3社ぶんの回答。同じ明細でも社によって値が違うのが比較表の見どころ。 */
+/**
+ * 3社ぶんの回答。同じ明細でも社によって値が違うのが比較表の見どころ。
+ *
+ * `prices` は `LINE_SOURCE` と同じ並びの原価単価。数が合わないと `demoSeed` が
+ * 例外を投げる（0円の回答が黙って入ると、比較表では「最安」に見えて気付けない）。
+ * 明細ごとに最安の社が変わるようにしてある（1社が全部最安だと、明細ごとに選ぶ意味が
+ * デモの画面から伝わらない）。
+ *
+ * `breakdown` は必要経費の内訳。各社の `prices × 数量` の合計と一致させてある
+ * （金額の桁が噛み合っていないと、実務者には作り物だと分かる）。
+ */
 export const COMPANIES = [
   {
     companyName: "サンプル内装工業",
-    email: "sample-naiso@example.com",
-    prices: [820_000, 640_000, 3_200, 85_000],
+    email: NAISO,
+    prices: [3_200, 4_800, 68_000, 85_000],
     breakdown: {
-      material_cost: 1_900_000,
-      labor_cost: 1_200_000,
-      legal_welfare_cost: 168_000,
-      safety_health_cost: 42_000,
-      retirement_mutual_aid_cost: 12_000,
-      work_days: 22,
+      material_cost: 380_000,
+      labor_cost: 320_000,
+      legal_welfare_cost: 44_800,
+      safety_health_cost: 4_000,
+      retirement_mutual_aid_cost: 1_000,
+      work_days: 8,
       material_supplied_note: "",
     },
   },
   {
     companyName: "テスト住宅設備",
-    email: "test-setsubi@example.com",
-    prices: [760_000, 710_000, 3_500, 92_000],
+    email: SETSUBI,
+    prices: [3_500, 4_550, 82_000, 92_000],
     breakdown: {
-      material_cost: 2_050_000,
-      labor_cost: 1_050_000,
-      legal_welfare_cost: 147_000,
-      safety_health_cost: 38_000,
-      retirement_mutual_aid_cost: 11_000,
-      work_days: 25,
+      material_cost: 420_000,
+      labor_cost: 325_000,
+      legal_welfare_cost: 45_500,
+      safety_health_cost: 2_900,
+      retirement_mutual_aid_cost: 1_000,
+      work_days: 10,
       material_supplied_note: "石膏ボードは元請支給とする。",
     },
   },
   {
     companyName: "ダミー工務店",
-    email: "dummy-koumuten@example.com",
-    prices: [880_000, 600_000, 2_980, 78_000],
+    email: KOUMUTEN,
+    prices: [2_980, 5_200, 71_000, 78_000],
     breakdown: {
-      material_cost: 1_780_000,
-      labor_cost: 1_320_000,
-      legal_welfare_cost: 184_000,
+      material_cost: 400_000,
+      labor_cost: 324_000,
+      legal_welfare_cost: 45_760,
       // 未入力のまま返してくる社（努力義務なので空でも回答は成立する）。
       safety_health_cost: null,
       retirement_mutual_aid_cost: null,
-      work_days: 20,
+      work_days: 7,
       material_supplied_note: "",
     },
   },

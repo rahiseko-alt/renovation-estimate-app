@@ -41,15 +41,19 @@ test("トップから3タップで見積書PDFまで行ける", async ({ page })
   await expect(
     page.getByRole("heading", { name: "3社から見積が返ってきました" }),
   ).toBeVisible();
-  // 比較表は明細1行につき全社を並べるので、社名は明細の数だけ出る。
+  // 比較表は明細1行につき全社を並べるので、社名の入った項目は明細の数だけ出る。
   // 「全社が同じ数だけ出ている」ことを見る（1社でも単価が欠けると比較にならない）。
+  //
+  // 社名は「採用中: <社名>」にも出るが、そちらは明細ごとに1社しか出ないので、
+  // ページ全体の社名の数を比べると採用済みの社だけ多く数えられる。
+  // 単価の並ぶ項目（listitem）に絞って数える。
   const appearances: number[] = [];
   for (const companyName of [
     "サンプル内装工業",
     "テスト住宅設備",
     "ダミー工務店",
   ]) {
-    const locator = page.getByText(companyName);
+    const locator = page.getByRole("listitem").filter({ hasText: companyName });
     await expect(locator.first()).toBeVisible();
     appearances.push(await locator.count());
   }
@@ -61,6 +65,16 @@ test("トップから3タップで見積書PDFまで行ける", async ({ page })
   await expect(
     page.getByText("この依頼には建設業法の法定項目 21 件が入っています"),
   ).toBeVisible();
+
+  // **見積書を押す前に金額が出ていること。** 3タップ目に出る書類が全行0円だった
+  // （docs/failures.md 2026-08-06）。PDFのバイト列から金額は読めないので、
+  // 0円のまま書類が出る状態は、この画面の合計でしか外から捕まえられない。
+  const totalRegion = page.getByRole("region", { name: "採用中の合計（税込）" });
+  await expect(totalRegion).toBeVisible();
+  const totalText = await totalRegion.innerText();
+  const totalYen = totalText.match(/([\d,]+)円/)?.[1];
+  expect(totalYen, `合計を読めない: ${totalText}`).toBeTruthy();
+  expect(Number(totalYen?.replace(/,/g, ""))).toBeGreaterThan(0);
 
   // ── 3タップ目：見積書を出す ────────────────────────────
   const downloadPromise = page.waitForEvent("download");

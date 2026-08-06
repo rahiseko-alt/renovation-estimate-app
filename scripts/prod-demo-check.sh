@@ -142,12 +142,32 @@ else
   fail "見積書へのボタンが比較表に無い"
 fi
 
-# 3タップ目（見積書PDF）は、ここでは押していない。
-# **ボタンの存在しか見ていない。** アクションIDがHTMLに載らない
-# （クライアント部品から呼ぶのでIDはJSチャンク側にある）ため、bash から
-# 素直に叩けない。かわりに、**比較表に採用済みの合計を出して、その数字が
-# 0円でないことをこの下で見る**形にする（PDFのバイト列から金額は読めないが、
-# 同じ計算を通った合計なら画面から読める）。合計の表示は別PRで入れる。
+# 3タップ目（見積書PDF）そのものは、ここでは押していない。アクションIDがHTMLに
+# 載らない（クライアント部品から呼ぶのでIDはJSチャンク側にある）ため、bash から
+# 素直に叩けない。かわりに**比較表に出ている採用済みの合計**を見る。
+# この合計と見積書は同じ計算（apps/web/lib/db/pricedEstimate.ts）を通るので、
+# ここが0円でなければ、書類も0円ではない。
+#
+# ラベルは apps/web/lib/quoteFlowText.ts の COMPARISON_TEXT.adoptedTotalLabel と同じ値。
+TOTAL_LABEL="採用中の合計（税込）"
+if ! grep -q "${TOTAL_LABEL}" "${WORK}/cmp.html"; then
+  fail "比較表に「${TOTAL_LABEL}」が無い（画面の作りが変わった可能性）"
+else
+  # ラベルの直後に出る「1,234,567円」から数字だけを取り出す。
+  # HTMLコメントを先に落とす。React は隣り合う描画の間にコメントノードを挟むことがあり、
+  # 残したままだと数字と「円」が別々に見える（実際にそれで読めなかった）。
+  TOTAL_YEN=$(sed 's/<!--[^>]*-->//g' "${WORK}/cmp.html" \
+    | tr '<' '\n' \
+    | sed -n "/${TOTAL_LABEL}/,\$p" \
+    | grep -o '[0-9][0-9,]*円' | head -1 | tr -d ',円')
+  if [ -z "${TOTAL_YEN}" ]; then
+    fail "「${TOTAL_LABEL}」の金額を読めない"
+  elif [ "${TOTAL_YEN}" -gt 0 ]; then
+    ok "採用済みの合計が ${TOTAL_YEN}円（0円ではない）"
+  else
+    fail "採用済みの合計が 0円（見積書も0円で出る）"
+  fi
+fi
 
 if grep -q "法定項目 21 件" "${WORK}/cmp.html"; then
   ok "法定項目が済んでいることを見せている"
