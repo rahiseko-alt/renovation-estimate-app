@@ -34,6 +34,8 @@ export default defineConfig({
     // 幅でしか踏めない。Desktop Chrome だけだと縮小倍率が1倍のままで、
     // 「小さくなった書類を親指で押す」という肝心の経路が検査されない
     // （docs/plan-rebuild.md「E2E は現在 Desktop Chrome 1プロジェクト」）。
-    { name: "mobile", use: { ...devices["iPhone 13"] } },
+    // 全件を2プロジェクトで流すと所要時間が倍になるだけなので、モバイル幅で踏む
+    // 意味があるテストだけを名前の @mobile で拾う（chromium は全件を流す）。
+    { name: "mobile", use: { ...devices["iPhone 13"] }, grep: /@mobile/ },
   ],
 });

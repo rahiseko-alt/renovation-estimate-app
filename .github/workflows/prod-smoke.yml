@@ -66,11 +66,17 @@ jobs:
           # 適用されていなくても緑になる。実際にそれで本番が壊れたまま
           # このワークフローが緑だった（docs/failures.md 2026-08-05）。
           #
-          # /q/[token] はログイン不要で getQuoteRequestByToken を通り、
-          # 必ず本番DBへ問い合わせる。テーブルが無い・接続できないときは
-          # 例外がそのまま 500 になるので、200 であることが「アプリからDBへ
-          # 到達できている」外部事実になる。実在しない UUID を使うので、
-          # 応答は「この依頼は見つかりません」の画面（200）になる。
+          # /q/[token] はログイン不要で、まず新モデルの quote_group_requests を
+          # 引き（getQuoteGroupRequestForSubcontractor）、見つからなければ旧
+          # quote_requests を引く。どちらも必ず本番DBへ問い合わせる。
+          # テーブルが無い・接続できないときは例外がそのまま 500 になるので、
+          # 200 であることが「アプリからDBへ到達できている」外部事実になる。
+          # 実在しない UUID を使うので、応答は「この依頼は見つかりません」の画面（200）。
+          #
+          # この経路は**新しいテーブルにも到達する**（作り直しで追加した
+          # quote_group_requests を最初に引くため）。回答画面を作り替えるときは、
+          # DBに触る前に早期returnする実装にしないこと。そうすると監視が
+          # 何も検証しなくなる（docs/failures.md 2026-08-05 の事故と同じ形）。
           url="${PROD_URL}/q/${PROD_DB_PROBE_TOKEN}"
           echo "Checking ${url}"
           code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 30 "${url}")

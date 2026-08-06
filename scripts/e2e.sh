@@ -61,5 +61,15 @@ if curl -s -o /dev/null --max-time 2 "http://localhost:${E2E_PORT}/" 2>/dev/null
   exit 1
 fi
 
+echo "== デモ用データを投入 =="
+# 新設計の検査（apps/web/e2e/new-flow.spec.ts）は、返信済みの下請3社ぶんのデータを
+# 前提にしている。入っていなければ「比較するものが無いので何も落ちない」だけの
+# 空の緑になるので、投入に失敗したらここで止める。
+# DEMO_USER_EMAIL は上で用意した値をそのまま渡す（ログインする利用者と owner_id を揃える）。
+if ! bash scripts/seed-demo.sh; then
+  echo "FAIL: デモ用データの投入に失敗した。データが無いまま E2E を走らせない。"
+  exit 1
+fi
+
 echo "== Playwright で一連の操作を検証 =="
 pnpm --filter web exec playwright test
