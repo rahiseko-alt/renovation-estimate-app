@@ -98,6 +98,9 @@
 - 必須の環境変数（名前だけ。値は書かない）: `AUTH_SECRET` / `DEMO_USER_EMAIL` /
   `DEMO_USER_PASSWORD` / `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY`
   （`apps/web/.env.example` 参照）
+- デモ用データの投入（返信済みの下請3社ぶんを含む）:
+  `DEMO_USER_EMAIL=<ログインする利用者のメール> bash scripts/seed-demo.sh`
+  （ローカル Supabase 起動済みで。何度実行しても増えず、同じ内容に作り直す）
 - 共通の文言・値の置き場所: `apps/web/lib/content.ts`
 - 金額計算の置き場所: `apps/web/lib/calc.ts`（画面・PDF・API は必ずここを通す）
 
