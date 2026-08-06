@@ -24,6 +24,17 @@ describe("createSessionValue と readSessionValue", () => {
     expect(await readSessionValue(value)).toBe("oyakata@example.com");
   });
 
+  // デモは6時間で切れる約束で発行する。Cookie の maxAge だけを短くしても、
+  // 値を控えておいた相手には効かない（Cookie は相手の持ち物）。
+  // 失効時刻は署名の中に入っていなければならない。
+  it("渡した有効期間で失効する（既定の30日を勝手に使わない）", async () => {
+    const shortLived = await createSessionValue("demo:abc", -1);
+    expect(await readSessionValue(shortLived)).toBeNull();
+
+    const stillValid = await createSessionValue("demo:abc", 60);
+    expect(await readSessionValue(stillValid)).toBe("demo:abc");
+  });
+
   it("Cookie が無ければ null", async () => {
     expect(await readSessionValue(undefined)).toBeNull();
     expect(await readSessionValue("")).toBeNull();
