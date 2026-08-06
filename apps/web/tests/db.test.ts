@@ -14,6 +14,7 @@ import {
 } from "../lib/db/priceMaster";
 import {
   createProject,
+  deleteProjectForOwner,
   getProjectForOwner,
   listProjectsForOwner,
 } from "../lib/db/projects";
@@ -54,6 +55,30 @@ describe("projects", () => {
     const list = await listProjectsForOwner(OWNER_A);
     expect(list.some((p) => p.id === mine.id)).toBe(true);
     expect(list.some((p) => p.id === others.id)).toBe(false);
+  });
+
+  it("作った本人は案件を消せる（作りかけの後始末に使う）", async () => {
+    const project = await createProject(
+      { customerName: "消される案件", siteAddress: "東京都港区0-0-0" },
+      OWNER_A,
+    );
+    await deleteProjectForOwner(project.id, OWNER_A);
+    expect(await getProjectForOwner(project.id, OWNER_A)).toBeNull();
+  });
+
+  it("他人の案件はIDを知っていても消せない（IDOR対策）", async () => {
+    const project = await createProject(
+      { customerName: "消せない案件", siteAddress: "東京都港区0-0-0" },
+      OWNER_A,
+    );
+    await deleteProjectForOwner(project.id, OWNER_B);
+    expect(await getProjectForOwner(project.id, OWNER_A)).not.toBeNull();
+  });
+
+  it("UUIDでないIDを渡しても例外にならず、何も消さない", async () => {
+    await expect(
+      deleteProjectForOwner("no-such-id", OWNER_A),
+    ).resolves.toBeUndefined();
   });
 });
 

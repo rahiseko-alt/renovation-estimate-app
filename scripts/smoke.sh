@@ -73,6 +73,29 @@ expect_contains() {
   fi
 }
 
+# ログインが要る画面が、Cookie 無しでどう振る舞うかをまとめて見る。
+# **307 だけでは足りない。** どこへ飛ばされたかを見ないと、無関係な場所への転送や
+# 転送のループでも合格してしまう。行き先が /login であることと、ログイン後に
+# 元の画面へ戻すための next を覚えていることまで確かめる。
+expect_login_redirect() {
+  local path="$1"
+  local encoded
+  encoded=$(printf '%s' "${path}" | sed 's|/|%2F|g')
+
+  check "GET ${path}（Cookie 無し）" 307 "$(curl -s -o /dev/null -w '%{http_code}' "${BASE}${path}")"
+
+  local location
+  location=$(curl -s -D - -o /dev/null "${BASE}${path}" | grep -i '^location:' | tr -d '\r' | awk '{print $2}')
+  case "${location}" in
+    */login|*/login\?*) echo "  OK   ${path}: ログイン画面へ誘導 (${location})" ;;
+    *) echo "  FAIL ${path}: 誘導先が違う: ${location}"; FAILURES=$((FAILURES + 1)) ;;
+  esac
+  case "${location}" in
+    *"next=${encoded}"*) echo "  OK   ${path}: ログイン後の戻り先を覚えている" ;;
+    *) echo "  FAIL ${path}: ログイン後の戻り先を覚えていない: ${location}"; FAILURES=$((FAILURES + 1)) ;;
+  esac
+}
+
 # 先客がいると、そのプロセスを検査してしまい結果の意味が無くなる。必ず落とす。
 if curl -s -o /dev/null --max-time 2 "${BASE}/" 2>/dev/null; then
   echo "FAIL: ポート ${PORT} は既に使われている。"
@@ -199,17 +222,7 @@ check_csp_and_nonce() {
 check_csp_and_nonce "/" "${HEADERS}" "${WORK}/home.html"
 
 echo "== ログインしていなければ中に入れない =="
-check "GET /projects（Cookie 無し）" 307 "$(curl -s -o /dev/null -w '%{http_code}' "${BASE}/projects")"
-LOCATION=$(curl -s -D - -o /dev/null "${BASE}/projects" | grep -i '^location:' | tr -d '\r' | awk '{print $2}')
-case "${LOCATION}" in
-  */login|*/login\?*) echo "  OK   ログイン画面へ誘導 (${LOCATION})" ;;
-  *) echo "  FAIL 誘導先が違う: ${LOCATION}"; FAILURES=$((FAILURES + 1)) ;;
-esac
-# ログイン後に元のページへ戻すため、行き先を覚えていることも確かめる。
-case "${LOCATION}" in
-  *"next=%2Fprojects"*) echo "  OK   ログイン後の戻り先 (/projects) を覚えている" ;;
-  *) echo "  FAIL ログイン後の戻り先を覚えていない: ${LOCATION}"; FAILURES=$((FAILURES + 1)) ;;
-esac
+expect_login_redirect "/projects"
 
 # セッションはアプリの外で組み立てる。アプリの実装を借りずに検査する。
 make_session() {
@@ -257,7 +270,7 @@ fi
 echo "== 下請台帳 =="
 # 依頼の送り先はこの画面からしか増やせない。ここが落ちると、法定項目を全部埋めても
 # 「送り先が1社も無い」で送信まで到達できなくなる。
-check "GET /subcontractors（Cookie 無し）" 307 "$(curl -s -o /dev/null -w '%{http_code}' "${BASE}/subcontractors")"
+expect_login_redirect "/subcontractors"
 SUBCONTRACTORS_HEADERS=$(curl -s -D - -o "${WORK}/subcontractors.html" -H "Cookie: rea_session=${VALID}" "${BASE}/subcontractors")
 check "GET /subcontractors（正しいセッション）" 200 "$(printf '%s' "${SUBCONTRACTORS_HEADERS}" | head -1 | grep -o '[0-9]\{3\}')"
 expect_contains "下請台帳に登録フォームが出る" "会社名" "${WORK}/subcontractors.html"
@@ -265,7 +278,7 @@ expect_contains "下請台帳に登録フォームが出る" "会社名" "${WORK
 echo "== 会社設定 =="
 # 請負者情報（①②の様式に印字される欄）と、法定項目の定型文の初期値を置く画面。
 # /settings は proxy.ts の保護対象に足したばかりなので、素通りしないことも確かめる。
-check "GET /settings/company（Cookie 無し）" 307 "$(curl -s -o /dev/null -w '%{http_code}' "${BASE}/settings/company")"
+expect_login_redirect "/settings/company"
 COMPANY_HEADERS=$(curl -s -D - -o "${WORK}/company.html" -H "Cookie: rea_session=${VALID}" "${BASE}/settings/company")
 check "GET /settings/company（正しいセッション）" 200 "$(printf '%s' "${COMPANY_HEADERS}" | head -1 | grep -o '[0-9]\{3\}')"
 expect_contains "会社設定に請負者名の欄が出る" "請負者名" "${WORK}/company.html"
