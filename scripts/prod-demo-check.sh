@@ -57,10 +57,15 @@ fi
 #  apps/web/app/demo/start/route.ts の冒頭を見る）。
 # 値は apps/web/lib/demoText.ts の DEMO_START_PATH と同じ。
 START_PATH="/demo/start"
-if grep -q "action=\"${START_PATH}\"" "${WORK}/home.html"; then
-  ok "デモ開始のフォームが ${START_PATH} を指している"
+# **method も一緒に見る。** action だけを見ると、GET のフォームでも通ってしまう
+# （/demo/start は POST しか受けないので、GET になった時点で経路が死ぬ）。
+# 属性の並び順はビルドで変わりうるので、同じ <form ...> の中に両方あることを見る。
+if tr '<' '\n' < "${WORK}/home.html" \
+  | grep -i '^form ' \
+  | grep -q "action=\"${START_PATH}\".*method=\"post\"\|method=\"post\".*action=\"${START_PATH}\""; then
+  ok "デモ開始のフォームが ${START_PATH} へ POST する"
 else
-  fail "トップのフォームが ${START_PATH} を指していない（画面の作りが変わった可能性）"
+  fail "トップに ${START_PATH} へ POST するフォームが無い（画面の作りが変わった可能性）"
   echo; echo "PROD DEMO CHECK FAILED"; exit 1
 fi
 
