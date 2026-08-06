@@ -76,8 +76,13 @@ describe("比較表", () => {
     // 行は明細の数のまま増えない。列（社）が3つ並ぶ。
     expect(comparison.rows).toHaveLength(1);
     expect(comparison.columns).toHaveLength(3);
-    for (const [index, column] of comparison.columns.entries()) {
-      expect(column.costUnitPriceByLineId[lineId]).toBe(prices[index]);
+    // 列の順は created_at 昇順。3件をループで作るので時刻が同着しうる。
+    // 位置ではなく requestId で引き当てる（同着のとき順序は保証されない）。
+    for (const [index, request] of requests.entries()) {
+      const column = comparison.columns.find(
+        (candidate) => candidate.requestId === request.id,
+      );
+      expect(column?.costUnitPriceByLineId[lineId]).toBe(prices[index]);
     }
   });
 
@@ -140,7 +145,11 @@ describe("比較表", () => {
   it("他人の案件の比較表は引けない（IDOR対策）", async () => {
     const { project } = await setupThreeWayRequest("比較4");
     const comparison = await getComparisonForProject(project.id, OWNER_B);
+    // 他社の単価（列）も採用状態も一切返らない。
     expect(comparison.columns).toHaveLength(0);
+    for (const row of comparison.rows) {
+      expect(row.adoptedRequestId).toBeNull();
+    }
   });
 
   it("回答が無い社の欄は空のまま（未回答と0円を混同しない）", async () => {

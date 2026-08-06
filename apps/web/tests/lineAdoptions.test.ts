@@ -203,7 +203,7 @@ describe("lineAdoptions", () => {
         },
         OWNER_B,
       ),
-    ).rejects.toThrow();
+    ).rejects.toThrow("依頼が見つかりません。");
 
     expect(await listLineAdoptionsForProject(project.id, OWNER_A)).toEqual([]);
   });
@@ -241,7 +241,7 @@ describe("lineAdoptions", () => {
         { projectId: project.id, lineItemId: lineTwo, quoteGroupRequestId: request.id },
         OWNER_A,
       ),
-    ).rejects.toThrow();
+    ).rejects.toThrow("この明細は、その依頼の対象範囲に入っていません。");
   });
 
   it("別案件の依頼IDでは採用できない（案件をまたいだ紐づけを作らない）", async () => {
@@ -263,6 +263,6 @@ describe("lineAdoptions", () => {
         },
         OWNER_A,
       ),
-    ).rejects.toThrow();
+    ).rejects.toThrow("依頼が、この案件のものではありません。");
   });
 });

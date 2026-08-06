@@ -97,19 +97,13 @@ export default function DocumentSpikePage() {
       </div>
 
       {/* 書類ビュー：読み取り専用。押せるのは行ブロックと写真枠だけ。 */}
-      <div
-        role="button"
-        tabIndex={0}
-        aria-label={SPIKE_TEXT.openSheet}
-        onClick={() => setSheetOpen(true)}
-        onKeyDown={(event) => {
-          if (event.key === "Enter" || event.key === " ") {
-            event.preventDefault();
-            setSheetOpen(true);
-          }
-        }}
-        className="cursor-pointer"
-      >
+      {/*
+        role="button" で包まない。ARIA は button の子孫を presentational として
+        扱うため、書類の見出し・表の意味が支援技術から消える。
+        キーボード操作は上の「写真・数量を入れる」ボタンが受け持つので、
+        ここは指で押せることだけを担う。
+      */}
+      <div onClick={() => setSheetOpen(true)} className="cursor-pointer">
         <DocumentCanvas pageWidthPx={QUOTE_REQUEST_TEMPLATE.pageWidthPx}>
           <DocumentView
             template={QUOTE_REQUEST_TEMPLATE}

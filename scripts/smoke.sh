@@ -270,7 +270,10 @@ check_csp_and_nonce "/q/<token>" "${Q_HEADERS}" "${WORK}/q.html"
 expect_contains "/q が実在しないトークンに専用の案内を出す" "この依頼は見つかりません" "${WORK}/q.html"
 
 # 形の違うトークン（UUIDでない）でも、500 にせず同じ案内を出す。
-curl -s -o "${WORK}/q-garbage.html" "${BASE}/q/not-a-uuid"
+# 本文だけを見ると、500 の応答にたまたま同じ文言が載っていても通ってしまう
+# （curl は --fail を付けない限り 500 でも成功終了する）。状態行も確かめる。
+Q_GARBAGE_HEADERS=$(curl -s -D - -o "${WORK}/q-garbage.html" "${BASE}/q/not-a-uuid")
+check "GET /q/<UUIDでないトークン>" 200 "$(printf '%s' "${Q_GARBAGE_HEADERS}" | head -1 | grep -o '[0-9]\{3\}')"
 expect_contains "/q が形の違うトークンにも専用の案内を出す" "この依頼は見つかりません" "${WORK}/q-garbage.html"
 
 echo "== 偽物・期限切れは弾く =="

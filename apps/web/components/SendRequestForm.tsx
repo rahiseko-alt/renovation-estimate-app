@@ -6,6 +6,7 @@
 // 本当の門は Server Action 側にある（クライアントの検証はバイパスできる）。
 // 「何が足りないか」を隠さずそのまま出す。
 
+import { unstable_rethrow } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { sendQuoteRequestGroupAction } from "../app/projects/[id]/send/actions";
@@ -48,13 +49,10 @@ export function SendRequestForm({
       try {
         await sendQuoteRequestGroupAction(projectId, selectedIds, priceBand);
       } catch (error) {
-        // redirect() は例外で制御を移すので、それ以外だけを失敗として扱う。
-        if (
-          error instanceof Error &&
-          error.message.includes("NEXT_REDIRECT")
-        ) {
-          throw error;
-        }
+        // redirect() は例外で制御を移す。その判定を error.message の文字列で
+        // 自前に書くと、Next 側の表現が変わった時に黙って壊れる。フレームワークの
+        // 内部例外は unstable_rethrow に任せ、それ以外だけを失敗として扱う。
+        unstable_rethrow(error);
         setErrorMessage(
           error instanceof Error ? error.message : SEND_REQUEST_TEXT.failed,
         );
