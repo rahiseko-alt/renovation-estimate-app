@@ -12,6 +12,8 @@
 // 対になっている。seed を変えたらここも直す。
 
 import { expect, test, type Page } from "@playwright/test";
+
+import { COMPARISON_TEXT } from "../lib/content";
 import { createClient } from "@supabase/supabase-js";
 
 // scripts/e2e.sh がこの検査の中だけで使い捨てる値を用意する（本物の秘密情報ではない。
@@ -178,27 +180,40 @@ test("比較表に3社の単価が並び、明細ごとの採用は1社に置き
     await expect(row).toContainText(`${quote.displayed}円`);
   }
 
-  // 1社を採用すると「採用中」に変わる。
-  const first = DEMO_QUOTES[0];
-  await section
-    .getByRole("listitem")
-    .filter({ hasText: first.companyName })
-    .getByRole("button", { name: "採用する" })
-    .click();
-  await expect(section.getByText(`採用中: ${first.companyName}`)).toBeVisible();
+  /**
+   * 採用のボタンは3社とも「採用」の1種類で、**採用中だけ色が変わる**
+   * （文字の出し分けは分かりにくいと言われた。docs/failures.md 2026-08-07）。
+   * 色は検査で見られないので、同じ意味を持つ aria-pressed で見る
+   * （色だけに頼らないための属性でもある）。
+   */
+  const adoptButtonFor = (companyName: string) =>
+    section
+      .getByRole("listitem")
+      .filter({ hasText: companyName })
+      .getByRole("button", { name: COMPARISON_TEXT.adopt });
 
-  // 別の社を採用し直すと置き換わる（2社が同時に採用中にならない＝C9の排他）。
+  // 1社を採用すると、その社のボタンだけが「押されている」状態になる。
+  const first = DEMO_QUOTES[0];
+  await adoptButtonFor(first.companyName).click();
+  await expect(adoptButtonFor(first.companyName)).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+
+  // 別の社を採用し直すと入れ替わる（2社が同時に採用中にならない＝C9の排他）。
   const second = DEMO_QUOTES[1];
-  await section
-    .getByRole("listitem")
-    .filter({ hasText: second.companyName })
-    .getByRole("button", { name: "採用する" })
-    .click();
-  await expect(section.getByText(`採用中: ${second.companyName}`)).toBeVisible();
-  await expect(section.getByText(`採用中: ${first.companyName}`)).toHaveCount(0);
-  // 採用を解除できるのは採用中の1社だけ。2社ぶん出ていたら排他が壊れている。
+  await adoptButtonFor(second.companyName).click();
+  await expect(adoptButtonFor(second.companyName)).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await expect(adoptButtonFor(first.companyName)).toHaveAttribute(
+    "aria-pressed",
+    "false",
+  );
+  // 押されているボタンは、この明細の中で必ず1つだけ。
   await expect(
-    section.getByRole("button", { name: "採用をやめる" }),
+    section.getByRole("button", { pressed: true }),
   ).toHaveCount(1);
 
   // 採用は「追加」ではないので、見積の明細行は増えない（C8）。
