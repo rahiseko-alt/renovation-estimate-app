@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 
+import { MAX_PROJECTS_PER_OWNER, NEW_PROJECT_TEXT } from "../lib/content";
 import { DEFAULT_DISPOSAL_ITEM_NAME } from "../lib/doc/templates/estimate";
 import {
   appendEstimateLine,
@@ -79,6 +80,57 @@ describe("projects", () => {
     await expect(
       deleteProjectForOwner("no-such-id", OWNER_A),
     ).resolves.toBeUndefined();
+  });
+});
+
+describe("案件の登録件数の上限", () => {
+  // 上限まで埋める持ち主は、他のテストと分ける（このファイルの他のテストが
+  // 使う OWNER_A を埋めてしまわないため）。前回の実行の残骸は tests/globalSetup.ts が消す。
+  const LIMIT_OWNER = "limit-projects@example.com";
+  const OTHER_OWNER = "limit-projects-other@example.com";
+
+  const filled: Awaited<ReturnType<typeof createProject>>[] = [];
+
+  beforeAll(async () => {
+    for (let i = 1; i <= MAX_PROJECTS_PER_OWNER; i += 1) {
+      filled.push(
+        await createProject(
+          { customerName: `上限テスト施主${i}`, siteAddress: `東京都港区${i}` },
+          LIMIT_OWNER,
+        ),
+      );
+    }
+  }, 120_000);
+
+  it(`上限（${MAX_PROJECTS_PER_OWNER}件）目までは登録できる`, () => {
+    expect(filled).toHaveLength(MAX_PROJECTS_PER_OWNER);
+    expect(filled.at(-1)?.customerName).toBe(
+      `上限テスト施主${MAX_PROJECTS_PER_OWNER}`,
+    );
+    expect(filled.every((project) => project.id)).toBe(true);
+  });
+
+  it(`上限を超える1件（${MAX_PROJECTS_PER_OWNER + 1}件目）は例外になる`, async () => {
+    await expect(
+      createProject(
+        { customerName: "上限を超える施主", siteAddress: "東京都港区999" },
+        LIMIT_OWNER,
+      ),
+    ).rejects.toThrow(NEW_PROJECT_TEXT.failedLimit);
+  });
+
+  it("一覧は上限まで返る（既定の件数で黙って切れない）", async () => {
+    const list = await listProjectsForOwner(LIMIT_OWNER);
+    expect(list).toHaveLength(MAX_PROJECTS_PER_OWNER);
+  });
+
+  it("別の owner_id の件数は上限に影響しない", async () => {
+    const project = await createProject(
+      { customerName: "別の持ち主の施主", siteAddress: "大阪府大阪市9-9" },
+      OTHER_OWNER,
+    );
+    expect(await getProjectForOwner(project.id, OTHER_OWNER)).not.toBeNull();
+    expect(await listProjectsForOwner(OTHER_OWNER)).toHaveLength(1);
   });
 });
 

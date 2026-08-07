@@ -1,4 +1,4 @@
-import { NEW_PROJECT_TEXT } from "../../../lib/content";
+import { FAILED_LIMIT, NEW_PROJECT_TEXT } from "../../../lib/content";
 import { createProjectAction } from "./actions";
 
 export default async function NewProjectPage({
@@ -8,6 +8,10 @@ export default async function NewProjectPage({
 }) {
   const { failed } = await searchParams;
   const errorId = "new-project-error";
+
+  // 断られた理由を文言に直す。既存の failed=1（入力内容の不備）はそのまま。
+  const errorMessage =
+    failed === FAILED_LIMIT ? NEW_PROJECT_TEXT.failedLimit : NEW_PROJECT_TEXT.failed;
 
   return (
     <main className="mx-auto w-full max-w-md px-5 py-8">
@@ -19,7 +23,7 @@ export default async function NewProjectPage({
           role="alert"
           className="mt-4 rounded border-2 border-red-700 bg-red-50 px-4 py-3 text-red-900"
         >
-          {NEW_PROJECT_TEXT.failed}
+          {errorMessage}
         </p>
       ) : null}
 

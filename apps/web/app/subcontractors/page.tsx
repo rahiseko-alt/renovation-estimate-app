@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 
 import { SubcontractorLedger } from "../../components/SubcontractorLedger";
 import { getCurrentUser } from "../../lib/auth/server";
-import { SUBCONTRACTORS_TEXT } from "../../lib/content";
+import { FAILED_LIMIT, SUBCONTRACTORS_TEXT } from "../../lib/content";
 import { listSubcontractorsForOwner } from "../../lib/db/subcontractors";
 
 /** 下請台帳。proxy.ts がログインを要求する（ここでも念のため確認する）。 */
@@ -20,6 +20,14 @@ export default async function SubcontractorsPage({
     listSubcontractorsForOwner(ownerId),
   ]);
 
+  // 断られた理由を文言に直す。既存の failed=1（入力内容の不備）はそのまま。
+  let errorMessage: string | null = null;
+  if (failed === FAILED_LIMIT) {
+    errorMessage = SUBCONTRACTORS_TEXT.failedLimit;
+  } else if (failed) {
+    errorMessage = SUBCONTRACTORS_TEXT.failed;
+  }
+
   return (
     <main className="mx-auto w-full max-w-md px-5 py-8">
       <h1 className="text-2xl font-bold">{SUBCONTRACTORS_TEXT.heading}</h1>
@@ -27,7 +35,7 @@ export default async function SubcontractorsPage({
 
       <SubcontractorLedger
         subcontractors={subcontractors}
-        failed={Boolean(failed)}
+        errorMessage={errorMessage}
       />
 
       <Link

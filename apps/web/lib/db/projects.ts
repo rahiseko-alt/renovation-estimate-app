@@ -5,7 +5,11 @@
 // 中身が返らないようにするため、絞り込まない取得関数はこのファイルに置かない
 // （他人の案件IDを知っているだけで読み書きできる状態を防ぐ境界を、ここ1箇所に固定する）。
 
-import { buildDefaultWorkName } from "../content";
+import {
+  buildDefaultWorkName,
+  MAX_PROJECTS_PER_OWNER,
+  NEW_PROJECT_TEXT,
+} from "../content";
 import { getSupabaseClient } from "./client";
 import type { NewProjectInput, Project } from "./types";
 import { isUuid } from "./uuid";
@@ -38,7 +42,11 @@ export async function listProjectsForOwner(ownerId: string): Promise<Project[]> 
     .from("projects")
     .select(COLUMNS)
     .eq("owner_id", ownerId)
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    // 取る件数を登録の上限とそろえる。createProject が上限で止めるので、
+    // 「上限まで登録できて、上限まで一覧に出る」が揃う（範囲を指定しないと PostgREST の
+    // 既定 max_rows で黙って切れる。supabase/config.toml 参照）。
+    .range(0, MAX_PROJECTS_PER_OWNER - 1);
   if (error) throw error;
   return (data as ProjectRow[]).map(toProject);
 }
@@ -60,10 +68,27 @@ export async function getProjectForOwner(
   return data ? toProject(data as ProjectRow) : null;
 }
 
+/**
+ * 案件を1件作る。所有者ごとの登録件数が上限に達していたら例外を投げる。
+ *
+ * 件数の検査はDBの制約ではなくここで行う（案件を作る入口はこの関数1つなので、
+ * 上限を守るのもここ1箇所で足りる）。数える処理と insert は1つのトランザクションに
+ * 入っていないため、同じ利用者が同時に登録すると上限をわずかに超えうる。
+ * 目的は無制限の積み上がりを止めることなので、その粒度で足りる。
+ */
 export async function createProject(
   input: NewProjectInput,
   ownerId: string,
 ): Promise<Project> {
+  const { count, error: countError } = await getSupabaseClient()
+    .from("projects")
+    .select("id", { count: "exact", head: true })
+    .eq("owner_id", ownerId);
+  if (countError) throw countError;
+  if ((count ?? 0) >= MAX_PROJECTS_PER_OWNER) {
+    throw new Error(NEW_PROJECT_TEXT.failedLimit);
+  }
+
   const { data, error } = await getSupabaseClient()
     .from("projects")
     .insert({

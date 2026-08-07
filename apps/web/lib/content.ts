@@ -5,6 +5,8 @@
 // 注意：CI の起動スモーク（.github/workflows/ci.yml / prod-smoke.yml）は
 // HOME_HEADING の値をリテラルで grep している。値を変えるときは両ワークフローも直す。
 
+import { MAX_PROJECTS_PER_OWNER } from "./limits";
+
 /** サイト共通のメタ情報（app/layout.tsx が参照）。 */
 export const SITE = {
   title: "リフォーム見積",
@@ -44,6 +46,8 @@ export const NEW_PROJECT_TEXT = {
   siteAddressLabel: "現場住所",
   submit: "登録する",
   failed: "施主名と現場住所の両方を入力してください。",
+  /** 上限に達したときの文言。lib/db/projects.ts が投げる例外の文面でもある。 */
+  failedLimit: `案件は${MAX_PROJECTS_PER_OWNER}件までしか登録できません。`,
 } as const;
 
 /** 案件詳細画面の文言。 */
@@ -387,6 +391,14 @@ export const PHOTO_TEXT = {
   deleteFailed: "写真の削除に失敗しました。もう一度お試しください。",
 } as const;
 
+
+// 登録件数の上限は lib/limits.ts が1つだけ持つ（文言とデータアクセスの両方が参照するため。
+// 理由はあちらのファイル冒頭）。値を引く入口はこのファイルのままにするため re-export する。
+export {
+  FAILED_LIMIT,
+  MAX_PROJECTS_PER_OWNER,
+  MAX_SUBCONTRACTORS_PER_OWNER,
+} from "./limits";
 
 // 新設計の画面（依頼グループ・下請の回答・比較表と採用・書類画面）の文言は
 // lib/quoteFlowText.ts が持つ。文言の入口はこのファイルのままにするため re-export する

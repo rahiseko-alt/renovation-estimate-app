@@ -7,6 +7,8 @@
 // 紙に印字される文字はここに置かない。それはテンプレート（lib/doc/templates/）が持つ
 // （docs/design.md 7章「文言の住所を1つに決める規則」）。
 
+import { MAX_SUBCONTRACTORS_PER_OWNER } from "./limits";
+
 /**
  * 下請の回答画面（/q/[token]。ログイン不要）の文言。作り直した版。
  *
@@ -150,6 +152,8 @@ export const SUBCONTRACTORS_TEXT = {
   submit: "登録する",
   delete: "削除",
   failed: "会社名とメールアドレスを入力してください。",
+  /** 上限に達したときの文言。lib/db/subcontractors.ts が投げる例外の文面でもある。 */
+  failedLimit: `登録できるのは${MAX_SUBCONTRACTORS_PER_OWNER}社までです。使わない会社を削除してから登録してください。`,
   back: "もどる",
 } as const;
 
