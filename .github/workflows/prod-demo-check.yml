@@ -1,6 +1,6 @@
 name: prod-demo-check
 
-# 商談で見せる経路（docs/flows.md「デモの画面の並び」D1〜D9）を、本番そのものを外から踏んで機械判定する
+# 商談で見せる経路（docs/flows.md「デモの画面の並び」D1〜D10）を、本番そのものを外から踏んで機械判定する
 # （scripts/prod-demo-check.sh）。
 #
 # **prod-smoke.yml とは別のファイルにしてある。理由は2つ。**

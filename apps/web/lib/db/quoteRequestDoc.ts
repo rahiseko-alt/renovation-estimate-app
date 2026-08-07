@@ -7,7 +7,7 @@
 // （lib/doc/ が保存の層に依存しないよう、依存の向きをこちら側に寄せている）。
 
 import {
-  PHOTO_MAX_PER_AREA,
+  PHOTO_MAX_PER_LINE,
   PHOTO_SIGNED_URL_EXPIRES_SECONDS,
 } from "../content";
 import type { DocData } from "../doc/schema";
@@ -21,7 +21,7 @@ import { LEGAL_ITEM_SLOT_KEYS, type Photo, type Project } from "./types";
 /**
  * 明細行IDごとに、枠へ入れる写真を選ぶ。
  *
- * **1箇所につき `PHOTO_MAX_PER_AREA` 枚まで**（撮る側の上限と同じ値を見る。
+ * **1つの明細につき `PHOTO_MAX_PER_LINE` 枚まで**（撮る側の上限と同じ値を見る。
  * 値は lib/flowText.ts が1つだけ持つ）。それより多い明細では**新しいほうを残す**
  * （撮り直しが反映される。一覧は created_at の昇順で返る）。
  *
@@ -40,8 +40,8 @@ function photosByLineId(photos: readonly Photo[]): Map<string, Photo[]> {
     }
   }
   for (const [lineId, inLine] of byLineId) {
-    if (inLine.length > PHOTO_MAX_PER_AREA) {
-      byLineId.set(lineId, inLine.slice(-PHOTO_MAX_PER_AREA));
+    if (inLine.length > PHOTO_MAX_PER_LINE) {
+      byLineId.set(lineId, inLine.slice(-PHOTO_MAX_PER_LINE));
     }
   }
   return byLineId;

@@ -18,6 +18,10 @@ import { DocumentConfirmScreen } from "../components/DocumentConfirmScreen";
 import { getSupabaseClient } from "../lib/db/client";
 import { createProject } from "../lib/db/projects";
 import { getQuoteRequestDocData } from "../lib/db/quoteRequestDoc";
+import {
+  createQuoteGroupRequest,
+  createQuoteRequestGroup,
+} from "../lib/db/quoteRequestGroups";
 import { setLegalItemSlot } from "../lib/db/legalItemSlots";
 import { setSiteConditionCheck } from "../lib/db/siteConditionChecks";
 import { createSubcontractor } from "../lib/db/subcontractors";
@@ -212,6 +216,29 @@ describe("D4 の見積回答期限（保存と法定の最短見積期間）", (
       formatDateJst(computeResponseDueAt(new Date(), DOCUMENT_PLANNED_PRICE_BAND)),
     );
     expect(await savedRequestTimes(project.id)).toHaveLength(0);
+  });
+
+  it("依頼を書き込む唯一の場所でも、最短見積期間を下回る期限は保存しない", async () => {
+    const { project, subcontractorId } = await projectReadyToSend("保存直前の防壁");
+    const group = await createQuoteRequestGroup({ projectId: project.id }, OWNER);
+    // 提示日と同じ日は、その日の終わりで数えてもどの帯の最短日数にも届かない。
+    const sameDay = responseDueAtFromDateInput(
+      toJstDateInput(new Date(group.presentedAt)),
+    );
+    expect(sameDay).not.toBeNull();
+
+    await expect(
+      createQuoteGroupRequest(
+        {
+          groupId: group.id,
+          subcontractorId,
+          plannedPriceBand: DOCUMENT_PLANNED_PRICE_BAND,
+          lineItemIds: [],
+          responseDueAt: sameDay!,
+        },
+        OWNER,
+      ),
+    ).rejects.toThrow(/法定の最短見積期間/);
   });
 
   it("期限を渡さない通常経路は、これまでどおり提示日時＋法定日数になる", async () => {

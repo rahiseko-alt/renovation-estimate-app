@@ -7,81 +7,130 @@ import {
   uploadPhotoAction,
   type PhotoWithUrl,
 } from "../app/projects/[id]/photos-actions";
-import {
-  DEFAULT_PHOTO_AREA,
-  PHOTO_AREAS,
-  PHOTO_MAX_PER_AREA,
-  PHOTO_STEP_TEXT,
-} from "../lib/content";
+import { PHOTO_MAX_PER_LINE, PHOTO_STEP_TEXT } from "../lib/content";
 import { DEMO_PHOTO_TEXT } from "../lib/demoText";
 import { compressPhotoForUpload } from "../lib/photo/compress";
+
+/**
+ * 枠1つぶん＝見積の明細行1件。**枠がそのまま書類の枠になる。**
+ * `area` は `photos.area`（必須の列）に入れる値で、決めるのは
+ * `lib/content.ts` の `photoAreaForLineName`（画面は箇所を選ばせない）。
+ */
+export type PhotoLine = {
+  id: string;
+  name: string;
+  quantity: number;
+  unit: string;
+  area: string;
+};
 
 type Props = {
   projectId: string;
   /** 撮り終えたあとの行き先。画面はどこへ行くかを自分で決めない。 */
   nextHref: string;
-  /**
-   * 箇所ごとの明細行ID（`lib/content.ts` の `lineIdByPhotoArea`）。
-   * 対応する明細が無い箇所は null で、そこで撮った写真は書類の枠に入らない。
-   */
-  lineIdByArea: Record<string, string | null>;
+  /** 枠として並べる工事。並び順は見積の明細のまま（書類と同じ順で見える）。 */
+  lines: PhotoLine[];
   /** 既に撮ってある写真。D4 から「修正」で戻ったときに枚数と見え方を引き継ぐ。 */
   initialPhotos: PhotoWithUrl[];
 };
 
-/** 撮った写真を箇所ごとに並べる。何枚撮れたかが見えないと、上限まで撮れない。 */
-function TakenPhotos({ photos }: { photos: PhotoWithUrl[] }) {
-  const areasWithPhotos = PHOTO_AREAS.filter((value) =>
-    photos.some((photo) => photo.area === value),
-  );
-  if (areasWithPhotos.length === 0) return null;
+/**
+ * 工事1件ぶんの枠。**枠そのものが撮影のボタン**で、押すとこの工事の撮影になる。
+ *
+ * 枠の中に出すのは、工事名・数量と単位・撮れた枚数・撮った写真。
+ * 数量と単位を添えるのは、書類の明細と同じ見え方にして、撮った写真が
+ * そのままこの行の枠に入ると伝えるため（docs/flows.md の D3）。
+ *
+ * `<ul>` を中に入れない（button の中に置けるのは phrasing content だけ）。
+ */
+function WorkLineFrame({
+  line,
+  photos,
+  disabled,
+  onPick,
+}: {
+  line: PhotoLine;
+  photos: PhotoWithUrl[];
+  disabled: boolean;
+  onPick: (line: PhotoLine) => void;
+}) {
+  const isFull = photos.length >= PHOTO_MAX_PER_LINE;
 
   return (
-    <section className="flex flex-col gap-4">
-      <h2 className="font-bold">{PHOTO_STEP_TEXT.takenHeading}</h2>
-      {areasWithPhotos.map((value) => {
-        const inArea = photos.filter((photo) => photo.area === value);
-        return (
-          <div key={value}>
-            <h3 className="text-sm text-gray-700">
-              {`${value}　${PHOTO_STEP_TEXT.countLabel(inArea.length)}`}
-            </h3>
-            <ul className="mt-2 grid grid-cols-3 gap-2">
-              {inArea.map((photo, index) => (
-                <li key={photo.id}>
-                  {photo.url ? (
-                    // eslint-disable-next-line @next/next/no-img-element -- 署名付きURLは短命で都度発行するため next/image の最適化キャッシュと相性が悪い
-                    <img
-                      src={photo.url}
-                      alt={PHOTO_STEP_TEXT.photoAlt(value, index + 1)}
-                      className="aspect-square w-full rounded border-2 border-gray-300 object-cover"
-                    />
-                  ) : (
-                    <div className="aspect-square w-full rounded bg-gray-200" />
-                  )}
-                </li>
-              ))}
-            </ul>
-          </div>
-        );
-      })}
-    </section>
+    <button
+      type="button"
+      disabled={disabled || isFull}
+      onClick={() => onPick(line)}
+      className="tap flex w-full flex-col gap-3 rounded border-2 border-dashed border-blue-800 bg-blue-50 p-4 text-left disabled:border-gray-400 disabled:bg-gray-100"
+    >
+      <span className="flex items-baseline justify-between gap-3">
+        <span className="text-lg font-bold">{line.name}</span>
+        <span className="shrink-0 text-sm text-gray-700">
+          {PHOTO_STEP_TEXT.quantityLabel(line.quantity, line.unit)}
+        </span>
+      </span>
+
+      {/* 押せる場所だと分かる形にする。**別のボタンではない**（枠ごと1つのボタン）。 */}
+      <span className="flex items-center justify-between gap-3 text-sm">
+        <span
+          className={
+            isFull
+              ? "rounded bg-gray-300 px-3 py-1 font-bold text-gray-700"
+              : "rounded bg-blue-800 px-3 py-1 font-bold text-white"
+          }
+        >
+          {isFull ? PHOTO_STEP_TEXT.limitReached : DEMO_PHOTO_TEXT.take}
+        </span>
+        <span className="text-gray-700">
+          {PHOTO_STEP_TEXT.countLabel(photos.length)}
+        </span>
+      </span>
+
+      {/* 上限ぶんの枠を最初から出す。何枚撮れるかが、押す前に見えている必要がある。 */}
+      <span className="grid grid-cols-3 gap-2">
+        {Array.from({ length: PHOTO_MAX_PER_LINE }, (_, index) => {
+          const photo = photos[index];
+          if (photo?.url) {
+            return (
+              // eslint-disable-next-line @next/next/no-img-element -- 署名付きURLは短命で都度発行するため next/image の最適化キャッシュと相性が悪い
+              <img
+                key={photo.id}
+                src={photo.url}
+                alt={PHOTO_STEP_TEXT.photoAlt(line.name, index + 1)}
+                className="aspect-square w-full rounded border-2 border-gray-300 object-cover"
+              />
+            );
+          }
+          return (
+            <span
+              key={photo?.id ?? `empty-${index}`}
+              className={
+                photo
+                  ? "aspect-square w-full rounded bg-gray-200"
+                  : "aspect-square w-full rounded border border-dashed border-gray-400 bg-white"
+              }
+            />
+          );
+        })}
+      </span>
+    </button>
   );
 }
 
 /**
  * D3 写真を撮る（`docs/flows.md`「デモの画面の並び」）。
  *
- * **出るのは「箇所を選ぶ」「写真を撮る／写真なしで進む」「次へ」だけ。**
+ * **出るのは「工事の枠」「写真なしで進む」「次へ」だけ。**
  * 表に無いボタン・画面・遷移は足さない（利用者との約束 2026-08-07）。
  *
  * 守っている決まりが3つある。
- * 1. **1箇所につき `PHOTO_MAX_PER_AREA` 枚まで。** 上限に達したら撮影を止める。
- * 2. **撮っても画面は移らない。** 移るのは「次へ」と「写真なしで進む」を押したときだけ。
+ * 1. **枠を押すと、その工事の撮影になる。** 箇所（`WORK_AREAS`）を選ばせる形は
+ *    2026-08-07 にやめた。選択肢が8つしか無く、デモの明細のうち給排水設備工事と
+ *    解体・廃棄物処理費が**どうやっても撮れず、書類の枠が2つ永久に空**だった
+ *    （実機の撮影で分かった）。枠＝明細行そのものなので、語彙とずれようがない。
+ * 2. **1枠につき `PHOTO_MAX_PER_LINE` 枚まで。** 上限に達した枠は押せなくする。
+ * 3. **撮っても画面は移らない。** 移るのは「次へ」と「写真なしで進む」を押したときだけ。
  *    以前はここで撮影直後に遷移していたため、2枚目が撮れなかった（実機で報告された）。
- * 3. **撮った写真は、その箇所の工事の明細行に結びつける。** `lineId` を渡さないと
- *    `photos.line_id` が null になり、書類（`lib/db/quoteRequestDoc.ts`）は
- *    それを枠に入れないので、撮っても書類に1枚も出ない（同じく実機で報告された）。
  *
  * **失敗しても先へ進める。** 商談の場で写真が上がらなかったときに、そこでデモが
  * 終わってしまう方が損失が大きい。撮れたら付ける、駄目なら付けずに進む。
@@ -89,19 +138,19 @@ function TakenPhotos({ photos }: { photos: PhotoWithUrl[] }) {
 export function DemoPhotoStep({
   projectId,
   nextHref,
-  lineIdByArea,
+  lines,
   initialPhotos,
 }: Props) {
   const router = useRouter();
+  // **隠し input は1つを使い回す**（枠ごとには置かない）。枠ごとに置くと、明細が
+  // 増えたぶんだけ隠し input が並び、押した枠との対応を DOM の構造が持つことになる。
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // いま撮ろうとしている枠。**state ではなく ref で持つ。** 画面の見た目を変えない
+  // 一時的な値で、state にすると押した直後の再描画を待ってからでないと撮影を開けない。
+  const pickedLineRef = useRef<PhotoLine | null>(null);
   const [photos, setPhotos] = useState<PhotoWithUrl[]>(initialPhotos);
-  const [area, setArea] = useState<string>(DEFAULT_PHOTO_AREA);
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
-
-  const takenInArea = photos.filter((photo) => photo.area === area).length;
-  const isFull = takenInArea >= PHOTO_MAX_PER_AREA;
-  const lineId = lineIdByArea[area] ?? null;
 
   /** 次の画面へ進む。「次へ」と「写真なしで進む」の行き先は同じ（表 D3）。 */
   function goNext(): void {
@@ -110,25 +159,32 @@ export function DemoPhotoStep({
     });
   }
 
-  /** 撮った写真を圧縮して、いま選んでいる箇所の明細行に結びつけて保存する。 */
+  /** 枠を押した。どの枠かを覚えてから、カメラ（ファイル選択）を開く。 */
+  function pickLine(line: PhotoLine): void {
+    pickedLineRef.current = line;
+    fileInputRef.current?.click();
+  }
+
+  /** 撮った写真を圧縮して、押した枠の明細行に結びつけて保存する。 */
   function handleFile(event: React.ChangeEvent<HTMLInputElement>): void {
     const input = event.target;
     const file = input.files?.[0];
-    // 同じ箇所で続けて撮れるように、選択を空に戻す（同じファイル名でも onChange が起きる）。
+    // 同じ枠で続けて撮れるように、選択を空に戻す（同じファイル名でも onChange が起きる）。
     input.value = "";
-    if (!file) return;
+    const line = pickedLineRef.current;
+    pickedLineRef.current = null;
+    if (!file || !line) return;
 
-    const takenArea = area;
-    const takenLineId = lineId;
     setMessage(null);
     startTransition(async () => {
       try {
         const compressed = await compressPhotoForUpload(file);
         const formData = new FormData();
         formData.append("photo", compressed, compressed.name || "photo.jpg");
-        formData.append("area", takenArea);
-        // 対応する明細が無い箇所では付けない（枠に入らない写真として残る）。
-        if (takenLineId) formData.append("lineId", takenLineId);
+        // area は photos の必須の列。値は明細名から決まる（lib/content.ts）。
+        formData.append("area", line.area);
+        // これを付けないと、撮っても書類のどの枠にも入らない（lib/db/quoteRequestDoc.ts）。
+        formData.append("lineId", line.id);
 
         const photo = await uploadPhotoAction(projectId, formData);
         setPhotos((current) => [...current, photo]);
@@ -141,35 +197,6 @@ export function DemoPhotoStep({
 
   return (
     <div className="mt-8 flex flex-col gap-6">
-      <div className="flex flex-col gap-2">
-        <label htmlFor="demo-photo-area" className="font-bold">
-          {PHOTO_STEP_TEXT.areaLabel}
-        </label>
-        <select
-          id="demo-photo-area"
-          value={area}
-          onChange={(event) => setArea(event.target.value)}
-          className="rounded border-2 border-gray-500 px-2 py-3"
-        >
-          {PHOTO_AREAS.map((value) => (
-            <option key={value} value={value}>
-              {value}
-            </option>
-          ))}
-        </select>
-        <p className="text-sm text-gray-700">
-          {PHOTO_STEP_TEXT.countLabel(takenInArea)}
-        </p>
-        {lineId === null ? (
-          <p className="text-sm text-gray-700">{PHOTO_STEP_TEXT.noLineNote}</p>
-        ) : null}
-        {isFull ? (
-          <p className="text-sm text-gray-700">
-            {PHOTO_STEP_TEXT.limitReached}
-          </p>
-        ) : null}
-      </div>
-
       <input
         ref={fileInputRef}
         type="file"
@@ -179,16 +206,25 @@ export function DemoPhotoStep({
         onChange={handleFile}
       />
 
-      <div className="flex flex-col gap-4">
-        <button
-          type="button"
-          disabled={isPending || isFull}
-          onClick={() => fileInputRef.current?.click()}
-          className="tap flex items-center justify-center rounded bg-blue-800 px-6 py-5 text-lg font-bold text-white disabled:opacity-60"
-        >
-          {isPending ? DEMO_PHOTO_TEXT.uploading : DEMO_PHOTO_TEXT.take}
-        </button>
+      <ul className="flex flex-col gap-4">
+        {lines.map((line) => (
+          <li key={line.id}>
+            <WorkLineFrame
+              line={line}
+              photos={photos.filter((photo) => photo.lineId === line.id)}
+              disabled={isPending}
+              onPick={pickLine}
+            />
+          </li>
+        ))}
+      </ul>
 
+      {isPending ? (
+        <p className="text-gray-700">{DEMO_PHOTO_TEXT.uploading}</p>
+      ) : null}
+      {message ? <p className="text-gray-700">{message}</p> : null}
+
+      <div className="flex flex-col gap-4">
         <button
           type="button"
           disabled={isPending}
@@ -197,20 +233,16 @@ export function DemoPhotoStep({
         >
           {DEMO_PHOTO_TEXT.skip}
         </button>
+
+        <button
+          type="button"
+          disabled={isPending}
+          onClick={goNext}
+          className="tap flex items-center justify-center rounded bg-blue-800 px-6 py-5 text-lg font-bold text-white disabled:opacity-60"
+        >
+          {PHOTO_STEP_TEXT.next}
+        </button>
       </div>
-
-      {message ? <p className="text-gray-700">{message}</p> : null}
-
-      <TakenPhotos photos={photos} />
-
-      <button
-        type="button"
-        disabled={isPending}
-        onClick={goNext}
-        className="tap flex items-center justify-center rounded bg-blue-800 px-6 py-5 text-lg font-bold text-white disabled:opacity-60"
-      >
-        {PHOTO_STEP_TEXT.next}
-      </button>
     </div>
   );
 }

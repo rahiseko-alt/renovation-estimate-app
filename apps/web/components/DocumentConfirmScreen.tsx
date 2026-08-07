@@ -70,20 +70,21 @@ export function DocumentConfirmScreen({
       </div>
 
       {/* 紙には出さない（画面の入力欄は doc-screen-only。globals.css の @media print）。 */}
-      <label className="doc-screen-only mt-6 block">
-        <span className="font-bold">
+      <div className="doc-screen-only mt-6 flex flex-col gap-2">
+        <label htmlFor="response-due" className="font-bold">
           {DOCUMENT_CONFIRM_TEXT.responseDueLabel}
-        </span>
+        </label>
         <input
+          id="response-due"
           type="date"
           value={dueDate}
           // 法定の最短より前は選べない。日付を選ぶ操作の側でも塞いでおく
           // （打ち込みは塞げないので、押したときとサーバ側でも同じ判定を通す）。
           min={responseDue.earliestValue}
           onChange={(event) => setDueDate(event.target.value)}
-          className="tap mt-2 block w-full rounded border-2 border-gray-500 px-4 py-3 text-lg"
+          className="w-full rounded border-2 border-gray-500 px-4 py-3"
         />
-      </label>
+      </div>
 
       <DocumentConfirmActions
         projectId={projectId}

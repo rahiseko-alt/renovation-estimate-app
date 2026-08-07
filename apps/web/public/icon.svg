@@ -6,14 +6,16 @@
   2. トップ画面のロゴ … components/HomeScreen.tsx が <img src="/icon.svg"> で読む
   3. public/icon-192.png / icon-512.png / apple-icon.png … このファイルを
      ラスタライズしたもの（PNG しか受け付けない PWA の manifest 用）。
-     図案を直したら、同じ大きさで書き出し直す。
+     図案を直したら、同じ大きさ（192 / 512 / 180）で書き出し直す。
+     **PNG は白で塗り潰して（透明を残さず）書き出す。** 端末側が自分の形に
+     切り抜くので、角を透明にしておくとそこが黒く出る。
 
   色は app/globals.css の @theme が持つ色トークン（color-brand / color-brand-deep）と同じ値。
   SVG からは CSS 変数を読めないので、ここだけは実値を書く。片方を変えたらもう片方も直す。
 -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" width="96" height="96">
-  <!-- 白い角丸の下地。マスクされる形（PWA の maskable）でも図が欠けないよう、
-       図は中央 80% の内側に収める。 -->
+  <!-- 白い角丸の下地。端末が自分の形に切り抜いても（PWA の maskable）
+       図が欠けないよう、図は中央寄りに置き、四隅を空ける。 -->
   <rect width="96" height="96" rx="21" fill="#ffffff" />
 
   <!-- 家。塗らず、太い輪郭だけで描く。 -->

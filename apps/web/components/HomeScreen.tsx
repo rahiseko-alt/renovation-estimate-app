@@ -150,10 +150,15 @@ export function HomeScreen({ loggedIn, onLogout }: Props) {
           **ログイン状態にかかわらず、いつでも出す。** 既にデモ中の人が押した場合は
           自分のデモへ戻る（中身が古ければ作り直される。app/demo/start/route.ts）。
         */}
+        {/*
+          押しやすさは上下の padding で作る（高さ 68px）。min-h-* は効かない：
+          globals.css の `button { min-height: 48px }` は層に入っていない素の規則で、
+          Tailwind のユーティリティ（層の中）より強いため。
+        */}
         <form method="post" action={DEMO_START_PATH} className="mt-10">
           <button
             type="submit"
-            className="tap flex min-h-16 w-full items-center justify-center rounded-2xl bg-brand-deep px-6 text-xl font-bold text-white"
+            className="tap flex w-full items-center justify-center rounded-2xl bg-brand-deep px-6 py-5 text-xl font-bold text-white"
           >
             {DEMO_ENTRY_TEXT.start}
           </button>

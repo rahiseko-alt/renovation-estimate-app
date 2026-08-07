@@ -116,7 +116,7 @@ async function markOf(
   return line.mark;
 }
 
-describe("D6 見積もり書類（1社ずつ）", () => {
+describe("D8 見積もり書類（1社ずつ）", () => {
   it("保留にした明細を、あとで採用に変えられる", async () => {
     const { project, lineOne, requestA } = await setupTwoAnsweredCompanies("D6保留");
 

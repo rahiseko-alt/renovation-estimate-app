@@ -1,4 +1,4 @@
-// デモの画面の並び D2〜D9 の文言（docs/flows.md「デモの画面の並び」）。
+// デモの画面の並び D2〜D10 の文言（docs/flows.md「デモの画面の並び」）。
 //
 // **この表に無いボタン・画面・遷移は作らない**（利用者の指示 2026-08-07）。
 // 文言をここ1箇所に置くのは、画面と検査（E2E・prod-demo-check）が同じ文字を
@@ -174,17 +174,25 @@ export const DEMO_RESTART_TEXT = {
 export const DEMO_RESTART_PATH = "/demo/restart";
 
 /**
- * D3 写真を撮る。**1箇所につき撮れる枚数の上限**
- * （利用者の回答 2026-08-07「とりあえずデモなので」。docs/flows.md の表 D3）。
+ * D3 写真を撮る。**1つの工事（明細行）につき撮れる枚数の上限**
+ * （利用者の回答 2026-08-07「とりあえずデモなので」。docs/flows.md の表 D3
+ * 「1枠につき3枚まで」）。
  *
  * **数字はここ1箇所だけに置く。** 写真の画面（撮影を止める判定と案内文）と
  * 書類（1つの枠に入れる枚数。lib/db/quoteRequestDoc.ts）が同じ値を見る
  * （AGENTS.md「結合を増やさない」1）。
+ *
+ * 2026-08-07 に PHOTO_MAX_PER_AREA から改名した。上限の単位が「箇所」から
+ * 「明細行（＝枠）」に変わったため（箇所を選ばせる形をやめた）。
  */
-export const PHOTO_MAX_PER_AREA = 3;
+export const PHOTO_MAX_PER_LINE = 3;
 
 /**
- * D3 写真を撮る。**出るのは「箇所を選ぶ」「写真を撮る／写真なしで進む」「次へ」だけ。**
+ * D3 写真を撮る。**出るのは「工事の枠」「写真なしで進む」「次へ」だけ。**
+ *
+ * 枠は工事（見積の明細行）1件につき1つで、**押すとその工事の撮影になる**。
+ * 箇所を選ばせる形はやめた（docs/flows.md の D3。選択肢が8つしか無く、
+ * 給排水設備工事と解体・廃棄物処理費が永久に撮れなかった）。
  *
  * 「写真を撮る」「写真なしで進む」「送信中…」「送れませんでした」は
  * lib/demoText.ts の DEMO_PHOTO_TEXT が持つ（scripts/smoke.sh と
@@ -192,18 +200,11 @@ export const PHOTO_MAX_PER_AREA = 3;
  * その4つで足りないぶんだけ。
  */
 export const PHOTO_STEP_TEXT = {
-  areaLabel: "箇所",
   next: "次へ",
-  /** いま選んでいる箇所で撮れた枚数。上限に達したら「写真を撮る」を押せなくする。 */
-  countLabel: (taken: number) => `${taken} / ${PHOTO_MAX_PER_AREA} 枚`,
-  limitReached: `この箇所は${PHOTO_MAX_PER_AREA}枚まで撮れます。`,
-  /**
-   * 選んだ箇所に対応する工事が、見積の明細に無いとき。
-   * **明細を勝手に足さない**（デモの明細は lib/demoFixture.ts が持ち、
-   * 増やすとデモの版が変わる）ので、撮れるが枠に入らないことをそのまま言う。
-   */
-  noLineNote:
-    "この箇所に合う工事が見積にありません。写真は撮れますが、書類の枠には入りません。",
-  takenHeading: "撮った写真",
-  photoAlt: (area: string, index: number) => `${area}の写真${index}`,
+  /** 枠の中に出す、その工事で撮れた枚数。上限に達したらその枠を押せなくする。 */
+  countLabel: (taken: number) => `${taken} / ${PHOTO_MAX_PER_LINE} 枚`,
+  limitReached: `${PHOTO_MAX_PER_LINE}枚まで`,
+  /** 枠に添える数量と単位。**書類の明細と同じ見え方にする**（そのまま書類になることが伝わる）。 */
+  quantityLabel: (quantity: number, unit: string) => `${quantity} ${unit}`,
+  photoAlt: (lineName: string, index: number) => `${lineName}の写真${index}`,
 } as const;

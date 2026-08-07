@@ -251,6 +251,16 @@ export const PRICE_MASTER_TEXT = {
  * 既定はその数量が意味を持つ箇所にする。**単位そのものは変えない**
  * （どの箇所が「式」かは実務者レビューでしか決められない層）。
  */
+/**
+ * どの箇所にも当てはまらない工事の写真に入れる箇所。
+ *
+ * `photos.area` は必須の列で、値は `PHOTO_AREAS` のいずれかでなければ
+ * `uploadPhotoAction` が弾く。D3 は明細行ごとに撮る（箇所を選ばせない）ので、
+ * 明細名に対応する箇所が無いときはここに寄せる（`photoAreaForLineName`）。
+ * **`WORK_AREAS` の中の値と同じものを2箇所に書かない**ため、下の表もこれを使う。
+ */
+export const OTHER_PHOTO_AREA = "その他";
+
 export const WORK_AREAS = [
   { area: "内装", itemName: "内装工事", unit: "㎡" },
   { area: "外壁", itemName: "外壁工事", unit: "㎡" },
@@ -259,10 +269,8 @@ export const WORK_AREAS = [
   { area: "浴室", itemName: "浴室工事", unit: "式" },
   { area: "洗面", itemName: "洗面工事", unit: "式" },
   { area: "トイレ", itemName: "トイレ工事", unit: "式" },
-  { area: "その他", itemName: "その他工事", unit: "式" },
+  { area: OTHER_PHOTO_AREA, itemName: "その他工事", unit: "式" },
 ] as const;
-
-export type WorkArea = (typeof WORK_AREAS)[number];
 
 /**
  * 写真を撮るときに選ぶ箇所の名前だけを取り出したもの。
@@ -274,34 +282,20 @@ export const PHOTO_AREAS = WORK_AREAS.map((entry) => entry.area);
 /** 箇所を選ばせるときの初期値。WORK_AREAS の先頭を正とする。 */
 export const DEFAULT_PHOTO_AREA: string = WORK_AREAS[0].area;
 
-/** 箇所の名前から、決まっている工事項目名と単位を引く。知らない箇所なら null。 */
-export function findWorkArea(area: string): WorkArea | null {
-  return WORK_AREAS.find((entry) => entry.area === area) ?? null;
-}
-
 /**
- * 箇所ごとに、撮った写真を結びつける明細行のID（無ければ null）を引く表を作る。
+ * 明細の工事項目名から、その写真に入れる箇所を決める。
  *
- * **対応の根拠は WORK_AREAS の itemName だけ。** 箇所が決まれば工事項目名も決まる
- * （上の WORK_AREAS の説明）ので、その名前と見積明細の name が一致する行に結びつける。
- * 一致する行が無い箇所は null のままにする。**明細をこちらで作らない**
- * （デモの明細は lib/demoFixture.ts が持ち、増やすとデモの版が変わる）。
- * null の箇所で撮った写真は、書類のどの枠にも入らない（lib/db/quoteRequestDoc.ts）。
- * その旨は画面が PHOTO_STEP_TEXT.noLineNote で伝える。
+ * **D3（写真を撮る）は明細行ごとに撮る**（`docs/flows.md`「デモの画面の並び」の D3。
+ * 箇所を選ばせる形は 2026-08-07 にやめた。選択肢が8つしか無く、給排水設備工事と
+ * 解体・廃棄物処理費が永久に撮れなかった）。写真と工事の結びつきを持つのは
+ * `photos.line_id` のほうで、`photos.area` は必須の列を埋めるために付ける。
+ *
+ * 対応する `WORK_AREAS` があればその箇所、無ければ `OTHER_PHOTO_AREA`。
+ * **ここで返す値は必ず `PHOTO_AREAS` に含まれる**（`uploadPhotoAction` の検証を
+ * 通る値しか返さない。検証のほうは緩めない）。
  */
-export function lineIdByPhotoArea(
-  lines: readonly { id: string; name: string }[],
-): Record<string, string | null> {
-  return Object.fromEntries(
-    PHOTO_AREAS.map((area) => {
-      const itemName = findWorkArea(area)?.itemName;
-      const line =
-        itemName === undefined
-          ? undefined
-          : lines.find((entry) => entry.name === itemName);
-      return [area, line?.id ?? null];
-    }),
-  );
+export function photoAreaForLineName(name: string): string {
+  return WORK_AREAS.find((entry) => entry.itemName === name)?.area ?? OTHER_PHOTO_AREA;
 }
 
 /**
@@ -451,7 +445,7 @@ export {
   SUBCONTRACTORS_TEXT,
 } from "./quoteFlowText";
 
-// デモの画面の並び D2〜D9（docs/flows.md）の文言は lib/flowText.ts が持つ。
+// デモの画面の並び D2〜D10（docs/flows.md）の文言は lib/flowText.ts が持つ。
 // 同じ理由で re-export する。
 export {
   DEMO_RESTART_PATH,
@@ -459,7 +453,7 @@ export {
   DOCUMENT_CONFIRM_TEXT,
   DOCUMENT_PLANNED_PRICE_BAND,
   DRAFTS_TEXT,
-  PHOTO_MAX_PER_AREA,
+  PHOTO_MAX_PER_LINE,
   PHOTO_STEP_TEXT,
   PROJECT_STEP_TEXT,
   QUOTE_DOCUMENT_TEXT,
