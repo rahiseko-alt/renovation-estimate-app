@@ -53,14 +53,11 @@ test("デモは D1 から D9 まで、表のとおりに進む", async ({ page }
   await expect(
     page.getByRole("heading", { name: DOCUMENT_CONFIRM_TEXT.heading }),
   ).toBeVisible();
-  // **ボタンは保存・送信・修正の3つだけ。** 表に無いものを足したらここで落ちる。
-  for (const label of [
-    DOCUMENT_CONFIRM_TEXT.save,
-    DOCUMENT_CONFIRM_TEXT.send,
-    DOCUMENT_CONFIRM_TEXT.edit,
-  ]) {
-    await expect(page.getByRole("button", { name: label })).toBeVisible();
-  }
+  // **操作は保存・送信・修正の3つだけ。** 表に無いものを足したらここで落ちる。
+  // 画面を移るだけの保存・修正はリンク、サーバを呼ぶ送信はボタン（役割が違うのは意図的）。
+  await expect(page.getByRole("link", { name: DOCUMENT_CONFIRM_TEXT.save })).toBeVisible();
+  await expect(page.getByRole("link", { name: DOCUMENT_CONFIRM_TEXT.edit })).toBeVisible();
+  await expect(page.getByRole("button", { name: DOCUMENT_CONFIRM_TEXT.send })).toBeVisible();
   await page.getByRole("button", { name: DOCUMENT_CONFIRM_TEXT.send }).click();
 
   // ── D4 送信しました（デモ）→ ロード中を挟んで自動で進む ──
@@ -74,7 +71,7 @@ test("デモは D1 から D9 まで、表のとおりに進む", async ({ page }
     timeout: 15_000,
   });
   await expect(page.getByRole("heading", { name: RECEIVED_TEXT.heading })).toBeVisible();
-  await page.getByRole("button", { name: RECEIVED_TEXT.toQuotes }).click();
+  await page.getByRole("link", { name: RECEIVED_TEXT.toQuotes }).click();
 
   // ── D7 下請け見積もり一覧 ───────────────────────────────
   await expect(page).toHaveURL(new RegExp(`${PROJECT_ID.source}/quotes$`));
@@ -152,7 +149,7 @@ test("D3 で「修正」を押すと、写真の画面に戻る", async ({ page 
   await page.getByRole("button", { name: DEMO_PHOTO_TEXT.skip }).click();
   await expect(page).toHaveURL(new RegExp(`${PROJECT_ID.source}/document$`));
 
-  await page.getByRole("button", { name: DOCUMENT_CONFIRM_TEXT.edit }).click();
+  await page.getByRole("link", { name: DOCUMENT_CONFIRM_TEXT.edit }).click();
   await expect(page).toHaveURL(/\/demo\/[0-9a-f-]{36}\/photo$/);
 });
 

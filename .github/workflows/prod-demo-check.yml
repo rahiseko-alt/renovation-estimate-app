@@ -1,6 +1,6 @@
 name: prod-demo-check
 
-# 商談で見せる3タップの経路を、本番そのものを外から踏んで機械判定する
+# 商談で見せる経路（docs/flows.md「デモの画面の並び」D1〜D9）を、本番そのものを外から踏んで機械判定する
 # （scripts/prod-demo-check.sh）。
 #
 # **prod-smoke.yml とは別のファイルにしてある。理由は2つ。**
@@ -35,7 +35,7 @@ env:
 
 jobs:
   demo-flow:
-    name: demo 3タップを本番で実際に踏む
+    name: デモの経路を本番で実際に踏む
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
