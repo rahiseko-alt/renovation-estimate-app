@@ -10,14 +10,14 @@ async function noop(): Promise<void> {}
 describe("HomeScreen", () => {
   it("見出しを出す（CI スモークが本文で探すマーカー）", () => {
     const html = renderToStaticMarkup(
-      <HomeScreen loggedIn={false} onLogout={noop} />,
+      <HomeScreen loggedIn={false} demoVisitor={false} onLogout={noop} />,
     );
     expect(html).toContain(HOME_HEADING);
   });
 
   it("未ログインなら行き先を見せず、ログインへ誘導する", () => {
     const html = renderToStaticMarkup(
-      <HomeScreen loggedIn={false} onLogout={noop} />,
+      <HomeScreen loggedIn={false} demoVisitor={false} onLogout={noop} />,
     );
     expect(html).toContain('href="/login"');
     for (const destination of HOME_DESTINATIONS) {
@@ -28,7 +28,7 @@ describe("HomeScreen", () => {
   // 商談で見せる相手はアカウントを持っていない。ログインが最初に来ると必ず止まる。
   it("未ログインならデモの入口を出す", () => {
     const html = renderToStaticMarkup(
-      <HomeScreen loggedIn={false} onLogout={noop} />,
+      <HomeScreen loggedIn={false} demoVisitor={false} onLogout={noop} />,
     );
     expect(html).toContain(DEMO_ENTRY_TEXT.start);
     // **素のフォームとして POST すること。** Server Action にすると呼び出し先IDが
@@ -44,13 +44,35 @@ describe("HomeScreen", () => {
 
   it("ログイン済みにはデモの入口を出さない（実データの画面に混ぜない）", () => {
     const html = renderToStaticMarkup(
-      <HomeScreen loggedIn onLogout={noop} />,
+      <HomeScreen loggedIn demoVisitor={false} onLogout={noop} />,
     );
     expect(html).not.toContain(DEMO_ENTRY_TEXT.start);
   });
 
+  /**
+   * **デモの利用者もログイン扱いになる**（使い捨ての識別子でセッションを持つ）。
+   * ここを出さないと、商談で一度デモを見せたあと、6時間トップから見せ直せない。
+   * 実際にそうなって「デモを触るボタンが出ない」と言われた
+   * （docs/failures.md 2026-08-06）。
+   */
+  it("デモ中の利用者には、トップからデモへ戻る道を出す", () => {
+    const html = renderToStaticMarkup(
+      <HomeScreen loggedIn demoVisitor onLogout={noop} />,
+    );
+    expect(html).toContain(DEMO_ENTRY_TEXT.resume);
+    // 押し先は同じ入口。Server Action にしない理由は DEMO_START_PATH を見る。
+    expect(html).toContain(`action="${DEMO_START_PATH}"`);
+  });
+
+  it("実利用者にはデモへ戻る道を出さない（実データの画面に混ぜない）", () => {
+    const html = renderToStaticMarkup(
+      <HomeScreen loggedIn demoVisitor={false} onLogout={noop} />,
+    );
+    expect(html).not.toContain(DEMO_ENTRY_TEXT.resume);
+  });
+
   it("ログイン済みなら行き先とログアウトを出す", () => {
-    const html = renderToStaticMarkup(<HomeScreen loggedIn onLogout={noop} />);
+    const html = renderToStaticMarkup(<HomeScreen loggedIn demoVisitor={false} onLogout={noop} />);
     for (const destination of HOME_DESTINATIONS) {
       expect(html).toContain(destination.label);
       expect(html).toContain(`href="${destination.href}"`);

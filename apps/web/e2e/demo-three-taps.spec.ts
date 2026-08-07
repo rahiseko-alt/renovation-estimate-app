@@ -105,6 +105,22 @@ test("デモを始めていない訪問者は、デモの画面を開けない",
   expect(response?.status()).toBe(404);
 });
 
+test("デモを始めたあとも、トップからデモへ戻れる（商談で見せ直せる）", async ({
+  page,
+}) => {
+  // デモの利用者もログイン扱いになるため、トップの入口が消えていた。
+  // 一度見せたら6時間トップから戻れず、商談で詰まった
+  // （docs/failures.md 2026-08-06「デモを触るボタンが出ない」）。
+  await page.goto("/");
+  await page.getByRole("button", { name: TAPS[0] }).click();
+  await expect(page).toHaveURL(/\/demo\/[0-9a-f-]{36}\/photo$/);
+  const projectId = new URL(page.url()).pathname.split("/")[2];
+
+  await page.goto("/");
+  await page.getByRole("button", { name: "デモの続きへ" }).click();
+  await expect(page).toHaveURL(`/demo/${projectId}/photo`);
+});
+
 test("デモの利用者に、実データの画面は空で見える", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: TAPS[0] }).click();
@@ -174,9 +190,8 @@ test("デモの中身を直したあと、古いデモを開いていた人に�
   const first = new URL(page.url()).pathname.split("/")[2];
 
   /**
-   * 入口をもう一度叩く。**トップのボタンは使えない。** デモ中はセッションを持つので
-   * トップがログイン後の表示になり、デモの入口が出ない（そういう画面にしてある）。
-   * フォームと同じ POST を、同じ Cookie で送る。
+   * 入口をもう一度叩く。トップの「デモの続きへ」と同じ POST を、同じ Cookie で送る
+   * （画面を経由しないのは、ここで見たいのが版の判定そのものだから）。
    */
   async function startAgain(): Promise<string> {
     const response = await context.request.post(`${origin}/demo/start`, {

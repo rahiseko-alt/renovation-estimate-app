@@ -10,6 +10,11 @@ import { DEMO_ENTRY_TEXT, DEMO_START_PATH } from "../lib/demoText";
 
 type Props = {
   loggedIn: boolean;
+  /**
+   * デモの利用者かどうか（`demo:` の使い捨て識別子で入っている人）。
+   * **デモの利用者もログイン扱いなので、これが無いと入口が消える。**
+   */
+  demoVisitor: boolean;
   /** ログアウトの実処理。画面はどう実現しているかを知らない。 */
   onLogout: () => Promise<void>;
 };
@@ -25,7 +30,7 @@ type Props = {
  * アカウントを持っていないので、ログインを先頭に出すと必ずそこで止まる。
  * ログインは「アカウントをお持ちの方」として下に置く。
  */
-export function HomeScreen({ loggedIn, onLogout }: Props) {
+export function HomeScreen({ loggedIn, demoVisitor, onLogout }: Props) {
   return (
     <main className="mx-auto w-full max-w-md px-5 py-8">
       <h1 className="text-2xl font-bold">{HOME_HEADING}</h1>
@@ -48,6 +53,28 @@ export function HomeScreen({ loggedIn, onLogout }: Props) {
               </li>
             ))}
           </ul>
+
+          {/*
+            **デモ中の人には、トップからデモへ戻る道を出す。**
+            出さないと、一度見せたあと6時間はトップから見せ直せない
+            （商談で実際に詰まった。lib/demoText.ts の resume を見る）。
+            実利用者には出さない（実データの画面にデモを混ぜない）。
+          */}
+          {demoVisitor ? (
+            <>
+              <form method="post" action={DEMO_START_PATH} className="mt-8">
+                <button
+                  type="submit"
+                  className="tap flex w-full items-center justify-center rounded bg-blue-800 px-6 py-5 text-lg font-bold text-white"
+                >
+                  {DEMO_ENTRY_TEXT.resume}
+                </button>
+              </form>
+              <p className="mt-2 text-gray-700">
+                {DEMO_ENTRY_TEXT.resumeDescription}
+              </p>
+            </>
+          ) : null}
 
           <form action={onLogout} className="mt-10">
             <button
