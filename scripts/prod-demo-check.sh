@@ -136,7 +136,7 @@ else
 fi
 
 # 着地した時点で3社の回答が並んでいること。「回答待ち」では見せられない。
-for COMPANY in "サンプル内装工業" "テスト住宅設備" "ダミー工務店"; do
+for COMPANY in "業者A" "業者B" "業者C"; do
   if grep -q "${COMPANY}" "${WORK}/cmp.html"; then
     ok "比較表に ${COMPANY} の単価が出ている"
   else

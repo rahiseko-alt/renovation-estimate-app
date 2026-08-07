@@ -12,6 +12,7 @@ import { readFileSync } from "node:fs";
 import { expect, test } from "@playwright/test";
 
 import { COMPARISON_TEXT } from "../lib/content";
+import { COMPANIES } from "../lib/demoFixture";
 
 /** 3タップの中身。ここに1つ足したら、それはデモが3タップでなくなったということ。 */
 const TAPS = ["デモを触ってみる", "写真なしで進む", "見積書PDFを出力"] as const;
@@ -50,11 +51,7 @@ test("トップから3タップで見積書PDFまで行ける", async ({ page })
   // ページ全体の社名の数を比べると採用済みの社だけ多く数えられる。
   // 単価の並ぶ項目（listitem）に絞って数える。
   const appearances: number[] = [];
-  for (const companyName of [
-    "サンプル内装工業",
-    "テスト住宅設備",
-    "ダミー工務店",
-  ]) {
+  for (const { companyName } of COMPANIES) {
     const locator = page.getByRole("listitem").filter({ hasText: companyName });
     await expect(locator.first()).toBeVisible();
     appearances.push(await locator.count());
@@ -105,6 +102,35 @@ test("デモを始めていない訪問者は、デモの画面を開けない",
   expect(response?.status()).toBe(404);
 });
 
+test("ログインしていてもいなくても、トップは同じ画面から始まる", async ({ page }) => {
+  // 以前はログイン状態で中身を出し分けていて、**デモを一度触るとデモの入口が消えた**
+  // （商談で見せ直せない。docs/failures.md 2026-08-06）。
+  // 出し分けをやめたので、同じ画面がいつでも出る。
+  await page.goto("/");
+  await expect(page.getByRole("button", { name: TAPS[0] })).toBeVisible();
+  // 商談で見せる相手に要らないものは、右上の引き出しの中（閉じている）。
+  await expect(page.getByRole("link", { name: "案件" })).toBeHidden();
+
+  await page.getByRole("button", { name: TAPS[0] }).click();
+  await expect(page).toHaveURL(/\/demo\/[0-9a-f-]{36}\/photo$/);
+  const projectId = new URL(page.url()).pathname.split("/")[2];
+
+  // デモ中（＝セッションを持っている状態）でも、トップは同じ。
+  await page.goto("/");
+  await expect(page.getByRole("button", { name: TAPS[0] })).toBeVisible();
+  await expect(page.getByRole("link", { name: "案件" })).toBeHidden();
+
+  // もう一度押せば自分のデモへ戻る（商談で見せ直せる）。
+  await page.getByRole("button", { name: TAPS[0] }).click();
+  await expect(page).toHaveURL(`/demo/${projectId}/photo`);
+});
+
+test("右上の丸を押すと、作る側の行き先が出る", async ({ page }) => {
+  await page.goto("/");
+  await page.getByLabel("開発者向け").click();
+  await expect(page.getByRole("link", { name: "ログインする" })).toBeVisible();
+});
+
 test("デモの利用者に、実データの画面は空で見える", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: TAPS[0] }).click();
@@ -113,7 +139,7 @@ test("デモの利用者に、実データの画面は空で見える", async ({
   // デモの識別子は訪問ごとに使い捨てなので、下請台帳にはデモが作った3社しか居ない。
   // 実利用者が登録した会社が混ざって見えることは無い。
   await page.goto("/subcontractors");
-  await expect(page.getByText("サンプル内装工業")).toBeVisible();
+  await expect(page.getByText(COMPANIES[0]!.companyName)).toBeVisible();
 });
 
 test("同時に走る2つのデモは、互いの案件を開けない", async ({ browser }) => {
@@ -174,9 +200,8 @@ test("デモの中身を直したあと、古いデモを開いていた人に�
   const first = new URL(page.url()).pathname.split("/")[2];
 
   /**
-   * 入口をもう一度叩く。**トップのボタンは使えない。** デモ中はセッションを持つので
-   * トップがログイン後の表示になり、デモの入口が出ない（そういう画面にしてある）。
-   * フォームと同じ POST を、同じ Cookie で送る。
+   * 入口をもう一度叩く。トップの「デモの続きへ」と同じ POST を、同じ Cookie で送る
+   * （画面を経由しないのは、ここで見たいのが版の判定そのものだから）。
    */
   async function startAgain(): Promise<string> {
     const response = await context.request.post(`${origin}/demo/start`, {

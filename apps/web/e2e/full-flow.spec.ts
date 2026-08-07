@@ -28,9 +28,10 @@ async function login(page: Page): Promise<void> {
   await page.getByLabel("メールアドレス").fill(DEMO_USER_EMAIL!);
   await page.getByLabel("パスワード").fill(DEMO_USER_PASSWORD!);
   await page.getByRole("button", { name: "ログインする" }).click();
-  // ログイン成功後の遷移先はトップ画面（HomeScreen）。ログイン状態でしか出ない
-  // 「ログアウト」ボタンで、ログインが通ったことを確かめる。
-  await expect(page.getByRole("button", { name: "ログアウト" })).toBeVisible();
+  // ログイン成功後の遷移先はトップ画面（HomeScreen）。
+  // ログアウトは引き出しの中に入ったので、ここでは行き先で判定する
+  // （失敗すると /login に留まるので、これでログインの成否は分かる）。
+  await expect(page).toHaveURL("/");
 }
 
 async function createProject(page: Page): Promise<string> {

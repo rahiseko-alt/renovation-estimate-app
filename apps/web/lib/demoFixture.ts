@@ -86,10 +86,15 @@ export const COMPANY_PROFILE = {
  *
  * `breakdown` は必要経費の内訳。各社の `prices × 数量` の合計と一致させてある
  * （金額の桁が噛み合っていないと、実務者には作り物だと分かる）。
+ *
+ * **社名は「業者A / 業者B / 業者C」にする。** 商談で見せる相手が一瞬で
+ * 「3社を比べている」と分かる必要がある。それらしい架空の社名にすると、
+ * 名前を読む手間が増えて、比較表の見どころ（同じ工事で単価が違う）から目が逸れる
+ * （利用者からの指摘。`docs/failures.md` 2026-08-07）。
  */
 export const COMPANIES = [
   {
-    companyName: "サンプル内装工業",
+    companyName: "業者A",
     email: NAISO,
     prices: [3_200, 4_800, 68_000, 85_000],
     breakdown: {
@@ -103,7 +108,7 @@ export const COMPANIES = [
     },
   },
   {
-    companyName: "テスト住宅設備",
+    companyName: "業者B",
     email: SETSUBI,
     prices: [3_500, 4_550, 82_000, 92_000],
     breakdown: {
@@ -117,7 +122,7 @@ export const COMPANIES = [
     },
   },
   {
-    companyName: "ダミー工務店",
+    companyName: "業者C",
     email: KOUMUTEN,
     prices: [2_980, 5_200, 71_000, 78_000],
     breakdown: {
