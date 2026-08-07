@@ -127,17 +127,19 @@ function PhotoLineBlockView({
   return (
     <div className="doc-photo-lines">
       {data.lines.map((line) => {
-        const photoUrl = data.photoUrlByLineId[line.id] ?? null;
+        // 枠は明細1つにつき1つ。中に入る写真は0枚〜複数枚（DocData の説明）。
+        // 0枚のときは空の点線枠のまま出す（撮り忘れがそのまま見える）。
+        const photoUrls = data.photoUrlByLineId[line.id] ?? [];
         return (
           <div className="doc-photo-line" key={line.id}>
             <div
               className="doc-photo-frame"
               style={{ width: block.frameSizePx, height: block.frameSizePx }}
             >
-              {photoUrl ? (
+              {photoUrls.map((photoUrl) => (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={photoUrl} alt={`${line.name}の現況写真`} />
-              ) : null}
+                <img key={photoUrl} src={photoUrl} alt={`${line.name}の現況写真`} />
+              ))}
             </div>
             <div className="doc-photo-line-body">
               <div className="doc-photo-line-name">{line.name}</div>

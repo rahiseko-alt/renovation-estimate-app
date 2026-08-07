@@ -270,6 +270,31 @@ export function findWorkArea(area: string): WorkArea | null {
 }
 
 /**
+ * 箇所ごとに、撮った写真を結びつける明細行のID（無ければ null）を引く表を作る。
+ *
+ * **対応の根拠は WORK_AREAS の itemName だけ。** 箇所が決まれば工事項目名も決まる
+ * （上の WORK_AREAS の説明）ので、その名前と見積明細の name が一致する行に結びつける。
+ * 一致する行が無い箇所は null のままにする。**明細をこちらで作らない**
+ * （デモの明細は lib/demoFixture.ts が持ち、増やすとデモの版が変わる）。
+ * null の箇所で撮った写真は、書類のどの枠にも入らない（lib/db/quoteRequestDoc.ts）。
+ * その旨は画面が PHOTO_STEP_TEXT.noLineNote で伝える。
+ */
+export function lineIdByPhotoArea(
+  lines: readonly { id: string; name: string }[],
+): Record<string, string | null> {
+  return Object.fromEntries(
+    PHOTO_AREAS.map((area) => {
+      const itemName = findWorkArea(area)?.itemName;
+      const line =
+        itemName === undefined
+          ? undefined
+          : lines.find((entry) => entry.name === itemName);
+      return [area, line?.id ?? null];
+    }),
+  );
+}
+
+/**
  * 法定①工事名称（docs/design.md 3章）の初期値を、現場住所から組み立てる。
  * projects.work_name の既定値として使う。画面上で直せる
  * （docs/design.md 7章「自動で埋めた項目も、画面に出す」）。
@@ -416,11 +441,16 @@ export {
   SUBCONTRACTORS_TEXT,
 } from "./quoteFlowText";
 
-// デモの画面の並び D3〜D8（docs/flows.md）の文言は lib/flowText.ts が持つ。
+// デモの画面の並び D2〜D9（docs/flows.md）の文言は lib/flowText.ts が持つ。
 // 同じ理由で re-export する。
 export {
+  DEMO_RESTART_PATH,
+  DEMO_RESTART_TEXT,
   DOCUMENT_CONFIRM_TEXT,
   DRAFTS_TEXT,
+  PHOTO_MAX_PER_AREA,
+  PHOTO_STEP_TEXT,
+  PROJECT_STEP_TEXT,
   QUOTE_DOCUMENT_TEXT,
   QUOTE_LIST_TEXT,
   RECEIVED_TEXT,

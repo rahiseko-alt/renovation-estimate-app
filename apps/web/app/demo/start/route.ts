@@ -9,64 +9,22 @@
 //
 // URL はビルドで変わらない。素のフォームから POST する形にすれば、
 // 古いページからでも必ず届く。JavaScript が動かない環境でも同じ経路を通る。
+//
+// 同一オリジンの確認・Cookie の発行・掃除は `lib/demoSession.ts` が持つ
+// （やり直しの入口 `/demo/restart` と同じものを通す）。
 
-import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { after } from "next/server";
 
-import { isDemoOwner, newDemoOwnerId } from "../../../lib/auth/demoOwner";
-import {
-  SESSION_COOKIE_NAME,
-  createSessionValue,
-  readSessionValue,
-  sessionCookieOptions,
-} from "../../../lib/auth/session";
-import {
-  findDemoProject,
-  purgeExpiredDemoData,
-} from "../../../lib/db/demoCleanup";
+import { newDemoOwnerId } from "../../../lib/auth/demoOwner";
+import { findDemoProject } from "../../../lib/db/demoCleanup";
 import { seedDemoData } from "../../../lib/db/demoSeed";
 import {
-  DEMO_CONTENT_VERSION,
-  DEMO_VERSION_COOKIE_NAME,
-} from "../../../lib/demoVersion";
-
-/**
- * デモの有効期間。商談1回ぶんが収まればよいので短く取る
- * （通常のログインの30日をデモに与える理由が無い）。
- *
- * この値は**署名の中の失効時刻と、Cookie の maxAge の両方**に使う。
- * Cookie だけ短くしても、値を控えておいた相手には効かない。
- */
-const DEMO_TTL_SECONDS = 60 * 60 * 6;
-
-/**
- * 同一オリジンからの POST かを確かめる。
- *
- * **Server Action はこれを自前で行っていた。** ルートハンドラには無いので、
- * ここに同じ判定を置く。置かないと、他所のサイトに置いたフォームから叩かれ、
- * 訪問者のセッション Cookie を勝手に貼り替えられる
- * （ログイン中の利用者なら、実質その場でログアウトさせられる）。
- *
- * 素のフォームの POST には Origin が付く。付いていないものは通さない。
- * 公開URLの判定には転送元のホスト（x-forwarded-host）を優先する
- * （Vercel の前段を通ると host は内部の値になりうる）。
- *
- * **この判定は、前段（Vercel）が `x-forwarded-host` を必ず上書きすることを前提にする。**
- * 上書きされない環境に載せ替えるなら、攻撃者がこのヘッダを自分で付けて
- * Origin と一致させられるので、ここは信頼できる値の比較に直すこと。
- */
-function isSameOrigin(request: Request): boolean {
-  const origin = request.headers.get("origin");
-  const host =
-    request.headers.get("x-forwarded-host") ?? request.headers.get("host");
-  if (!origin || !host) return false;
-  try {
-    return new URL(origin).host === host;
-  } catch {
-    return false;
-  }
-}
+  currentDemoOwnerId,
+  demoContentIsCurrent,
+  isSameOrigin,
+  issueDemoSession,
+  purgeExpiredDemoAfterResponse,
+} from "../../../lib/demoSession";
 
 /**
  * デモ一式を用意して、案件IDを返す。
@@ -84,37 +42,25 @@ function isSameOrigin(request: Request): boolean {
  * 触った人ほど古いものを見る）。版が違えば、**同じ識別子のまま作り直す**
  * （新しい識別子を発行すると、古い案件が期限まで残る）。版は `lib/demoVersion.ts`。
  *
+ * **①を迂回するのが「最初からやり直す」**（`app/demo/restart/route.ts`）。
+ * あちらは作り直すことそのものが目的なので、この分岐を通らない。
+ *
  * それでも、Cookie を捨てて叩き直す相手は止められない。**このアプリは
  * IPごとの流量制限を持っていない**（サーバレスで共有できる状態を持たないため）。
  * 前段（Vercel の WAF 等）で掛ける前提にする。`docs/design.md` 6-1 参照。
  */
 async function startDemo(): Promise<string> {
-  const store = await cookies();
-
-  const current = await readSessionValue(store.get(SESSION_COOKIE_NAME)?.value);
-  const demoOwner = current && isDemoOwner(current) ? current : null;
-  const contentIsCurrent =
-    store.get(DEMO_VERSION_COOKIE_NAME)?.value === DEMO_CONTENT_VERSION;
+  const demoOwner = await currentDemoOwnerId();
 
   // ①既にデモ中で、中身も今のものなら作り直さない。
-  if (demoOwner && contentIsCurrent) {
+  if (demoOwner && (await demoContentIsCurrent())) {
     const existing = await findDemoProject(demoOwner);
     if (existing) return existing;
   }
 
   // 中身が古いデモ中の訪問者は、同じ識別子のまま作り直す。
   const ownerId = demoOwner ?? newDemoOwnerId();
-
-  store.set(
-    SESSION_COOKIE_NAME,
-    await createSessionValue(ownerId, DEMO_TTL_SECONDS),
-    sessionCookieOptions(DEMO_TTL_SECONDS),
-  );
-  store.set(
-    DEMO_VERSION_COOKIE_NAME,
-    DEMO_CONTENT_VERSION,
-    sessionCookieOptions(DEMO_TTL_SECONDS),
-  );
+  await issueDemoSession(ownerId);
 
   // 発行したばかりの識別子なら、この owner_id にはまだ1行も無いので
   // 後始末（往復2回）を飛ばす（seedDemoData の ownerIsNew を見る）。
@@ -122,18 +68,8 @@ async function startDemo(): Promise<string> {
     ownerIsNew: demoOwner === null,
   });
 
-  // ②掃除は**応答を返したあとに**回す。利用者の待ち時間に足さない。
-  // 失敗しても始めさせる（商談の場でデモが開かない方が損失が大きい。
-  // 次に誰かが始めたときに、また掃除の機会がある）。
-  after(async () => {
-    try {
-      await purgeExpiredDemoData(new Date(Date.now() - DEMO_TTL_SECONDS * 1000));
-    } catch (error) {
-      // デモは止めない。ただし黙って消すと、掃除が毎回失敗していても気付けない。
-      // 第一引数は固定の文字列にし、値は別引数で渡す（photoStorage.ts と同じ理由）。
-      console.error("期限切れデモの掃除に失敗した:", { error });
-    }
-  });
+  // ②掃除は応答を返したあとに回す（理由は lib/demoSession.ts）。
+  purgeExpiredDemoAfterResponse();
 
   return projectId;
 }
@@ -146,8 +82,10 @@ export async function POST(request: Request): Promise<Response> {
   const projectId = await startDemo();
 
   // 303 で返す。POST の応答に 307 を使うと、ブラウザが遷移先へも POST し直す。
+  // 行き先は D2「案件をつくる」（docs/flows.md「デモの画面の並び」）。
+  // 変えるときは、実装より先に表を直してもらう。
   return NextResponse.redirect(
-    new URL(`/demo/${projectId}/photo`, request.url),
+    new URL(`/demo/${projectId}/project`, request.url),
     303,
   );
 }

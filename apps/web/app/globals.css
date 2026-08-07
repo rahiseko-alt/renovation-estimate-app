@@ -132,17 +132,26 @@ textarea {
   padding: 12px 0;
   min-height: 100px;
 }
+/*
+ * 写真枠。明細1行につき1つで、中に写真が0枚〜複数枚入る（1箇所につき撮れる枚数は
+ * lib/flowText.ts の PHOTO_MAX_PER_AREA）。枠の大きさは枚数で変えない——
+ * 変えると明細ごとに行の高さが揃わず、書類として読みにくくなる。
+ * 複数枚のときは枠の幅を等分して横に並べる（はみ出しは overflow で切る）。
+ * 0枚のときは中身が無く、点線の枠だけが残る。
+ */
 .doc-photo-frame {
   border: 2px dashed #999;
   flex-shrink: 0;
   overflow: hidden;
   display: flex;
-  align-items: center;
+  align-items: stretch;
   justify-content: center;
+  gap: 2px;
   color: #999;
 }
 .doc-photo-frame img {
-  width: 100%;
+  flex: 1 1 0;
+  min-width: 0;
   height: 100%;
   object-fit: cover;
 }

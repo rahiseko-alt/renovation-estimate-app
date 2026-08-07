@@ -150,6 +150,9 @@ expect_contains "未ログインのトップにデモの入口" "デモを触っ
 check "GET /demo/<uuid>/photo（デモ未開始）" 404 \
   "$(curl -s -o /dev/null -w '%{http_code}' \
     "${BASE}/demo/00000000-0000-4000-8000-000000000000/photo")"
+check "GET /demo/<uuid>/project（デモ未開始）" 404 \
+  "$(curl -s -o /dev/null -w '%{http_code}' \
+    "${BASE}/demo/00000000-0000-4000-8000-000000000000/project")"
 check "GET /login" 200 "$(curl -s -o /dev/null -w '%{http_code}' "${BASE}/login")"
 check "GET /api/health" 200 "$(curl -s -o /dev/null -w '%{http_code}' "${BASE}/api/health")"
 check "GET /offline" 200 "$(curl -s -o /dev/null -w '%{http_code}' "${BASE}/offline")"

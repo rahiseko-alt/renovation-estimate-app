@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 
 import { DocumentCanvas } from "../../../../components/DocumentCanvas";
 import { DocumentConfirmActions } from "../../../../components/DocumentConfirmActions";
+import { DemoRestartButton } from "../../../../components/DemoRestartButton";
 import { isDemoOwner } from "../../../../lib/auth/demoOwner";
 import { getCurrentUser } from "../../../../lib/auth/server";
 import { DOCUMENT_CONFIRM_TEXT } from "../../../../lib/content";
@@ -31,6 +32,9 @@ export default async function DocumentConfirmPage({
   if (!project) notFound();
 
   const data = await getQuoteRequestDocData(project, ownerId);
+  // この画面は通常経路でも開く（D4 はデモの表の一部だが、URLは /projects 配下）。
+  // やり直しはデモの利用者にだけ出す。
+  const demo = isDemoOwner(ownerId);
 
   return (
     <main className="mx-auto w-full max-w-md px-4 py-6">
@@ -59,11 +63,16 @@ export default async function DocumentConfirmPage({
       */}
       <DocumentConfirmActions
         projectId={id}
-        editHref={
-          isDemoOwner(ownerId) ? `/demo/${id}/photo` : `/projects/${id}`
-        }
+        editHref={demo ? `/demo/${id}/photo` : `/projects/${id}`}
         saveHref="/drafts"
       />
+
+      {/* 紙には出さない（画面のボタンは doc-screen-only。globals.css の @media print）。 */}
+      {demo ? (
+        <div className="doc-screen-only">
+          <DemoRestartButton />
+        </div>
+      ) : null}
     </main>
   );
 }
