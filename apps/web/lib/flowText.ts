@@ -145,10 +145,12 @@ export const QUOTE_LIST_TEXT = {
 
 /** D9 下書き保存フォルダ。 */
 export const DRAFTS_TEXT = {
-  heading: "下書き保存フォルダ",
-  description: "まだ下請けに出していないものです。続きから直せます。",
-  empty: "下書きはありません。",
-  resume: "続きから",
+  heading: "保存フォルダ",
+  description: "保存した案件です。押すと書類を開けます。",
+  empty: "保存した案件はありません。",
+  resume: "開く",
+  /** 既に下請けへ出したものの目印。押せば書類は同じように開ける。 */
+  sentMark: "送信済み",
 } as const;
 
 /**
