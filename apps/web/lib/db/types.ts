@@ -84,6 +84,12 @@ export type Photo = {
   ownerId: string;
   /** 箇所（PHOTO_AREAS のいずれか）。 */
   area: string;
+  /**
+   * 結びついている見積明細行（PersistedEstimateLine.id）。
+   * null は「まだどの行にも結びついていない写真」。書類の枠を埋めるのは
+   * これが入っている写真だけ（docs/flows.md 工程5）。
+   */
+  lineId: string | null;
   /** Supabase Storage バケット "photos" 内のオブジェクトキー。 */
   storagePath: string;
   createdAt: string;
@@ -92,6 +98,8 @@ export type Photo = {
 export type NewPhotoInput = {
   projectId: string;
   area: string;
+  /** 結びつける明細行。省略・null なら未結び付けで入る。 */
+  lineId?: string | null;
   storagePath: string;
 };
 
@@ -383,14 +391,28 @@ export type QuoteGroupRequestForSubcontractor = {
 // supabase/migrations/20260806010000_line_adoptions.sql。
 // ---------------------------------------------------------------------------
 
+/**
+ * 明細に付ける印。`adopted` は採用、`on_hold` は保留。
+ * **保留は、あとで採用に変えられる**（不採用の記録ではない。利用者の指示 2026-08-07）。
+ */
+export type LineMarkStatus = "adopted" | "on_hold";
+
+export const LINE_MARK_STATUSES: readonly LineMarkStatus[] = [
+  "adopted",
+  "on_hold",
+];
+
 export type LineAdoption = {
   id: string;
   projectId: string;
   ownerId: string;
-  /** 採用した明細行。PersistedEstimateLine.id を指す。 */
+  /** 印を付けた明細行。PersistedEstimateLine.id を指す。 */
   lineItemId: string;
-  /** 採用した社ごとの依頼。QuoteGroupRequest.id を指す。 */
+  /** 印を付けた社ごとの依頼。QuoteGroupRequest.id を指す。 */
   quoteGroupRequestId: string;
+  /** 採用か保留か。1明細につき採用は1社まで（DBの部分 unique index で保証）。 */
+  status: LineMarkStatus;
+  /** 印を付けた時刻（採用・保留のどちらでも入る）。 */
   adoptedAt: string;
 };
 
@@ -398,6 +420,10 @@ export type AdoptLineInput = {
   projectId: string;
   lineItemId: string;
   quoteGroupRequestId: string;
+};
+
+export type MarkLineInput = AdoptLineInput & {
+  status: LineMarkStatus;
 };
 
 /**

@@ -12,13 +12,15 @@ import { getSupabaseClient } from "./client";
 import type { NewPhotoInput, Photo } from "./types";
 import { isUuid } from "./uuid";
 
-const COLUMNS = "id, project_id, owner_id, area, storage_path, created_at";
+const COLUMNS =
+  "id, project_id, owner_id, area, line_id, storage_path, created_at";
 
 type PhotoRow = {
   id: string;
   project_id: string;
   owner_id: string;
   area: string;
+  line_id: string | null;
   storage_path: string;
   created_at: string;
 };
@@ -29,6 +31,7 @@ function toPhoto(row: PhotoRow): Photo {
     projectId: row.project_id,
     ownerId: row.owner_id,
     area: row.area,
+    lineId: row.line_id,
     storagePath: row.storage_path,
     createdAt: row.created_at,
   };
@@ -78,6 +81,7 @@ export async function createPhoto(
       project_id: input.projectId,
       owner_id: ownerId,
       area: input.area,
+      line_id: input.lineId ?? null,
       storage_path: input.storagePath,
     })
     .select(COLUMNS)
