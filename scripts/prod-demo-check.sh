@@ -66,9 +66,22 @@ fetch() {
 # tr '<' '\n' でタグごとに切ると、部品の中身はその断片の末尾に来る（例: `button ...>採用`）。
 # 説明文の断片は文末まで続くので、末尾一致にならない。
 # React が描画の間に挟むコメントノードも、この切り方なら断片の末尾が変わらない。
+#
+# 照合は**固定文字列**で行う。grep に渡すと文言が正規表現として解釈されるため、
+# 文言に `.` や `(` が入った日に、意図と違うものに当たる（または当たらなくなる）。
+# awk の substr 比較は固定文字列なので、その揺れが起きない。
 has_label() {
   local file="$1" label="$2"
-  tr '<' '\n' < "${file}" | grep -q ">${label}$"
+  tr '<' '\n' < "${file}" | awk -v needle=">${label}" '
+    {
+      n = length(needle)
+      if (length($0) >= n && substr($0, length($0) - n + 1) == needle) {
+        found = 1
+        exit
+      }
+    }
+    END { exit !found }
+  '
 }
 
 echo "== 対象: ${BASE} =="

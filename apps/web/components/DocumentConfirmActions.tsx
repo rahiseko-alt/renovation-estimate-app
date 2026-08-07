@@ -31,7 +31,10 @@ export function DocumentConfirmActions({
     setErrorMessage(null);
     startSending(async () => {
       try {
-        await sendFromDocumentAction(projectId);
+        // 送れなかった理由は**返り値**で来る（Next.js は本番ビルドで Server Action の
+        // 例外を伏せるため、throw では意図した日本語が画面に出ない）。
+        const result = await sendFromDocumentAction(projectId);
+        if (!result.ok) setErrorMessage(result.message);
       } catch (error) {
         // redirect() は例外で制御を移す。フレームワークの内部例外は
         // unstable_rethrow に任せ、それ以外だけを失敗として扱う

@@ -166,10 +166,16 @@ describe("D6 見積もり書類（1社ずつ）", () => {
     ).toBeNull();
 
     // 押す側も同じ。所有者でなければ通らない。
+    // **投げずに返す**（Next.js は本番ビルドで Server Action の例外を伏せるため、
+    // 想定内の失敗は返り値で画面へ渡す。app/projects/[id]/quotes/actions.ts）。
     currentUser.value = OWNER_B;
-    await expect(
-      markLineAction(project.id, "00000000-0000-4000-8000-000000000000", requestA.id, "adopted"),
-    ).rejects.toThrow();
+    const result = await markLineAction(
+      project.id,
+      "00000000-0000-4000-8000-000000000000",
+      requestA.id,
+      "adopted",
+    );
+    expect(result.ok).toBe(false);
     currentUser.value = OWNER_A;
   });
 });

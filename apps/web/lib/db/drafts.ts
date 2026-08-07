@@ -30,8 +30,10 @@ async function selectSentProjectIds(
     .eq("owner_id", ownerId)
     .in("project_id", [...projectIds]);
   if (error) throw error;
+  // data は null になりうる（エラー以外でも返る）。そのまま .map すると落ちるので
+  // 「1件も出していない」と同じ扱いにする。
   return new Set(
-    (data as { project_id: string }[]).map((row) => row.project_id),
+    ((data ?? []) as { project_id: string }[]).map((row) => row.project_id),
   );
 }
 

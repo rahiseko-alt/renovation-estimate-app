@@ -9,6 +9,17 @@ import { LINE_MARK_STATUSES } from "../../../../lib/db/types";
 import type { LineMarkStatus } from "../../../../lib/db/types";
 
 /**
+ * 想定内の失敗は**投げずに返す**。
+ *
+ * Next.js は本番ビルドで Server Action の例外を伏せる（クライアントに届くのは
+ * 差し替えられた汎用メッセージで、こちらが書いた日本語は出ない）。
+ * 画面に理由を出したいので、想定内の失敗は返り値で渡す。
+ * throw が残るのは**想定外**のときだけで、そちらは呼び出し側が
+ * QUOTE_DOCUMENT_TEXT.markFailed に落とす。
+ */
+export type MarkLineResult = { ok: true } | { ok: false; message: string };
+
+/**
  * D6（見積もり書類）で、明細1件にその社の「採用」または「保留」の印を付ける。
  *
  * 所有者確認をここでも行う。画面で押せなくしても Server Action は直接叩ける
@@ -16,35 +27,44 @@ import type { LineMarkStatus } from "../../../../lib/db/types";
  * 採用の排他（1明細1社）と、依頼の対象範囲の検査、採用を付け替えたときに
  * 前の社を保留へ下ろす扱いは lib/db/lineAdoptions.ts が行う。
  */
-async function requireProjectOwner(projectId: string): Promise<string> {
-  const ownerId = await getCurrentUser();
-  if (!ownerId) {
-    throw new Error("ログインしてください。");
-  }
-  const project = await getProjectForOwner(projectId, ownerId);
-  if (!project) {
-    throw new Error("案件が見つかりません。");
-  }
-  return ownerId;
-}
-
 export async function markLineAction(
   projectId: string,
   lineItemId: string,
   quoteGroupRequestId: string,
   status: LineMarkStatus,
-): Promise<void> {
-  const ownerId = await requireProjectOwner(projectId);
+): Promise<MarkLineResult> {
+  const ownerId = await getCurrentUser();
+  if (!ownerId) {
+    return { ok: false, message: "ログインしてください。" };
+  }
+  const project = await getProjectForOwner(projectId, ownerId);
+  if (!project) {
+    return { ok: false, message: "案件が見つかりません。" };
+  }
   // 直接叩かれたときに未知の状態が入らないようにする（型は実行時には残らない）。
   if (!LINE_MARK_STATUSES.includes(status)) {
-    throw new Error("印の種類が不正です。");
+    return { ok: false, message: "印の種類が不正です。" };
   }
-  await markLine(
-    { projectId, lineItemId, quoteGroupRequestId, status },
-    ownerId,
-  );
+
+  try {
+    await markLine(
+      { projectId, lineItemId, quoteGroupRequestId, status },
+      ownerId,
+    );
+  } catch (error) {
+    // lineAdoptions.ts の検証（依頼の所有者・案件の一致・対象範囲）は日本語の
+    // Error で落ちる。それ以外（DBの障害など）は想定外なので投げ直す。
+    if (error instanceof Error) {
+      return { ok: false, message: error.message };
+    }
+    throw error;
+  }
+
+  // **成功したときだけ**作り直す。失敗しているのに作り直すと、
+  // 変わっていない画面を描き直すだけで無駄な往復が増える。
   // 押しても画面は移らない（docs/flows.md D6）が、一覧（D7）と
   // この画面自身の印は次に開いたときに新しくする。
   revalidatePath(`/projects/${projectId}/quotes`);
   revalidatePath(`/projects/${projectId}/quotes/${quoteGroupRequestId}`);
+  return { ok: true };
 }

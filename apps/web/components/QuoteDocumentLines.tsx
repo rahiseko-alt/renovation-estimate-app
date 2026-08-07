@@ -27,17 +27,23 @@ export function QuoteDocumentLines({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
+  // 想定内の失敗は**返り値**で受ける。Next.js は本番ビルドで Server Action の例外を
+  // 伏せるため、throw を catch して message を出しても意図した日本語は出ない
+  // （app/projects/[id]/quotes/actions.ts の MarkLineResult）。
+  // catch に残るのは想定外の失敗だけなので、そこは決まった文言にする。
   function mark(lineItemId: string, status: LineMarkStatus): void {
     setErrorMessage(null);
     startTransition(async () => {
       try {
-        await markLineAction(projectId, lineItemId, quote.requestId, status);
-      } catch (error) {
-        setErrorMessage(
-          error instanceof Error
-            ? error.message
-            : QUOTE_DOCUMENT_TEXT.markFailed,
+        const result = await markLineAction(
+          projectId,
+          lineItemId,
+          quote.requestId,
+          status,
         );
+        if (!result.ok) setErrorMessage(result.message);
+      } catch {
+        setErrorMessage(QUOTE_DOCUMENT_TEXT.markFailed);
       }
     });
   }

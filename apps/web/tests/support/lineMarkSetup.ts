@@ -13,8 +13,11 @@ import {
 } from "../../lib/db/quoteRequestGroups";
 import { createSubcontractor } from "../../lib/db/subcontractors";
 
-export const OWNER_A = "owner-a@example.com";
-export const OWNER_B = "owner-b@example.com";
+// 案件の登録件数には所有者ごとの上限（lib/limits.ts）があり、共用の
+// owner-a@example.com は1回の実行で既に上限近くまで使っている。
+// この土台専用の所有者を使い、他のテストの余地を削らない（tests/drafts.test.ts と同じ理由）。
+export const OWNER_A = "line-mark-owner@example.com";
+export const OWNER_B = "line-mark-other-owner@example.com";
 
 /** 明細2行（既定行＋追加1行）と依頼グループを持つ案件を作る。 */
 export async function setupProject(customerName: string) {

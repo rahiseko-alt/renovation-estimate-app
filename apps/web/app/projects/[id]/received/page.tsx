@@ -7,7 +7,8 @@ import { getProjectForOwner } from "../../../../lib/db/projects";
 
 /**
  * D5 受信しました（デモ）（docs/flows.md「デモの画面の並び」）。
- * ボタンは「見積もりを見る」1つだけで、D6 の入口（/projects/[id]/quotes）へ渡す。
+ * ボタンは「見積もりを見る」1つだけで、D7 下請け見積もり一覧（/projects/[id]/quotes）へ渡す。
+ * 1社ずつの見積もり書類（D6）はその一覧から開く（/projects/[id]/quotes/[requestId]）。
  * proxy.ts が /projects 配下にログインを要求し、所有者確認はここでも行う。
  */
 export default async function ReceivedPage({

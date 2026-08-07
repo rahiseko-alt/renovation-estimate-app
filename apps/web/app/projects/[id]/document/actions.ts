@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 
 import { getCurrentUser } from "../../../../lib/auth/server";
+import { DOCUMENT_CONFIRM_TEXT } from "../../../../lib/content";
 import { hasQuoteRequestGroup } from "../../../../lib/db/drafts";
 import { getProjectForOwner } from "../../../../lib/db/projects";
 import { listSubcontractorsForOwner } from "../../../../lib/db/subcontractors";
@@ -19,12 +20,21 @@ import { sendQuoteRequestGroup } from "../send/actions";
 const DOCUMENT_PLANNED_PRICE_BAND = "under_500man";
 
 /**
+ * 送れなかった理由を、画面が出せる言葉で返す。
+ * 成功したときは redirect（例外で制御が移る）なので、ここへは戻ってこない。
+ * 形は app/projects/[id]/quotes/actions.ts の MarkLineResult に合わせる。
+ */
+export type SendFromDocumentResult = { ok: true } | { ok: false; message: string };
+
+/**
  * 確認画面（D3）の「送信」。**送信の実体は作らない。**
  * 既存の送信（app/projects/[id]/send/actions.ts の sendQuoteRequestGroup）を
  * そのまま通し、送信ゲートも所有者確認もあちらの1箇所で受ける。
  * ここが持つのは「誰に・どの帯で送るか」と「送ったあとの行き先」だけ。
  */
-export async function sendFromDocumentAction(projectId: string): Promise<void> {
+export async function sendFromDocumentAction(
+  projectId: string,
+): Promise<SendFromDocumentResult> {
   const ownerId = await getCurrentUser();
   if (!ownerId) {
     throw new Error("ログインしてください。");
@@ -38,6 +48,12 @@ export async function sendFromDocumentAction(projectId: string): Promise<void> {
   // 押すたびに依頼が増えると、下請には同じ工事の依頼が何通も届く。
   if (!(await hasQuoteRequestGroup(projectId, ownerId))) {
     const subcontractors = await listSubcontractorsForOwner(ownerId);
+    // 送り先はこの画面では選ばせない（docs/flows.md の D3）ので、台帳が空なら
+    // 送りようがない。送信側に渡すと「送り先を1社以上選んでください。」が返るが、
+    // 選ぶ欄の無いこの画面ではその指示に従えない。ここで止めて言い換える。
+    if (subcontractors.length === 0) {
+      return { ok: false, message: DOCUMENT_CONFIRM_TEXT.noSubcontractors };
+    }
     await sendQuoteRequestGroup(
       projectId,
       subcontractors.map((subcontractor) => subcontractor.id),

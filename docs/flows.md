@@ -570,12 +570,29 @@ flowchart LR
     SND["/projects/[id]/send<br/>送り先と予定価格帯"]
   end
 
+  subgraph FLOW["デモの画面の並び（上の D1〜D9 の表が正。線はその表のとおり）"]
+    direction TB
+    DOC["/projects/[id]/document<br/>D3 確認画面（保存 / 送信 / 修正）"]
+    SNT["/projects/[id]/sent<br/>D4 送信しました（デモ）"]
+    RCV["/projects/[id]/received<br/>D5 受信しました（デモ）"]
+    QL["/projects/[id]/quotes<br/>D7 下請け見積もり一覧"]
+    QDOC["/projects/[id]/quotes/[requestId]<br/>D6 見積もり書類（1社ずつ）"]
+    DRF["/drafts<br/>D8 下書き保存フォルダ"]
+    DOC -->|"送信"| SNT
+    SNT -->|"ロード中（デモ）を3秒流して自動で"| RCV
+    RCV -->|"見積もりを見る"| QL
+    QL -->|"見積もりを見る（1社ぶん）"| QDOC
+    QDOC -->|"一覧へ（採用 / 保留を押しても移らない）"| QL
+    DOC -->|"保存"| DRF
+    DRF -->|"続きから"| DOC
+  end
+
   subgraph OUT["比較と書類"]
     direction TB
     CMP["/projects/[id]/comparison<br/>比較表・採用"]
     PDF(["PDFがブラウザに降りてくる<br/>（画面遷移ではない）"])
     CMP -->|"採用 / 取り消しで再描画"| CMP
-    CMP -->|"見積書PDFを出力（デモの3タップ目）"| PDF
+    CMP -->|"見積書PDFを出力"| PDF
   end
 
   subgraph SUBC["下請（ログイン不要）"]
@@ -605,7 +622,8 @@ flowchart LR
   SND -->|"止められた（同じ画面に留まる）"| SND
   CMP -->|"中身を見る（デモ）"| LEG
 
-  DP -->|"写真を撮る / 写真なしで進む"| CMP
+  DP -->|"写真を撮る / 写真なしで進む"| DOC
+  DOC -->|"修正"| DP
   SND -.->|"発行されたリンクをアプリの外で渡す"| QT
   EST -.->|"旧モデル：明細ごとに単価を頼む"| QT
   QD -.->|"回答が並ぶ"| CMP

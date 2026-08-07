@@ -84,7 +84,8 @@
   （`lib/db/` のテストはローカル Supabase が要る。下記「データの保存先」参照）
 - lint / 型チェック: `pnpm --filter web lint` / `pnpm --filter web typecheck`
 - **本番のデモ経路を外から踏む**: `bash scripts/prod-demo-check.sh`
-  （3タップの経路と待ち時間を機械判定する。**「本番で動いています」と言う前にこれを通す。**
+  （`docs/flows.md`「デモの画面の並び」の D1〜D9 の経路と、待ち時間を機械判定する。
+  **「本番で動いています」と言う前にこれを通す。**
   一度も踏まずにそう言って、実際には1タップ目が10秒かかって落ちていたことがある。
   `docs/failures.md` 2026-08-06 参照）
 - 起動スモーク（受け入れ条件を HTTP で機械判定）: `bash scripts/smoke.sh`（先に `pnpm -r build`）

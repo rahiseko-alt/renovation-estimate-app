@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 
 import { DocumentCanvas } from "../../../../components/DocumentCanvas";
 import { DocumentConfirmActions } from "../../../../components/DocumentConfirmActions";
+import { isDemoOwner } from "../../../../lib/auth/demoOwner";
 import { getCurrentUser } from "../../../../lib/auth/server";
 import { DOCUMENT_CONFIRM_TEXT } from "../../../../lib/content";
 import { getProjectForOwner } from "../../../../lib/db/projects";
@@ -51,9 +52,16 @@ export default async function DocumentConfirmPage({
         </DocumentCanvas>
       </div>
 
+      {/*
+        「修正」の戻り先は写真のある画面（D2）。**デモと通常で行き先が違う。**
+        /demo/<id>/photo は isDemoOwner を要求する（app/demo/[projectId]/photo/page.tsx）ので、
+        通常の案件でそこへ戻すと404になる。通常の案件は写真の欄を持つ案件詳細へ戻す。
+      */}
       <DocumentConfirmActions
         projectId={id}
-        editHref={`/demo/${id}/photo`}
+        editHref={
+          isDemoOwner(ownerId) ? `/demo/${id}/photo` : `/projects/${id}`
+        }
         saveHref="/drafts"
       />
     </main>

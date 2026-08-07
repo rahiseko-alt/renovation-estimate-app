@@ -5,7 +5,10 @@
 // 旧実装は下請の回答を見積に新しい明細行として追加していたため、同じ工事を3社に頼んで
 // 3社とも回答すると同じ工事項目が3行入った。ここでは行を足さず、「この明細はこの社の
 // 依頼を採った」を1明細につき1件だけ持つ（排他は DB の unique 制約が保証する）。
-// 採用し直しは同じ (project_id, line_item_id) への upsert なので、前の採用が置き換わる。
+// 印の書き込みは DB関数 public.mark_line が1トランザクションで行う
+// （supabase/migrations/20260807020000_mark_line_atomic.sql）。採用し直しは
+// (project_id, line_item_id, quote_group_request_id) への upsert で、前の採用は
+// 同じトランザクションの中で保留に下がる。
 
 import { getSupabaseClient } from "./client";
 import {
@@ -84,6 +87,11 @@ async function assertMarkable(
  * 1明細につき採用は1社までという排他（DBの部分 unique index）を守りつつ、
  * 「採用でも保留でも一覧に貯まる」（利用者の指示 2026-08-07）を両立させるには
  * これしかない。消すと、一度採ってから採り直した社が一覧から消える。
+ *
+ * **「下ろす」と「上げる」は1トランザクションで行う**（DB関数 public.mark_line。
+ * supabase/migrations/20260807020000_mark_line_atomic.sql）。分けて書くと、
+ * 上げる側が失敗したときに前の採用が保留に下がったまま残り、その明細が
+ * 採用0社になる。
  */
 export async function markLine(
   input: MarkLineInput,
@@ -91,36 +99,14 @@ export async function markLine(
 ): Promise<LineAdoption> {
   await assertMarkable(input, ownerId);
 
-  const db = getSupabaseClient();
-
-  if (input.status === "adopted") {
-    // 先に下ろしてから上げる。逆にすると、一瞬2社が採用になって
-    // 部分 unique index に弾かれる。
-    const { error: demoteError } = await db
-      .from("line_adoptions")
-      .update({ status: "on_hold" })
-      .eq("project_id", input.projectId)
-      .eq("line_item_id", input.lineItemId)
-      .eq("owner_id", ownerId)
-      .eq("status", "adopted")
-      .neq("quote_group_request_id", input.quoteGroupRequestId);
-    if (demoteError) throw demoteError;
-  }
-
-  const { data, error } = await db
-    .from("line_adoptions")
-    .upsert(
-      {
-        project_id: input.projectId,
-        owner_id: ownerId,
-        line_item_id: input.lineItemId,
-        quote_group_request_id: input.quoteGroupRequestId,
-        status: input.status,
-        adopted_at: new Date().toISOString(),
-      },
-      { onConflict: "project_id,line_item_id,quote_group_request_id" },
-    )
-    .select(COLUMNS)
+  const { data, error } = await getSupabaseClient()
+    .rpc("mark_line", {
+      p_project_id: input.projectId,
+      p_owner_id: ownerId,
+      p_line_item_id: input.lineItemId,
+      p_request_id: input.quoteGroupRequestId,
+      p_status: input.status,
+    })
     .single();
   if (error) throw error;
   return toLineAdoption(data as LineAdoptionRow);

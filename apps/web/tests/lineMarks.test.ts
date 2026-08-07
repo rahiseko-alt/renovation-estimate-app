@@ -4,6 +4,7 @@
 
 import { describe, expect, it } from "vitest";
 
+import { getSupabaseClient } from "../lib/db/client";
 import {
   cancelLineAdoption,
   listLineAdoptionsForProject,
@@ -108,6 +109,42 @@ describe("明細の保留", () => {
     expect(marks).toHaveLength(1);
     expect(marks[0]!.quoteGroupRequestId).toBe(b.id);
     expect(marks[0]!.status).toBe("on_hold");
+  });
+
+  it("印を付けるのに失敗したら、前の採用は adopted のまま残る（下ろすだけで終わらない）", async () => {
+    const { project, group, lineOne } = await setupProject("保留6");
+    const a = await requestTo(group.id, "保留6社A", "hold6a@example.com", [lineOne]);
+
+    await markLine(
+      { projectId: project.id, lineItemId: lineOne, quoteGroupRequestId: a.id, status: "adopted" },
+      OWNER_A,
+    );
+
+    // **markLine の入口からは、この失敗に確実には届かない。** 実在しない依頼ID・
+    // 他人の依頼ID・対象範囲外の明細は、DBに触る前に assertMarkable が弾く
+    // （弾くのが正しい）。残るのは「読んだ直後に依頼が消えた」たぐいの割り込みで、
+    // 外から狙って起こせない。そこで markLine が原子性を預けている先――
+    // DB関数 mark_line（supabase/migrations/20260807020000_mark_line_atomic.sql）――を
+    // 直接呼び、その契約を見る。実在しない依頼IDを渡すと、
+    // 「他社の採用を下ろす」が済んだあとで quote_group_request_id の外部キーに落ちる。
+    //
+    // **ここで見ているのは「途中で落ちても何も残らない」こと。**
+    // 例外を握り潰す分岐（`exception when ... then`）を後から足すと、下ろしたところで
+    // 止まり、この明細は採用0社になる（画面には「選べませんでした」しか出ない）。
+    // その形になっていないことを固定する。
+    const { error } = await getSupabaseClient().rpc("mark_line", {
+      p_project_id: project.id,
+      p_owner_id: OWNER_A,
+      p_line_item_id: lineOne,
+      p_request_id: "00000000-0000-4000-8000-000000000000",
+      p_status: "adopted",
+    });
+    expect(error).not.toBeNull();
+
+    const marks = await listLineMarksForProject(project.id, OWNER_A);
+    expect(marks).toHaveLength(1);
+    expect(marks[0]!.quoteGroupRequestId).toBe(a.id);
+    expect(marks[0]!.status).toBe("adopted");
   });
 
   it("保留も、他人の依頼IDでは付けられない", async () => {
