@@ -94,6 +94,14 @@ function legalItemsOf(
 export async function getQuoteRequestDocData(
   project: Project,
   ownerId: string,
+  /**
+   * 書類に印字する見積回答期限。**この関数は日付を決めない。**
+   * 期限は元請が確認画面（D4）で打ち直せる値で、どの日を出すかは画面が持つ
+   * （初期値の日数は lib/flowText.ts の RESPONSE_DUE_DEFAULT_DAYS）。
+   * ここで決めると、画面の欄と書類の印字が別々に日付を持つことになる。
+   * 渡されなければ空欄のまま（依頼を出す前の案件詳細などで使う）。
+   */
+  responseDueAt: Date | null = null,
 ): Promise<DocData> {
   // 互いに依存しない3つ。直列に待たない（比較表と同じ理由。docs/failures.md 2026-08-06）。
   const [estimate, photos, slots] = await Promise.all([
@@ -108,9 +116,7 @@ export async function getQuoteRequestDocData(
     // **施主名は積まない。** この書類は下請に渡るもので、法定8項目にも含まれない
     // （docs/design.md 7章）。テンプレートに欄が無いことと二重に守る。
     customerName: "",
-    // 見積回答期限は依頼を出した時点（提示日時＋法定日数）に決まる。
-    // 出す前のこの画面では、まだどこにも存在しない値なので持たせない。
-    responseDueAt: null,
+    responseDueAt,
     issuedAt: new Date(),
     lines: estimate.lines,
     // 依頼書は単価を空で出す書類なので集計欄も出さない（テンプレート側にも欄が無い）。

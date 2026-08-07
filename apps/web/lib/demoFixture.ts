@@ -26,7 +26,7 @@ const KOUMUTEN = "dummy-koumuten@example.com";
  * 数量が常に1になり、その主張がデモ自身の反例になる。数量が実数で成立する項目に寄せる。
  * 単位は `lib/content.ts` の `UNITS` にあるものだけを使う。
  *
- * `adoptedBy` は、比較表で**どの社を採った状態で見せるか**。3タップの経路に
+ * `adoptedBy` は、比較表で**どの社を採った状態で見せるか**。デモの経路に
  * 「採用」のタップが無いので、投入の時点で採ってある状態にする。
  * 最安を計算で選ばない（「安い順に自動で採らない」は製品の姿勢で、
  * `lib/db/comparison.ts` の `cheapestRequestIdByLineId` にも同じ注記がある）。

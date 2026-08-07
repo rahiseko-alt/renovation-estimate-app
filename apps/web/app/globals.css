@@ -17,6 +17,18 @@
 
   /* 押せるものの最小サイズ。 */
   --spacing-tap: 48px;
+
+  /*
+   * ブランドの色。**アプリの緑はこの2つだけ**で、画面ごとに別の緑を書かない。
+   * 同じ値をアイコン（public/icon.svg）も持つ（SVG から CSS 変数を読めないため）。
+   * 片方を変えたらもう片方も直す。
+   *
+   * - brand（明るい黄緑）: ロゴの家の輪郭・飾り。**文字色には使わない**
+   *   （白地とのコントラストが 3:1 に届かず、WCAG 1.4.3 を満たさない）
+   * - brand-deep（深緑）: 押せるもの（ボタン）と、白地に載せる文字
+   */
+  --color-brand: #7cb342;
+  --color-brand-deep: #2e7d52;
 }
 
 /* 常に白ベース（OSのダークモード設定に関係なく）。 */
@@ -31,6 +43,33 @@ body {
   font-family: var(--font-sans);
   font-size: 1rem;
   line-height: 1.6;
+}
+
+/*
+ * 見出しを途中で2色に分ける（前半が緑、後半が黒）。
+ *
+ * **文字列を <span> で割らない。** トップの見出し（lib/content.ts の HOME_HEADING）は
+ * CI の起動スモークと本番スモークが本文から探すマーカーでもあり（AGENTS.md の注意書き）、
+ * 割ると HTML 上で文字が連続しなくなって grep が外れる。
+ * だから文字は1つのまま置き、背景のグラデーションを文字の形に切り抜いて塗る。
+ * 色を変える位置は --two-tone-split（%）で渡す。切り抜けない環境では単色で出る。
+ */
+.two-tone-heading {
+  --two-tone-split: 0%;
+  color: #111827;
+}
+
+@supports (background-clip: text) or (-webkit-background-clip: text) {
+  .two-tone-heading {
+    background-image: linear-gradient(
+      90deg,
+      var(--color-brand-deep) 0 var(--two-tone-split),
+      #111827 var(--two-tone-split) 100%
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
 }
 
 /* 金額と数量は等幅数字で右寄せにする。桁がずれると比較できない */

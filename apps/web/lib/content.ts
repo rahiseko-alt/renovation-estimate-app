@@ -17,6 +17,16 @@ export const SITE = {
 export const HOME_HEADING = "リフォーム見積";
 
 /**
+ * ブラウザの外枠に付く色（PWA の manifest の theme_color と、viewport の themeColor）。
+ * **2箇所から参照されるのでここに1つだけ置く。**
+ *
+ * 値はアプリの深緑で、`app/globals.css` の色トークン color-brand-deep と、
+ * アイコン（`public/icon.svg`）の電卓の色と同じ。CSS・SVG からは TS の定数を読めないため、
+ * 実値はこの3ファイルが持つ。**色を変えるときは3つとも直す。**
+ */
+export const THEME_COLOR = "#2e7d52";
+
+/**
  * トップページの説明文。看板にしている3つの接続をそのまま言う
  * （`docs/design.md` 2章「図面の無い現場で、撮った写真がそのまま複数社への
  * 見積依頼になる」）。**比べるところまで言う**：複数社への同時依頼が主眼で、
@@ -447,6 +457,7 @@ export {
   DEMO_RESTART_PATH,
   DEMO_RESTART_TEXT,
   DOCUMENT_CONFIRM_TEXT,
+  DOCUMENT_PLANNED_PRICE_BAND,
   DRAFTS_TEXT,
   PHOTO_MAX_PER_AREA,
   PHOTO_STEP_TEXT,
@@ -454,6 +465,7 @@ export {
   QUOTE_DOCUMENT_TEXT,
   QUOTE_LIST_TEXT,
   RECEIVED_TEXT,
+  RESPONSE_DUE_DEFAULT_DAYS,
   SENT_LOADING_SECONDS,
   SENT_TEXT,
 } from "./flowText";

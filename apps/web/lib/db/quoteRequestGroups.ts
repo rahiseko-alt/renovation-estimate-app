@@ -6,7 +6,7 @@
 // グループ（提示日時を持つ）と、社ごとの依頼（宛先・トークン・予定価格帯・回答期限・
 // 対象明細の範囲）の2段構成。
 
-import { computeResponseDueAt } from "../legalPeriod";
+import { computeResponseDueAt, meetsMinimumQuotePeriod } from "../legalPeriod";
 import { getSupabaseClient } from "./client";
 import { getOrCreateEstimate } from "./estimates";
 import { getSubcontractorForOwner } from "./subcontractors";
@@ -117,8 +117,9 @@ function toQuoteGroupRequest(row: QuoteGroupRequestRow): QuoteGroupRequest {
 }
 
 /**
- * 社ごとの依頼を1件作る。見積回答期限は、グループの提示日時と予定価格帯から
- * ここで計算して保存する（docs/design.md 7章「見積期間の元になる予定価格」）。
+ * 社ごとの依頼を1件作る。見積回答期限は、渡されればその日を、渡されなければ
+ * グループの提示日時と予定価格帯から計算した日を保存する
+ * （docs/design.md 7章「見積期間の元になる予定価格」）。
  * 呼び出し側で案件・グループの所有者確認を済ませた上で使う。
  *
  * さらにここで2つ確かめる（CodeRabbit のレビューで指摘。IDOR / データ整合性）。
@@ -151,10 +152,17 @@ export async function createQuoteGroupRequest(
     throw new Error("対象明細の範囲に、存在しない明細IDが含まれています。");
   }
 
-  const responseDueAt = computeResponseDueAt(
-    new Date(group.presentedAt),
-    input.plannedPriceBand,
-  );
+  // 渡されなければ提示日時＋法定日数で自動計算する（通常経路はこのまま）。
+  // 渡された期限は、**保存する直前にもう一度**法定の最短見積期間と突き合わせる。
+  // ここが依頼を書き込む唯一の場所なので、どの入口から来ても法令違反の期限が
+  // 保存されないことを、この1箇所で保証できる。
+  const presentedAt = new Date(group.presentedAt);
+  const responseDueAt =
+    input.responseDueAt ??
+    computeResponseDueAt(presentedAt, input.plannedPriceBand);
+  if (!meetsMinimumQuotePeriod(responseDueAt, presentedAt, input.plannedPriceBand)) {
+    throw new Error("見積回答期限が、法定の最短見積期間より短くなっています。");
+  }
 
   const { data, error } = await getSupabaseClient()
     .from("quote_group_requests")
