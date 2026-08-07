@@ -182,28 +182,52 @@ test("デモは D1 から D10 まで、表のとおりに進む", async ({ page 
   await expect(page.getByText(QUOTE_LIST_TEXT.empty)).toHaveCount(0);
   await expectRestartButton(page);
 
-  // **一覧でも採用／保留が押せる**（利用者の指示 2026-08-07。実機で
-  // 「一覧で押せない。詳細でしか押せない」と言われた）。押しても画面は移らない。
-  const listHold = page.getByRole("button", { name: QUOTE_DOCUMENT_TEXT.hold }).first();
-  const listAdopt = page.getByRole("button", { name: QUOTE_DOCUMENT_TEXT.adopt }).first();
-  const urlBeforeListMark = page.url();
-  await listHold.click();
-  await expect(listHold).toHaveAttribute("aria-pressed", "true");
-  expect(page.url()).toBe(urlBeforeListMark);
+  // **表になっている**（利用者の指示 2026-08-08）。工事が行・社が列で、
+  // 左上に「工事」、社ごとに「詳細」がある。社ごとの縦積みに戻ったらここで落ちる。
+  await expect(page.getByText(QUOTE_LIST_TEXT.lineColumn).first()).toBeVisible();
+  await expect(page.getByRole("link", { name: QUOTE_LIST_TEXT.detail })).toHaveCount(
+    COMPANIES.length,
+  );
 
-  // **採用も一覧で押せる。** 押せないのは保留だけ、という壊れ方をここで捕まえる。
+  // **同じ工事の単価が同じ行に並ぶ。** 1社目と2社目の内装工事のマスが、
+  // 画面の上下方向でほぼ同じ位置にあることで見る（表になっていない限り揃わない）。
+  const firstRowCells = page.getByRole("button", {
+    name: `${QUOTE_DOCUMENT_TEXT.adopt} ${COMPANIES[0]!.companyName}`,
+  });
+  const cellA = await firstRowCells.first().boundingBox();
+  const cellB = await page
+    .getByRole("button", {
+      name: `${QUOTE_DOCUMENT_TEXT.adopt} ${COMPANIES[1]!.companyName}`,
+    })
+    .first()
+    .boundingBox();
+  expect(cellA).not.toBeNull();
+  expect(cellB).not.toBeNull();
+  expect(Math.abs(cellA!.y - cellB!.y)).toBeLessThan(4);
+  // 同じ行なら、横には離れている（縦積みだと x が同じになる）。
+  expect(cellB!.x).toBeGreaterThan(cellA!.x + cellA!.width - 1);
+
+  // **単価のマスがそのまま採用のボタン。押しても画面は移らない。**
+  const urlBeforeListMark = page.url();
+  const listAdopt = firstRowCells.first();
   await listAdopt.click();
   await expect(listAdopt).toHaveAttribute("aria-pressed", "true");
-  await expect(listHold).toHaveAttribute("aria-pressed", "false");
   expect(page.url()).toBe(urlBeforeListMark);
 
-  // 一覧でも保留へ戻せる。**この先の「D8 で押した採用が D7 に貯まっている」検査を
-  // ここで先取りしないため**、状態は保留へ戻してから D8 に進む。
-  await listHold.click();
-  await expect(listHold).toHaveAttribute("aria-pressed", "true");
+  // **もう一度押すと外れる**（2026-08-08 の指示。押し間違いを戻せること）。
+  await listAdopt.click();
   await expect(listAdopt).toHaveAttribute("aria-pressed", "false");
+  expect(page.url()).toBe(urlBeforeListMark);
 
-  await page.getByRole("link", { name: QUOTE_LIST_TEXT.open }).first().click();
+  // **保留のボタンは一覧に無い**（D8 だけが持つ。利用者の指示 2026-08-08）。
+  // 1マスに採用と保留を両方入れる作りに戻ったらここで落ちる。
+  // 名前は**完全一致**で見る。既定の部分一致だと、マスの読み上げ名に
+  // 「保留」を含めた実装に変えたときに、この検査が黙って通ってしまう。
+  await expect(
+    page.getByRole("button", { name: QUOTE_DOCUMENT_TEXT.hold, exact: true }),
+  ).toHaveCount(0);
+
+  await page.getByRole("link", { name: QUOTE_LIST_TEXT.detail }).first().click();
 
   // ── D8 見積もり書類（1社ずつ） ─────────────────────────
   await expect(page).toHaveURL(
@@ -227,6 +251,13 @@ test("デモは D1 から D10 まで、表のとおりに進む", async ({ page 
   await expect(holdButtons.first()).toHaveAttribute("aria-pressed", "false");
   expect(page.url()).toBe(urlBeforeMark);
 
+  // **D8 で付けた保留が、一覧のマスに出る**（表示だけ。一覧では変えられない）。
+  // ここで保留を残さずに戻ると、一覧に保留が出なくなる退行を見逃す
+  // （上の1件目は採用に変えてしまったので、2件目に付けて残す）。
+  const secondHold = holdButtons.nth(1);
+  await secondHold.click();
+  await expect(secondHold).toHaveAttribute("aria-pressed", "true");
+
   // 画面が移るのは「一覧へ」を押したときだけ。
   await page.getByRole("link", { name: QUOTE_DOCUMENT_TEXT.toList }).click();
   await expect(page).toHaveURL(new RegExp(`${PROJECT_ID.source}/quotes$`));
@@ -237,6 +268,8 @@ test("デモは D1 から D10 まで、表のとおりに進む", async ({ page 
       .getByRole("button", { name: QUOTE_LIST_TEXT.adoptedMark, pressed: true })
       .first(),
   ).toBeVisible();
+  // D8 で残した保留も、一覧のマスに印として出ている。
+  await expect(page.getByText(QUOTE_DOCUMENT_TEXT.hold).first()).toBeVisible();
 
   // ── D10 見積書PDF ─────────────────────────────────────
   // **D7 の「見積書を出す」を押す。** これが表のとおりの経路（2026-08-07 に利用者が

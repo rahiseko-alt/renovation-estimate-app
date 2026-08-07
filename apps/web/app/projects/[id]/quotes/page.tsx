@@ -1,9 +1,8 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { DemoRestartButton } from "../../../../components/DemoRestartButton";
 import { DownloadPdfButton } from "../../../../components/DownloadPdfButton";
-import { QuoteDocumentLines } from "../../../../components/QuoteDocumentLines";
+import { QuoteAdoptionMatrix } from "../../../../components/QuoteAdoptionMatrix";
 import { isDemoOwner } from "../../../../lib/auth/demoOwner";
 import { getCurrentUser } from "../../../../lib/auth/server";
 import { QUOTE_LIST_TEXT } from "../../../../lib/content";
@@ -13,15 +12,16 @@ import { listAnsweredQuoteDocuments } from "../../../../lib/db/quoteDocuments";
 /**
  * D7 下請け見積もり一覧（案件ごと。docs/flows.md「デモの画面の並び」）。
  *
- * **社ごとに1ブロック**。各社から D8 へ入れる（「見積もりを見る」）。
- * この表に無いボタン・遷移を足さない。
+ * **工事が行・社が列の表**（利用者の指示 2026-08-08）。同じ工事の3社の単価が
+ * 同じ行に並ぶ。社名の横の「詳細」から D8 へ入る。この表に無いボタン・遷移を足さない。
  *
- * **採用／保留は D7 と D8 の両方で押せる**（利用者の指示 2026-08-07。
- * 実機で「一覧で押せない。詳細でしか押せない」と言われた）。押しても画面は移らず、
- * どちらで押しても同じところ（`line_adoptions`）に入る。**明細のボタンは D8 と
- * 同じ部品**（`components/QuoteDocumentLines.tsx`）をそのまま呼ぶ。ここに同じ
- * ボタンを書くと、押下状態の出し方や失敗時の文言が2箇所に分かれる
- * （AGENTS.md「結合を増やさない」2：同じ処理を呼ぶ入口は1つにする）。
+ * **この画面で押せるのは採用だけ**（同・利用者の指示）。単価のマスがそのまま
+ * 採用のボタンで、押しても画面は移らない。**保留は D8 で押す**
+ * （2026-08-07 の「一覧でも保留を押せる」はこの指示で置き換わった。
+ * 経緯は docs/flows.md「D7 を表にした（2026-08-08）」）。
+ *
+ * 表は `components/QuoteAdoptionMatrix.tsx` が持ち、書き込みは D8 と同じ
+ * Server Action を通る（AGENTS.md「結合を増やさない」2）。
  *
  * D7 → D10 は「見積書を出す」1つだけ（利用者の指示 2026-08-07）。
  * PDF を出す処理は案件詳細・比較表と同じ DownloadPdfButton を通る。
@@ -49,28 +49,10 @@ export default async function QuoteListPage({
       {quotes.length === 0 ? (
         <p className="mt-6 text-gray-700">{QUOTE_LIST_TEXT.empty}</p>
       ) : (
-        <div className="mt-6 flex flex-col gap-6">
-          {quotes.map((quote) => (
-            <section
-              key={quote.requestId}
-              className="rounded border-2 border-gray-400 p-4"
-            >
-              <h2 className="-mx-4 -mt-4 rounded-t bg-gray-800 px-4 py-3 text-lg font-bold text-white">
-                {quote.companyName}
-              </h2>
-
-              {/* その社が回答していない明細にボタンが出ないのは部品側の判定
-                  （costUnitPrice が null なら出さない）。D8 と同じ扱いになる。 */}
-              <QuoteDocumentLines projectId={id} quote={quote} />
-
-              <Link
-                href={`/projects/${id}/quotes/${quote.requestId}`}
-                className="tap mt-4 flex items-center justify-center rounded bg-blue-800 px-5 font-bold text-white"
-              >
-                {QUOTE_LIST_TEXT.open}
-              </Link>
-            </section>
-          ))}
+        <div className="mt-2 flex flex-col gap-6">
+          {/* その社が回答していない明細のマスが押せないのは部品側の判定
+              （costUnitPrice が null なら押せない）。D8 と同じ扱いになる。 */}
+          <QuoteAdoptionMatrix projectId={id} quotes={quotes} />
 
           {/* 回答が1件も無いとき（上の empty）はこのボタンを出さない。採用できる単価が
               1つも無く、押しても中身の無い書類が出るだけになるため。 */}

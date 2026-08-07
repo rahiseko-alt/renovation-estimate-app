@@ -101,6 +101,13 @@ function renderDoc(data: DocData): string {
   );
 }
 
+/**
+ * 写真枠だけを数える。`doc-photo-frame` だけで数えると、包む側の
+ * `doc-photo-frames` と、書類に埋め込んだ CSS の中の同じ語まで拾う
+ * （枠が 1明細1つ だった頃はその差に気づけず、3枠にしたときに初めて落ちた）。
+ */
+const FRAME = /class="doc-photo-frame"/g;
+
 function countOf(html: string, pattern: RegExp): number {
   return (html.match(pattern) ?? []).length;
 }
@@ -134,7 +141,7 @@ describe("見積依頼書に写真が入る（ローカル Supabase の実デー
 
     const html = renderDoc(data);
     // 枠は明細の数だけ。写真は撮った1枚だけが枠の中に出る。
-    expect(countOf(html, /doc-photo-frame/g)).toBe(lines.length);
+    expect(countOf(html, FRAME)).toBe(lines.length * PHOTO_MAX_PER_LINE);
     expect(countOf(html, /<img/g)).toBe(1);
     expect(html).toContain(data.photoUrlByLineId[lines[0]!.id]![0]!);
   });
@@ -151,7 +158,7 @@ describe("見積依頼書に写真が入る（ローカル Supabase の実デー
     expect(data.photoUrlByLineId[lines[0]!.id]).toHaveLength(PHOTO_MAX_PER_LINE);
 
     const html = renderDoc(data);
-    expect(countOf(html, /doc-photo-frame/g)).toBe(lines.length);
+    expect(countOf(html, FRAME)).toBe(lines.length * PHOTO_MAX_PER_LINE);
     expect(countOf(html, /<img/g)).toBe(PHOTO_MAX_PER_LINE);
   });
 
@@ -165,7 +172,7 @@ describe("見積依頼書に写真が入る（ローカル Supabase の実デー
 
     const html = renderDoc(data);
     // 枠は明細の数だけ出るが、中身は無い。
-    expect(countOf(html, /doc-photo-frame/g)).toBe(lines.length);
+    expect(countOf(html, FRAME)).toBe(lines.length * PHOTO_MAX_PER_LINE);
     expect(countOf(html, /<img/g)).toBe(0);
   });
 });
@@ -187,7 +194,7 @@ describe("デモの明細4行すべてに写真を結びつけられる（ロー
 
     const html = renderDoc(data);
     // 枠は4つとも出て、4つとも中身がある（空の枠が残らない）。
-    expect(countOf(html, /doc-photo-frame/g)).toBe(names.length);
+    expect(countOf(html, FRAME)).toBe(names.length * PHOTO_MAX_PER_LINE);
     expect(countOf(html, /<img/g)).toBe(names.length);
   });
 });

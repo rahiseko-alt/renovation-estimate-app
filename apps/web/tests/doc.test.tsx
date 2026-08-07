@@ -11,6 +11,7 @@ import {
   ESTIMATE_TOTALS_ROWS,
 } from "../lib/doc/templates/estimate";
 import { QUOTE_REQUEST_TEMPLATE } from "../lib/doc/templates/quote-request";
+import { PHOTO_MAX_PER_LINE } from "../lib/flowText";
 
 function line(partial: Partial<DocLine> = {}): DocLine {
   return {
@@ -95,7 +96,7 @@ describe("①見積依頼書", () => {
     expect(html).toContain(data.workName);
   });
 
-  it("写真枠は1明細につき1つ（B8）", () => {
+  it("写真枠は1明細につき3つ（撮影画面と同じ数だけ並ぶ）", () => {
     const data = docData({
       lines: [line({ id: "a" }), line({ id: "b", name: "浴室工事" })],
     });
@@ -106,13 +107,16 @@ describe("①見積依頼書", () => {
         audience="subcontractor"
       />,
     );
-    const frames = html.match(/doc-photo-frame/g) ?? [];
-    expect(frames).toHaveLength(data.lines.length);
+    // 枠だけを数える（`doc-photo-frames` と埋め込み CSS の同じ語を拾わないよう、
+    // class の完全一致で見る）。
+    const frames = html.match(/class="doc-photo-frame"/g) ?? [];
+    expect(frames).toHaveLength(data.lines.length * PHOTO_MAX_PER_LINE);
   });
 
-  it("1つの枠に、その明細の写真が渡した順に並ぶ（枠は増えない）", () => {
-    // 1箇所につき複数枚撮れる（docs/flows.md の表 D3）。枠の数は明細の数のままで、
-    // 写真は枠の中に並ぶ。写真の無い明細は空の点線枠のまま残る。
+  it("枠は渡した順に埋まる（枠の数は増えない）", () => {
+    // 1箇所につき3枚まで撮れる（docs/flows.md の表 D3）。枠の数は
+    // 明細数 × 3 で固定で、撮った写真が前から順に入る。
+    // 撮っていない枠は空の点線のまま残る（撮り忘れがそのまま見える）。
     const urls = ["https://example.test/1.jpg", "https://example.test/2.jpg"];
     const data = docData({
       lines: [line({ id: "a" }), line({ id: "b", name: "浴室工事" })],
@@ -125,7 +129,9 @@ describe("①見積依頼書", () => {
         audience="subcontractor"
       />,
     );
-    expect(html.match(/doc-photo-frame/g) ?? []).toHaveLength(data.lines.length);
+    expect(html.match(/class="doc-photo-frame"/g) ?? []).toHaveLength(
+      data.lines.length * PHOTO_MAX_PER_LINE,
+    );
     expect(html.match(/<img/g) ?? []).toHaveLength(urls.length);
     expect(html.indexOf(urls[0]!)).toBeLessThan(html.indexOf(urls[1]!));
   });
