@@ -26,6 +26,7 @@ import {
   DEMO_RESTART_TEXT,
   DOCUMENT_CONFIRM_TEXT,
   NEW_PROJECT_TEXT,
+  PHOTO_MAX_PER_LINE,
   PHOTO_STEP_TEXT,
   PROJECT_STEP_TEXT,
   QUOTE_DOCUMENT_TEXT,
@@ -99,26 +100,41 @@ test("デモは D1 から D10 まで、表のとおりに進む", async ({ page 
 
   // **枠を押すと撮影になる。** 実ブラウザでもカメラは開けないので、撮影の入口
   // （ファイル選択）が開くところまでを見て、そこへ画像を渡す。
+  //
+  // **上限まで続けて撮る。** 1枚で止めると「2枚目が撮れない」不具合を素通りする
+  // （実機で実際に起きた。docs/failures.md 2026-08-07）。枚数の上限は利用者の指示
+  // 「とりあえずデモなので各箇所3枚」（2026-08-07）で、`PHOTO_MAX_PER_LINE` が正。
   const firstLine = LINE_SOURCE[0]!;
   const firstFrame = page.getByRole("button", { name: firstLine.name });
-  const [chooser] = await Promise.all([
-    page.waitForEvent("filechooser"),
-    firstFrame.click(),
-  ]);
-  await chooser.setFiles({
-    name: "genba.png",
-    mimeType: "image/png",
-    buffer: makePng(),
-  });
+  for (let taken = 1; taken <= PHOTO_MAX_PER_LINE; taken += 1) {
+    const [chooser] = await Promise.all([
+      page.waitForEvent("filechooser"),
+      firstFrame.click(),
+    ]);
+    await chooser.setFiles({
+      name: `genba-${taken}.png`,
+      mimeType: "image/png",
+      buffer: makePng(),
+    });
 
-  // **渡した写真がその枠に入る。** 入らないと書類の枠が空のままになる
-  // （docs/failures.md 2026-08-07「撮っても書類に入らなかった」）。
+    // **渡した写真がその枠に入る。** 入らないと書類の枠が空のままになる
+    // （docs/failures.md 2026-08-07「撮っても書類に入らなかった」）。
+    await expect(
+      page.getByAltText(PHOTO_STEP_TEXT.photoAlt(firstLine.name, taken)),
+    ).toBeVisible();
+    await expect(firstFrame).toContainText(PHOTO_STEP_TEXT.countLabel(taken));
+    // **撮っても画面は移らない**（続けて撮れることが条件。表 D3）。
+    await expect(page).toHaveURL(DEMO_PHOTO_URL);
+  }
+
+  // **上限に達した枠は押せない。** 4枚目を選ぶ経路が画面に無いことを、
+  // 文言ではなく押せるかどうかで見る。
+  await expect(firstFrame).toBeDisabled();
+  await expect(firstFrame).toContainText(PHOTO_STEP_TEXT.limitReached);
+  // **上限は枠ごと。** 1枠が埋まっても他の工事はまだ撮れる。
   await expect(
-    page.getByAltText(PHOTO_STEP_TEXT.photoAlt(firstLine.name, 1)),
-  ).toBeVisible();
-  await expect(firstFrame).toContainText(PHOTO_STEP_TEXT.countLabel(1));
-  // **撮っても画面は移らない**（続けて撮れることが条件。表 D3）。
-  await expect(page).toHaveURL(DEMO_PHOTO_URL);
+    page.getByRole("button", { name: LINE_SOURCE[1]!.name }),
+  ).toBeEnabled();
 
   await page.getByRole("button", { name: PHOTO_STEP_TEXT.next }).click();
 
@@ -169,10 +185,23 @@ test("デモは D1 から D10 まで、表のとおりに進む", async ({ page 
   // **一覧でも採用／保留が押せる**（利用者の指示 2026-08-07。実機で
   // 「一覧で押せない。詳細でしか押せない」と言われた）。押しても画面は移らない。
   const listHold = page.getByRole("button", { name: QUOTE_DOCUMENT_TEXT.hold }).first();
+  const listAdopt = page.getByRole("button", { name: QUOTE_DOCUMENT_TEXT.adopt }).first();
   const urlBeforeListMark = page.url();
   await listHold.click();
   await expect(listHold).toHaveAttribute("aria-pressed", "true");
   expect(page.url()).toBe(urlBeforeListMark);
+
+  // **採用も一覧で押せる。** 押せないのは保留だけ、という壊れ方をここで捕まえる。
+  await listAdopt.click();
+  await expect(listAdopt).toHaveAttribute("aria-pressed", "true");
+  await expect(listHold).toHaveAttribute("aria-pressed", "false");
+  expect(page.url()).toBe(urlBeforeListMark);
+
+  // 一覧でも保留へ戻せる。**この先の「D8 で押した採用が D7 に貯まっている」検査を
+  // ここで先取りしないため**、状態は保留へ戻してから D8 に進む。
+  await listHold.click();
+  await expect(listHold).toHaveAttribute("aria-pressed", "true");
+  await expect(listAdopt).toHaveAttribute("aria-pressed", "false");
 
   await page.getByRole("link", { name: QUOTE_LIST_TEXT.open }).first().click();
 
