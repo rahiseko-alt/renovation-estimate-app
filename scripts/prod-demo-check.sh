@@ -20,7 +20,7 @@
 #   D6  /projects/<id>/received           「見積もりを見る」
 #   D7  /projects/<id>/quotes             社ごとの一覧＋明細の採用/保留＋「見積書を出す」
 #   D8  /projects/<id>/quotes/<requestId> 1社ずつ。明細ごとに採用/保留
-#   D9  /drafts                           D4 の「保存」から降りる下書き保存フォルダ
+#   D9  /drafts                           D4 の「保存」から降りる保存フォルダ
 #   D10 見積書PDF                         D7 の「見積書を出す」から降りてくる
 #
 # 使い方:
@@ -398,18 +398,18 @@ else
   done
 fi
 
-# ── D9 下書き保存フォルダ ─────────────────────────────────
+# ── D9 保存フォルダ ─────────────────────────────────────
 # D4 の「保存」から降りる枝。**保存そのものは押していない**（保存はリンクなので
 # 押せるが、押す前の状態でも一覧は開ける）。ここで見るのは画面が生きていること。
 RESULT=$(fetch "${WORK}/drafts.html" "${BASE}/drafts")
 CODE="${RESULT% *}"
 if [ "${CODE}" = "200" ]; then
-  ok "D9 下書き保存フォルダ (200, ${RESULT#* }s)"
+  ok "D9 保存フォルダ (200, ${RESULT#* }s)"
 else
-  fail "D9 下書き保存フォルダが ${CODE}"
+  fail "D9 保存フォルダが ${CODE}"
 fi
 # 文言は apps/web/lib/flowText.ts の DRAFTS_TEXT.heading と同じ値。
-if grep -qF "下書き保存フォルダ" "${WORK}/drafts.html"; then
+if grep -qF "保存フォルダ" "${WORK}/drafts.html"; then
   ok "D9 見出しが出ている"
 else
   fail "D9 見出しが無い"

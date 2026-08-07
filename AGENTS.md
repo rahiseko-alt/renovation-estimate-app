@@ -126,6 +126,11 @@
 本文から探すマーカーでもある。`apps/web/lib/content.ts` と `scripts/smoke.sh` の `MARKER`、
 `.github/workflows/prod-smoke.yml` の3箇所を同時に直す。
 
+同じ理由で、**D9 の見出し `DRAFTS_TEXT.heading`（`apps/web/lib/flowText.ts`）は
+`scripts/prod-demo-check.sh` が本文から探すマーカーでもある。** 画面の名前を変えるときは
+両方を同時に直す（2026-08-08 に「下書き保存フォルダ」→「保存フォルダ」と変えて片方を
+放置し、**日次の本番検査が赤のまま気づかれなかった**。`docs/failures.md` 参照）。
+
 同じ理由で、デモの入口の文言 `DEMO_ENTRY_TEXT.start`（`apps/web/lib/demoText.ts`）は
 `scripts/smoke.sh` と `apps/web/e2e/demo-flow.spec.ts` が探す文字列でもある。
 **デモの画面の並びは `docs/flows.md`「デモの画面の並び」（D1〜D10）が正で、
