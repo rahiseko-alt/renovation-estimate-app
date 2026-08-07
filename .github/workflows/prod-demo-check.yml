@@ -34,7 +34,7 @@ env:
   PROD_URL: "https://renovation-estimate-app-web.vercel.app"
 
 jobs:
-  demo-three-taps:
+  demo-flow:
     name: demo 3タップを本番で実際に踏む
     runs-on: ubuntu-latest
     steps:

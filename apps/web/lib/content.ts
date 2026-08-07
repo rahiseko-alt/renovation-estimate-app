@@ -415,3 +415,15 @@ export {
   SPIKE_TEXT,
   SUBCONTRACTORS_TEXT,
 } from "./quoteFlowText";
+
+// デモの画面の並び D3〜D8（docs/flows.md）の文言は lib/flowText.ts が持つ。
+// 同じ理由で re-export する。
+export {
+  DOCUMENT_CONFIRM_TEXT,
+  DRAFTS_TEXT,
+  QUOTE_DOCUMENT_TEXT,
+  QUOTE_LIST_TEXT,
+  RECEIVED_TEXT,
+  SENT_LOADING_SECONDS,
+  SENT_TEXT,
+} from "./flowText";

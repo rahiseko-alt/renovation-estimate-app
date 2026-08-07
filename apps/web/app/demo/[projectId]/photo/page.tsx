@@ -35,7 +35,9 @@ export default async function DemoPhotoPage({
 
       <DemoPhotoStep
         projectId={projectId}
-        nextHref={`/projects/${projectId}/comparison`}
+        // D2 の次は D3（確認画面）。docs/flows.md「デモの画面の並び」が正で、
+        // この行き先を変えるときは表のほうを先に直す。
+        nextHref={`/projects/${projectId}/document`}
       />
     </main>
   );

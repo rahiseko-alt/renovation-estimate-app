@@ -126,9 +126,12 @@
 `.github/workflows/prod-smoke.yml` の3箇所を同時に直す。
 
 同じ理由で、デモの入口の文言 `DEMO_ENTRY_TEXT.start`（`apps/web/lib/demoText.ts`）は
-`scripts/smoke.sh` と `apps/web/e2e/demo-three-taps.spec.ts` の `TAPS` が探す文字列でもある。
-**この3タップは商談で見せる経路そのものなので、ボタンを1つ増やしたら E2E が落ちる**
-（落ちたら実装を直す。検査のほうを緩めない）。
+`scripts/smoke.sh` と `apps/web/e2e/demo-flow.spec.ts` が探す文字列でもある。
+**デモの画面の並びは `docs/flows.md`「デモの画面の並び」（D1〜D9）が正で、
+そこに無いボタン・画面・遷移を作らないことが利用者との約束**（2026-08-07）。
+`apps/web/e2e/demo-flow.spec.ts` はその並びをそのまま検査していて、
+**画面やボタンを1つ足したら落ちる**（落ちたら実装を直す。検査のほうを緩めない。
+表を変えたいときは、実装より先に利用者に表を直してもらう）。
 
 **`apps/web/vercel.json` の `regions` は、Supabase のリージョンと対になっている。**
 アプリとDBが離れていると往復1回に0.45〜0.85秒かかり、デモの1タップ目が3秒台になる

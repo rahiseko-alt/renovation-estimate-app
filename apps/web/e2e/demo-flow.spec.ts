@@ -1,8 +1,12 @@
 // デモの受け入れ条件を実ブラウザで機械判定する。
 //
-// **条件は「3タップで見積書が出ること」**。商談で見せる相手はアカウントを持たず、
-// PCにも不慣れなので、途中に設定画面・入力欄・ログインが1つでも挟まると経路が壊れる。
-// タップ数は下の TAPS 配列そのもので、増やせばこの検査が落ちる。
+// **条件は「docs/flows.md の『デモの画面の並び』D1〜D9 のとおりに進むこと」**。
+// 商談で見せる相手はアカウントを持たず、PCにも不慣れなので、途中に設定画面・
+// 入力欄・ログインが1つでも挟まると経路が壊れる。
+//
+// **画面もボタンも遷移も、表に無いものを作らないことが利用者との約束**（2026-08-07）。
+// だからこの検査は「進めること」だけでなく「**表に無いボタンが出ていないこと**」も見る。
+// 表を変えるときは、実装とこの検査を同時に直す。検査のほうを緩めない。
 //
 // 前提データを外から入れない。**デモは自分でデータを作るところまでが機能**なので、
 // seed に頼ると「入口が壊れていても通る」検査になる（scripts/seed-demo.sh は使わない）。
@@ -11,13 +15,21 @@ import { readFileSync } from "node:fs";
 
 import { expect, test } from "@playwright/test";
 
-import { COMPARISON_TEXT } from "../lib/content";
+import {
+  COMPARISON_TEXT,
+  DOCUMENT_CONFIRM_TEXT,
+  PROJECT_DETAIL_TEXT,
+  QUOTE_DOCUMENT_TEXT,
+  QUOTE_LIST_TEXT,
+  RECEIVED_TEXT,
+  SENT_TEXT,
+} from "../lib/content";
+import { DEMO_ENTRY_TEXT, DEMO_PHOTO_TEXT } from "../lib/demoText";
 import { COMPANIES } from "../lib/demoFixture";
 
-/** 3タップの中身。ここに1つ足したら、それはデモが3タップでなくなったということ。 */
-const TAPS = ["デモを触ってみる", "写真なしで進む", "見積書PDFを出力"] as const;
+const PROJECT_ID = /\/projects\/[0-9a-f-]{36}/;
 
-test("トップから3タップで見積書PDFまで行ける", async ({ page }) => {
+test("デモは D1 から D9 まで、表のとおりに進む", async ({ page }) => {
   // 商談中にコンソールへエラーが出る状態は「動いている」と言えない。
   const consoleErrors: string[] = [];
   page.on("console", (message) => {
@@ -25,50 +37,92 @@ test("トップから3タップで見積書PDFまで行ける", async ({ page })
   });
   page.on("pageerror", (error) => consoleErrors.push(error.message));
 
-  // ── 0タップ目：ログインせずにトップを開く ──────────────────
+  // ── D1 トップ ────────────────────────────────────────
   await page.goto("/");
-  await expect(page.getByRole("button", { name: TAPS[0] })).toBeVisible();
+  await page.getByRole("button", { name: DEMO_ENTRY_TEXT.start }).click();
 
-  // ── 1タップ目：デモを始める ────────────────────────────
-  await page.getByRole("button", { name: TAPS[0] }).click();
+  // ── D2 写真を撮る ─────────────────────────────────────
   await expect(page).toHaveURL(/\/demo\/[0-9a-f-]{36}\/photo$/);
   await expect(page.getByRole("heading", { name: "現場の写真を撮る" })).toBeVisible();
-
-  // ── 2タップ目：写真を飛ばして進む ───────────────────────
   // カメラは実ブラウザの検査で扱えないので、逃げ道のほうを検査する。
   // 商談で写真が撮れない・上がらないときに通る経路がこれで、ここが死ぬとデモが止まる。
-  await page.getByRole("button", { name: TAPS[1] }).click();
-  await expect(page).toHaveURL(/\/projects\/[0-9a-f-]{36}\/comparison$/);
+  await page.getByRole("button", { name: DEMO_PHOTO_TEXT.skip }).click();
 
-  // 着地した時点で、3社の回答が既に並んでいること（「回答待ち」では見せられない）。
+  // ── D3 確認画面（はめ込んだ画像） ──────────────────────
+  await expect(page).toHaveURL(new RegExp(`${PROJECT_ID.source}/document$`));
   await expect(
-    page.getByRole("heading", { name: "3社から見積が返ってきました" }),
+    page.getByRole("heading", { name: DOCUMENT_CONFIRM_TEXT.heading }),
   ).toBeVisible();
-  // 比較表は明細1行につき全社を並べるので、社名の入った項目は明細の数だけ出る。
-  // 「全社が同じ数だけ出ている」ことを見る（1社でも単価が欠けると比較にならない）。
-  //
-  // 社名は「採用中: <社名>」にも出るが、そちらは明細ごとに1社しか出ないので、
-  // ページ全体の社名の数を比べると採用済みの社だけ多く数えられる。
-  // 単価の並ぶ項目（listitem）に絞って数える。
-  const appearances: number[] = [];
-  for (const { companyName } of COMPANIES) {
-    const locator = page.getByRole("listitem").filter({ hasText: companyName });
-    await expect(locator.first()).toBeVisible();
-    appearances.push(await locator.count());
+  // **ボタンは保存・送信・修正の3つだけ。** 表に無いものを足したらここで落ちる。
+  for (const label of [
+    DOCUMENT_CONFIRM_TEXT.save,
+    DOCUMENT_CONFIRM_TEXT.send,
+    DOCUMENT_CONFIRM_TEXT.edit,
+  ]) {
+    await expect(page.getByRole("button", { name: label })).toBeVisible();
   }
-  expect(new Set(appearances).size).toBe(1);
-  expect(appearances[0]).toBeGreaterThan(0);
-  await expect(page.getByText("回答待ち")).toHaveCount(0);
+  await page.getByRole("button", { name: DOCUMENT_CONFIRM_TEXT.send }).click();
 
-  // 面倒な設定は隠さず、済んでいる事実として見せる（商談の深い話への入口）。
-  await expect(
-    page.getByText("この依頼には建設業法の法定項目 21 件が入っています"),
-  ).toBeVisible();
+  // ── D4 送信しました（デモ）→ ロード中を挟んで自動で進む ──
+  await expect(page).toHaveURL(new RegExp(`${PROJECT_ID.source}/sent$`));
+  await expect(page.getByRole("heading", { name: SENT_TEXT.heading })).toBeVisible();
+  await expect(page.getByText(SENT_TEXT.loading)).toBeVisible();
 
-  // **見積書を押す前に金額が出ていること。** 3タップ目に出る書類が全行0円だった
+  // ── D5 受信しました（デモ） ────────────────────────────
+  // ボタンを押さずに進むこと自体が条件なので、URL の変化を待つ。
+  await expect(page).toHaveURL(new RegExp(`${PROJECT_ID.source}/received$`), {
+    timeout: 15_000,
+  });
+  await expect(page.getByRole("heading", { name: RECEIVED_TEXT.heading })).toBeVisible();
+  await page.getByRole("button", { name: RECEIVED_TEXT.toQuotes }).click();
+
+  // ── D7 下請け見積もり一覧 ───────────────────────────────
+  await expect(page).toHaveURL(new RegExp(`${PROJECT_ID.source}/quotes$`));
+  await expect(page.getByRole("heading", { name: QUOTE_LIST_TEXT.heading })).toBeVisible();
+  // 3社ぶんが並んでいること（1社でも欠けたら比較にならない）。
+  for (const { companyName } of COMPANIES) {
+    await expect(page.getByText(companyName).first()).toBeVisible();
+  }
+  await expect(page.getByText(QUOTE_LIST_TEXT.empty)).toHaveCount(0);
+  await page.getByRole("link", { name: QUOTE_LIST_TEXT.open }).first().click();
+
+  // ── D6 見積もり書類（1社ずつ） ─────────────────────────
+  await expect(page).toHaveURL(
+    new RegExp(`${PROJECT_ID.source}/quotes/[0-9a-f-]{36}$`),
+  );
+  const holdButtons = page.getByRole("button", { name: QUOTE_DOCUMENT_TEXT.hold });
+  const adoptButtons = page.getByRole("button", { name: QUOTE_DOCUMENT_TEXT.adopt });
+  await expect(holdButtons.first()).toBeVisible();
+  await expect(adoptButtons.first()).toBeVisible();
+
+  // **押しても画面は移らない**（1社ぶんの明細を続けて押せる、が条件）。
+  const urlBeforeMark = page.url();
+  await holdButtons.first().click();
+  await expect(holdButtons.first()).toHaveAttribute("aria-pressed", "true");
+  expect(page.url()).toBe(urlBeforeMark);
+
+  // **保留は、あとで採用に変えられる。**
+  await adoptButtons.first().click();
+  await expect(adoptButtons.first()).toHaveAttribute("aria-pressed", "true");
+  await expect(holdButtons.first()).toHaveAttribute("aria-pressed", "false");
+  expect(page.url()).toBe(urlBeforeMark);
+
+  // 画面が移るのは「一覧へ」を押したときだけ。
+  await page.getByRole("link", { name: QUOTE_DOCUMENT_TEXT.toList }).click();
+  await expect(page).toHaveURL(new RegExp(`${PROJECT_ID.source}/quotes$`));
+  await expect(page.getByText(QUOTE_LIST_TEXT.adoptedMark).first()).toBeVisible();
+
+  // ── D9 見積書PDF ──────────────────────────────────────
+  // **表は D7 → D9 の操作を決めていない**（利用者に確かめる。docs/flows.md）。
+  // いま押せるのは案件の画面なので、そこから出す。ここを表に足すまでは、
+  // 「採用が書類に効いている」ことだけを見る。
+  const projectId = urlBeforeMark.match(/\/projects\/([0-9a-f-]{36})\//)?.[1];
+  expect(projectId, `案件IDを取れない: ${urlBeforeMark}`).toBeTruthy();
+  await page.goto(`/projects/${projectId}/comparison`);
+
+  // **見積書を押す前に金額が出ていること。** 書類が全行0円だったことがある
   // （docs/failures.md 2026-08-06）。PDFのバイト列から金額は読めないので、
   // 0円のまま書類が出る状態は、この画面の合計でしか外から捕まえられない。
-  // 目印の文言は画面と同じ値を使う（2箇所に書くと、片方だけ直したときに黙って通る）。
   const totalRegion = page.getByRole("region", {
     name: COMPARISON_TEXT.adoptedTotalLabel,
   });
@@ -78,9 +132,8 @@ test("トップから3タップで見積書PDFまで行ける", async ({ page })
   expect(totalYen, `合計を読めない: ${totalText}`).toBeTruthy();
   expect(Number(totalYen?.replace(/,/g, ""))).toBeGreaterThan(0);
 
-  // ── 3タップ目：見積書を出す ────────────────────────────
   const downloadPromise = page.waitForEvent("download");
-  await page.getByRole("button", { name: TAPS[2] }).click();
+  await page.getByRole("button", { name: PROJECT_DETAIL_TEXT.pdfLink }).click();
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toMatch(/^estimate-.+\.pdf$/);
 
@@ -91,6 +144,16 @@ test("トップから3タップで見積書PDFまで行ける", async ({ page })
   expect(bytes.subarray(0, 5).toString("latin1")).toBe("%PDF-");
 
   expect(consoleErrors).toEqual([]);
+});
+
+test("D3 で「修正」を押すと、写真の画面に戻る", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: DEMO_ENTRY_TEXT.start }).click();
+  await page.getByRole("button", { name: DEMO_PHOTO_TEXT.skip }).click();
+  await expect(page).toHaveURL(new RegExp(`${PROJECT_ID.source}/document$`));
+
+  await page.getByRole("button", { name: DOCUMENT_CONFIRM_TEXT.edit }).click();
+  await expect(page).toHaveURL(/\/demo\/[0-9a-f-]{36}\/photo$/);
 });
 
 test("デモを始めていない訪問者は、デモの画面を開けない", async ({ page }) => {
@@ -107,21 +170,21 @@ test("ログインしていてもいなくても、トップは同じ画面か�
   // （商談で見せ直せない。docs/failures.md 2026-08-06）。
   // 出し分けをやめたので、同じ画面がいつでも出る。
   await page.goto("/");
-  await expect(page.getByRole("button", { name: TAPS[0] })).toBeVisible();
+  await expect(page.getByRole("button", { name: DEMO_ENTRY_TEXT.start })).toBeVisible();
   // 商談で見せる相手に要らないものは、右上の引き出しの中（閉じている）。
   await expect(page.getByRole("link", { name: "案件" })).toBeHidden();
 
-  await page.getByRole("button", { name: TAPS[0] }).click();
+  await page.getByRole("button", { name: DEMO_ENTRY_TEXT.start }).click();
   await expect(page).toHaveURL(/\/demo\/[0-9a-f-]{36}\/photo$/);
   const projectId = new URL(page.url()).pathname.split("/")[2];
 
   // デモ中（＝セッションを持っている状態）でも、トップは同じ。
   await page.goto("/");
-  await expect(page.getByRole("button", { name: TAPS[0] })).toBeVisible();
+  await expect(page.getByRole("button", { name: DEMO_ENTRY_TEXT.start })).toBeVisible();
   await expect(page.getByRole("link", { name: "案件" })).toBeHidden();
 
   // もう一度押せば自分のデモへ戻る（商談で見せ直せる）。
-  await page.getByRole("button", { name: TAPS[0] }).click();
+  await page.getByRole("button", { name: DEMO_ENTRY_TEXT.start }).click();
   await expect(page).toHaveURL(`/demo/${projectId}/photo`);
 });
 
@@ -133,7 +196,7 @@ test("右上の丸を押すと、作る側の行き先が出る", async ({ page 
 
 test("デモの利用者に、実データの画面は空で見える", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: TAPS[0] }).click();
+  await page.getByRole("button", { name: DEMO_ENTRY_TEXT.start }).click();
   await expect(page).toHaveURL(/\/demo\//);
 
   // デモの識別子は訪問ごとに使い捨てなので、下請台帳にはデモが作った3社しか居ない。
@@ -152,7 +215,7 @@ test("同時に走る2つのデモは、互いの案件を開けない", async (
   async function startDemo(context: (typeof contextA)): Promise<string> {
     const page = await context.newPage();
     await page.goto("/");
-    await page.getByRole("button", { name: TAPS[0] }).click();
+    await page.getByRole("button", { name: DEMO_ENTRY_TEXT.start }).click();
     await expect(page).toHaveURL(/\/demo\/[0-9a-f-]{36}\/photo$/);
     const projectId = new URL(page.url()).pathname.split("/")[2];
     if (!projectId) throw new Error("デモ案件のIDを取れない");
@@ -194,7 +257,7 @@ test("デモの中身を直したあと、古いデモを開いていた人に�
   // （有効期間は6時間。直した当日に触った人ほど古いものを見る）。
   // 版が変わったことを、版のCookieを別の値に差し替えて再現する。
   await page.goto("/");
-  await page.getByRole("button", { name: TAPS[0] }).click();
+  await page.getByRole("button", { name: DEMO_ENTRY_TEXT.start }).click();
   await expect(page).toHaveURL(/\/demo\/[0-9a-f-]{36}\/photo$/);
   const origin = new URL(page.url()).origin;
   const first = new URL(page.url()).pathname.split("/")[2];
