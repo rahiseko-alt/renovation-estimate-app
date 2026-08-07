@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { getCurrentUser } from "../../../../lib/auth/server";
-import { markLine } from "../../../../lib/db/lineAdoptions";
+import { clearLineMark, markLine } from "../../../../lib/db/lineAdoptions";
 import { getProjectForOwner } from "../../../../lib/db/projects";
 import { LINE_MARK_STATUSES } from "../../../../lib/db/types";
 import type { LineMarkStatus } from "../../../../lib/db/types";
@@ -20,7 +20,12 @@ import type { LineMarkStatus } from "../../../../lib/db/types";
 export type MarkLineResult = { ok: true } | { ok: false; message: string };
 
 /**
- * D6（見積もり書類）で、明細1件にその社の「採用」または「保留」の印を付ける。
+ * D6（見積もり書類）で、明細1件にその社の「採用」または「保留」の印を付け外しする。
+ *
+ * **同じ印をもう一度押したら無印に戻す**（採用↔無印、保留↔無印。利用者の指示
+ * 2026-08-08）。押し間違えたときに、別の印を選ばないと戻せない状態だった。
+ * どちらにするかは `isPressed` で呼び出し側が渡す——いま付いている印は画面が
+ * 持っているので、外すためだけにDBをもう一度読まない。
  *
  * 所有者確認をここでも行う。画面で押せなくしても Server Action は直接叩ける
  * （app/projects/[id]/comparison/actions.ts と同じ原則）。
@@ -32,6 +37,7 @@ export async function markLineAction(
   lineItemId: string,
   quoteGroupRequestId: string,
   status: LineMarkStatus,
+  isPressed = false,
 ): Promise<MarkLineResult> {
   const ownerId = await getCurrentUser();
   if (!ownerId) {
@@ -47,10 +53,13 @@ export async function markLineAction(
   }
 
   try {
-    await markLine(
-      { projectId, lineItemId, quoteGroupRequestId, status },
-      ownerId,
-    );
+    const input = { projectId, lineItemId, quoteGroupRequestId, status };
+    // 押されている印をもう一度押したら外す。付いていないものを押したら付ける。
+    if (isPressed) {
+      await clearLineMark(input, ownerId);
+    } else {
+      await markLine(input, ownerId);
+    }
   } catch (error) {
     // lineAdoptions.ts の検証（依頼の所有者・案件の一致・対象範囲）は日本語の
     // Error で落ちる。それ以外（DBの障害など）は想定外なので投げ直す。

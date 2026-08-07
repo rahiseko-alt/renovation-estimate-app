@@ -31,7 +31,14 @@ export function QuoteDocumentLines({
   // 伏せるため、throw を catch して message を出しても意図した日本語は出ない
   // （app/projects/[id]/quotes/actions.ts の MarkLineResult）。
   // catch に残るのは想定外の失敗だけなので、そこは決まった文言にする。
-  function mark(lineItemId: string, status: LineMarkStatus): void {
+  // **押されている印をもう一度押したら無印に戻す**（採用↔無印、保留↔無印。
+  // 利用者の指示 2026-08-08）。いま付いている印はこの画面が持っているので、
+  // 外すか付けるかの判断もここで渡す。
+  function mark(
+    lineItemId: string,
+    status: LineMarkStatus,
+    isPressed: boolean,
+  ): void {
     setErrorMessage(null);
     startTransition(async () => {
       try {
@@ -40,6 +47,7 @@ export function QuoteDocumentLines({
           lineItemId,
           quote.requestId,
           status,
+          isPressed,
         );
         if (!result.ok) setErrorMessage(result.message);
       } catch {
@@ -89,22 +97,25 @@ export function QuoteDocumentLines({
                     ["adopted", QUOTE_DOCUMENT_TEXT.adopt],
                     ["on_hold", QUOTE_DOCUMENT_TEXT.hold],
                   ] as const
-                ).map(([status, label]) => (
-                  <button
-                    key={status}
-                    type="button"
-                    aria-pressed={line.mark === status}
-                    disabled={isPending}
-                    onClick={() => mark(line.lineItemId, status)}
-                    className={`tap grow rounded px-5 font-bold ${
-                      line.mark === status
-                        ? "bg-blue-800 text-white"
-                        : "bg-gray-300 text-gray-900"
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
+                ).map(([status, label]) => {
+                  const isPressed = line.mark === status;
+                  return (
+                    <button
+                      key={status}
+                      type="button"
+                      aria-pressed={isPressed}
+                      disabled={isPending}
+                      onClick={() => mark(line.lineItemId, status, isPressed)}
+                      className={`tap grow rounded px-5 font-bold ${
+                        isPressed
+                          ? "bg-blue-800 text-white"
+                          : "bg-gray-300 text-gray-900"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
               </div>
             )}
           </li>
