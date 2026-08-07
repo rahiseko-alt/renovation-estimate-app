@@ -56,46 +56,56 @@ export function QuoteDocumentLines({
         </p>
       ) : null}
 
-      <ul className="mt-4 flex flex-col gap-4">
+      {/*
+        **1明細を縦に積まず、1行にまとめる。** 工事名・数量・金額をそれぞれ別の行に
+        置いていたので、1画面に2明細しか入らず、余白ばかりが目立った
+        （利用者の指摘 2026-08-08）。工事名と金額を同じ行の左右に置き、
+        数量は金額の脇に小さく添える。押す面積（tap）は変えない。
+      */}
+      <ul className="mt-4 flex flex-col gap-2">
         {quote.lines.map((line) => (
           <li
             key={line.lineItemId}
-            className="rounded border-2 border-gray-400 p-4"
+            className="rounded border-2 border-gray-400 px-3 py-2"
           >
-            <div className="font-bold">{line.name}</div>
-            <div className="mt-1 tabular text-gray-700">
-              {`${line.quantity} ${line.unit}`}
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="font-bold">{line.name}</span>
+              <span className="tabular shrink-0 text-right">
+                <span className="text-sm text-gray-700">
+                  {`${line.quantity} ${line.unit}`}
+                </span>
+                {line.costUnitPrice === null ? null : (
+                  <span className="ml-2 text-lg font-bold">
+                    {`${formatYen(line.costUnitPrice)}円`}
+                  </span>
+                )}
+              </span>
             </div>
 
             {line.costUnitPrice === null ? null : (
-              <>
-                <div className="mt-1 tabular text-lg font-bold">
-                  {`${formatYen(line.costUnitPrice)}円`}
-                </div>
-                <div className="mt-3 flex gap-3">
-                  {(
-                    [
-                      ["adopted", QUOTE_DOCUMENT_TEXT.adopt],
-                      ["on_hold", QUOTE_DOCUMENT_TEXT.hold],
-                    ] as const
-                  ).map(([status, label]) => (
-                    <button
-                      key={status}
-                      type="button"
-                      aria-pressed={line.mark === status}
-                      disabled={isPending}
-                      onClick={() => mark(line.lineItemId, status)}
-                      className={`tap grow rounded px-5 font-bold ${
-                        line.mark === status
-                          ? "bg-blue-800 text-white"
-                          : "bg-gray-300 text-gray-900"
-                      }`}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-              </>
+              <div className="mt-2 flex gap-2">
+                {(
+                  [
+                    ["adopted", QUOTE_DOCUMENT_TEXT.adopt],
+                    ["on_hold", QUOTE_DOCUMENT_TEXT.hold],
+                  ] as const
+                ).map(([status, label]) => (
+                  <button
+                    key={status}
+                    type="button"
+                    aria-pressed={line.mark === status}
+                    disabled={isPending}
+                    onClick={() => mark(line.lineItemId, status)}
+                    className={`tap grow rounded px-5 font-bold ${
+                      line.mark === status
+                        ? "bg-blue-800 text-white"
+                        : "bg-gray-300 text-gray-900"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
             )}
           </li>
         ))}

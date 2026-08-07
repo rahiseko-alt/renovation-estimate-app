@@ -7,6 +7,7 @@
 // ここは配置の解釈だけを行う。文言はテンプレート、金額は lib/calc.ts が持つ。
 
 import { formatYen, lineAmount } from "../../calc";
+import { PHOTO_MAX_PER_LINE } from "../../flowText";
 import {
   visibleTo,
   type DocAudience,
@@ -130,24 +131,32 @@ function PhotoLineBlockView({
         // 枠は明細1つにつき1つ。中に入る写真は0枚〜複数枚（DocData の説明）。
         // 0枚のときは空の点線枠のまま出す（撮り忘れがそのまま見える）。
         const photoUrls = data.photoUrlByLineId[line.id] ?? [];
+        // **撮影画面と同じく、枠は3つ横に並べる。** 1つの枠に3枚を押し込むと
+        // 1枚あたりが細くなり、右側が余白のまま残る（利用者の指摘 2026-08-08）。
+        // 撮っていない枠は空の点線のまま出す（撮り忘れがそのまま見える）。
+        const slots = Array.from(
+          { length: PHOTO_MAX_PER_LINE },
+          (_, index) => photoUrls[index] ?? null,
+        );
         return (
           <div className="doc-photo-line" key={line.id}>
-            <div
-              className="doc-photo-frame"
-              style={{ width: block.frameSizePx, height: block.frameSizePx }}
-            >
-              {photoUrls.map((photoUrl) => (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img key={photoUrl} src={photoUrl} alt={`${line.name}の現況写真`} />
-              ))}
-            </div>
             <div className="doc-photo-line-body">
-              <div className="doc-photo-line-name">{line.name}</div>
-              <div className="doc-photo-line-quantity">
+              <span className="doc-photo-line-name">{line.name}</span>
+              <span className="doc-photo-line-quantity">
                 {line.quantity > 0
                   ? `${block.quantityLabel}：${line.quantity} ${line.unit}`
                   : block.emptyQuantityText}
-              </div>
+              </span>
+            </div>
+            <div className="doc-photo-frames">
+              {slots.map((photoUrl, index) => (
+                <div className="doc-photo-frame" key={photoUrl ?? `empty-${index}`}>
+                  {photoUrl === null ? null : (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={photoUrl} alt={`${line.name}の現況写真`} />
+                  )}
+                </div>
+              ))}
             </div>
           </div>
         );

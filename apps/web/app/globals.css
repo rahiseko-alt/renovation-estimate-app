@@ -165,41 +165,48 @@ textarea {
 }
 
 .doc-photo-line {
-  display: flex;
-  align-items: center;
-  gap: 16px;
   border-bottom: 1px solid #ccc;
   padding: 12px 0;
-  min-height: 100px;
 }
 /*
- * 写真枠。明細1行につき1つで、中に写真が0枚〜複数枚入る（1行につき撮れる枚数は
- * lib/flowText.ts の PHOTO_MAX_PER_LINE）。枠の大きさは枚数で変えない——
- * 変えると明細ごとに行の高さが揃わず、書類として読みにくくなる。
- * 複数枚のときは枠の幅を等分して横に並べる（はみ出しは overflow で切る）。
- * 0枚のときは中身が無く、点線の枠だけが残る。
+ * 写真枠は**撮影画面と同じく PHOTO_MAX_PER_LINE 個を横一列**に並べ、
+ * 紙幅いっぱいまで使う（lib/doc/render/html.tsx）。
+ * 1つの枠に複数枚を押し込むと1枚あたりが細くなり、右側が余白のまま残った
+ * （利用者の指摘 2026-08-08）。撮っていない枠は点線のまま残す＝撮り忘れが見える。
+ * 正方形に揃えるので、明細ごとに行の高さがばらつかない。
  */
-.doc-photo-frame {
-  border: 2px dashed #999;
-  flex-shrink: 0;
-  overflow: hidden;
+.doc-photo-frames {
   display: flex;
-  align-items: stretch;
-  justify-content: center;
-  gap: 2px;
+  gap: 8px;
+  width: 100%;
+}
+.doc-photo-frame {
+  flex: 1 1 0;
+  min-width: 0;
+  aspect-ratio: 1 / 1;
+  border: 2px dashed #999;
+  overflow: hidden;
   color: #999;
 }
 .doc-photo-frame img {
-  flex: 1 1 0;
-  min-width: 0;
+  width: 100%;
   height: 100%;
   object-fit: cover;
+  display: block;
+}
+.doc-photo-line-body {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
 }
 .doc-photo-line-name {
   font-weight: 700;
 }
 .doc-photo-line-quantity {
   color: #555;
+  white-space: nowrap;
 }
 
 .doc-totals {
