@@ -29,6 +29,53 @@ export async function findDemoProject(ownerId: string): Promise<string | null> {
 }
 
 /**
+ * この利用者のデモ案件に付いた写真の**実体**（Storage のオブジェクト）を消し、
+ * 全部消せたかどうかを返す。**投げない**（`tryDeletePhotoObjects` と同じ約束）。
+ *
+ * 案件の行を消しても Storage のオブジェクトは道連れにならないので、作り直す前に
+ * ここを通す。使うのは「最初からやり直す」（`lib/db/demoRestart.ts`）で、
+ * 前の相手が撮った写真を次の商談に持ち越さないため。
+ *
+ * **消せなくても呼び出し側は止まらない。** そのぶんオブジェクトは残るが、
+ * 商談の場でデモを始められない方が損失が大きい（`purgeExpiredDemoData` が
+ * 失敗しても始めさせるのと同じ判断）。
+ */
+export async function tryRemoveDemoPhotoObjects(
+  ownerId: string,
+): Promise<boolean> {
+  const db = getSupabaseClient();
+  try {
+    const projects = must(
+      await db
+        .from("projects")
+        .select("id")
+        .eq("owner_id", ownerId)
+        .eq("work_name", DEMO_WORK_NAME),
+      "作り直すデモ案件の確認",
+    ) as Array<{ id: string }>;
+    if (projects.length === 0) return true;
+
+    const photos = must(
+      await db
+        .from("photos")
+        .select("storage_path")
+        .in(
+          "project_id",
+          projects.map((row) => row.id),
+        ),
+      "作り直すデモ写真の確認",
+    ) as Array<{ storage_path: string }>;
+
+    return await tryDeletePhotoObjects(photos.map((row) => row.storage_path));
+  } catch (error) {
+    // 黙って握ると、毎回失敗していても気付けない。
+    // 第一引数は固定の文字列にする（photoStorage.ts と同じ理由）。
+    console.error("やり直し前の写真の削除に失敗した:", { error });
+    return false;
+  }
+}
+
+/**
  * 案件を消したあとに1件も案件が残らない所有者だけを返す。
  *
  * 下請台帳と会社設定は案件に紐づかず `owner_id` 単位で消すしかない。

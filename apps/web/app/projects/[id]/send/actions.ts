@@ -3,6 +3,13 @@
 import { redirect } from "next/navigation";
 
 import { getCurrentUser } from "../../../../lib/auth/server";
+import { DOCUMENT_CONFIRM_TEXT } from "../../../../lib/content";
+import { formatDateJst } from "../../../../lib/doc/date";
+import {
+  computeResponseDueAt,
+  meetsMinimumQuotePeriod,
+  responseDueAtFromDateInput,
+} from "../../../../lib/legalPeriod";
 import { getOrCreateEstimate } from "../../../../lib/db/estimates";
 import { getProjectForOwner } from "../../../../lib/db/projects";
 import {
@@ -27,12 +34,17 @@ const PRICE_BAND_SET: ReadonlySet<string> = new Set(PLANNED_PRICE_BANDS);
  * 「サーバ側でも同じ検査をする」。app/projects/[id]/photos-actions.ts と同じ原則）。
  *
  * 予定価格帯が未選択のまま送らせない（同章「未選択のまま送信させない」）。
- * 見積回答期限はグループの提示日時と帯から lib/legalPeriod.ts が決める。
+ *
+ * 見積回答期限は responseDueDate を渡さなければグループの提示日時と帯から
+ * lib/legalPeriod.ts が決める（/projects/[id]/send の通常経路はこれまでどおり）。
+ * 確認画面（D4）だけが、元請の打ち直した日付を渡してくる。
  */
 export async function sendQuoteRequestGroup(
   projectId: string,
   subcontractorIds: string[],
   plannedPriceBand: string,
+  /** 元請が打ち直した見積回答期限（YYYY-MM-DD・日本時間）。省略すると自動計算。 */
+  responseDueDate?: string,
 ): Promise<void> {
   const ownerId = await getCurrentUser();
   if (!ownerId) {
@@ -52,6 +64,27 @@ export async function sendQuoteRequestGroup(
   if (!PRICE_BAND_SET.has(plannedPriceBand)) {
     throw new Error("予定価格帯を選んでください。");
   }
+  const band = plannedPriceBand as PlannedPriceBand;
+
+  // 期限を渡されたときだけ確かめる。**画面が弾いていても、ここでも弾く**
+  // （この関数は Server Action なので直接叩ける）。グループを作る前に判定して、
+  // 依頼の付かない空のグループが残らないようにする。
+  let responseDueAt: Date | undefined;
+  if (responseDueDate !== undefined) {
+    const now = new Date();
+    const parsed = responseDueAtFromDateInput(responseDueDate);
+    if (!parsed) {
+      throw new Error(DOCUMENT_CONFIRM_TEXT.responseDueMissing);
+    }
+    if (!meetsMinimumQuotePeriod(parsed, now, band)) {
+      throw new Error(
+        DOCUMENT_CONFIRM_TEXT.responseDueTooEarly(
+          formatDateJst(computeResponseDueAt(now, band)),
+        ),
+      );
+    }
+    responseDueAt = parsed;
+  }
 
   const gate = await checkSubmissionGate(projectId, ownerId);
   if (!gate.ok) {
@@ -68,8 +101,9 @@ export async function sendQuoteRequestGroup(
       {
         groupId: group.id,
         subcontractorId,
-        plannedPriceBand: plannedPriceBand as PlannedPriceBand,
+        plannedPriceBand: band,
         lineItemIds,
+        responseDueAt,
       },
       ownerId,
     );

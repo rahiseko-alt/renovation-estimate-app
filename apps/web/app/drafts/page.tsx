@@ -1,12 +1,14 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { DemoRestartButton } from "../../components/DemoRestartButton";
+import { isDemoOwner } from "../../lib/auth/demoOwner";
 import { getCurrentUser } from "../../lib/auth/server";
 import { DRAFTS_TEXT } from "../../lib/content";
 import { listDraftProjectsForOwner } from "../../lib/db/drafts";
 
 /**
- * D8 下書き保存フォルダ（docs/flows.md「デモの画面の並び」）。
+ * D9 下書き保存フォルダ（docs/flows.md「デモの画面の並び」）。
  *
  * 下書き＝**まだ下請けに出していない案件**。その定義とクエリは lib/db/drafts.ts が持ち、
  * 下書き用のテーブルも列も作っていない。
@@ -45,6 +47,9 @@ export default async function DraftsPage() {
           ))}
         </ul>
       )}
+
+      {/* D2〜D10 に1つずつ置く「最初からやり直す」。デモの利用者にだけ出す。 */}
+      {isDemoOwner(ownerId) ? <DemoRestartButton /> : null}
     </main>
   );
 }

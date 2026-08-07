@@ -38,7 +38,9 @@ const BASE_DATA: DocData = {
     },
   ],
   totals: null,
-  photoUrlByLineId: { [LINE_ID]: null },
+  // 枠に入る写真は0枚〜複数枚（lib/doc/schema.ts の DocData）。ここは固定サンプルなので
+  // 撮る前の状態＝0枚から始める。
+  photoUrlByLineId: { [LINE_ID]: [] },
   legalItems: [
     { label: "責任施工範囲", body: "本書に記載の工事範囲一式とします。" },
     { label: "工事着手・完了の時期", body: "着工日は別途協議のうえ決定します。" },
@@ -70,7 +72,7 @@ export default function DocumentSpikePage() {
         quantity: Number.isFinite(parsedQuantity) ? parsedQuantity : 0,
       },
     ],
-    photoUrlByLineId: { [LINE_ID]: photoDataUrl },
+    photoUrlByLineId: { [LINE_ID]: photoDataUrl ? [photoDataUrl] : [] },
   };
 
   return (

@@ -32,6 +32,10 @@ export type PhotoWithUrl = Photo & { url: string | null };
  * （IDOR対策）で、ログイン状態と案件の所有者をここでも確かめてから保存する。
  *
  * formData には圧縮済みの File（key: "photo"）と箇所（key: "area"）を入れて渡す。
+ * 明細行ID（key: "lineId"）は任意で、入っていればその明細に結びつける。
+ * **結びつけないと、その写真は書類のどの枠にも入らない**（lib/db/quoteRequestDoc.ts が
+ * line_id をキーに枠へ流し込む）。渡された明細IDがこの案件の見積に無ければ
+ * createPhoto が弾く（lib/db/photos.ts）。
  * 圧縮・種別・サイズの制限はクライアント側（lib/photo/compress.ts）でも行うが、
  * Server Action はブラウザを経由しない呼び出しからも直接叩けるため、
  * クライアント側の検証はバイパスできる前提でここでも同じ制限を確かめる
@@ -56,6 +60,13 @@ export async function uploadPhotoAction(
     throw new Error("箇所が不正です。");
   }
 
+  // 明細行ID は任意。空文字は「付けない」と同じに扱う（フォームの未選択は空で届く）。
+  const lineIdValue = formData.get("lineId");
+  if (lineIdValue !== null && typeof lineIdValue !== "string") {
+    throw new Error("明細行が不正です。");
+  }
+  const lineId = lineIdValue === null || lineIdValue === "" ? null : lineIdValue;
+
   const file = formData.get("photo");
   if (!(file instanceof File) || file.size === 0) {
     throw new Error("写真が選択されていません。");
@@ -72,7 +83,7 @@ export async function uploadPhotoAction(
 
   let photo: Photo;
   try {
-    photo = await createPhoto({ projectId, area, storagePath }, user);
+    photo = await createPhoto({ projectId, area, lineId, storagePath }, user);
   } catch (error) {
     // DB行の作成に失敗したら、アップロード済みのオブジェクトを残さない
     // （参照の無いオブジェクトがストレージに溜まり続けるのを防ぐ）。

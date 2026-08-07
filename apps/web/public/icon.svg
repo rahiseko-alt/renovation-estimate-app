@@ -1,0 +1,47 @@
+<!--
+  アプリのアイコン。**この1ファイルが図案の正**で、他の場所に描き直さない
+  （AGENTS.md「結合を増やさない」1）。ここから作る・ここを見る先は3つ。
+
+  1. ブラウザのタブ（favicon）と PWA のアイコン … app/layout.tsx の metadata.icons
+  2. トップ画面のロゴ … components/HomeScreen.tsx が <img src="/icon.svg"> で読む
+  3. public/icon-192.png / icon-512.png / apple-icon.png … このファイルを
+     ラスタライズしたもの（PNG しか受け付けない PWA の manifest 用）。
+     図案を直したら、同じ大きさ（192 / 512 / 180）で書き出し直す。
+     **PNG は白で塗り潰して（透明を残さず）書き出す。** 端末側が自分の形に
+     切り抜くので、角を透明にしておくとそこが黒く出る。
+
+  色は app/globals.css の @theme が持つ色トークン（color-brand / color-brand-deep）と同じ値。
+  SVG からは CSS 変数を読めないので、ここだけは実値を書く。片方を変えたらもう片方も直す。
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" width="96" height="96">
+  <!-- 白い角丸の下地。端末が自分の形に切り抜いても（PWA の maskable）
+       図が欠けないよう、図は中央寄りに置き、四隅を空ける。 -->
+  <rect width="96" height="96" rx="21" fill="#ffffff" />
+
+  <!-- 家。塗らず、太い輪郭だけで描く。 -->
+  <g fill="none" stroke="#7cb342" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M10 40 L38 17 L66 40" />
+    <path d="M17 34.5 L17 68 L59 68 L59 34.5" />
+  </g>
+
+  <!-- 窓（2×2）。 -->
+  <g fill="#9ca3af">
+    <rect x="25" y="41" width="8" height="8" rx="1" />
+    <rect x="37" y="41" width="8" height="8" rx="1" />
+    <rect x="25" y="53" width="8" height="8" rx="1" />
+    <rect x="37" y="53" width="8" height="8" rx="1" />
+  </g>
+
+  <!-- 電卓。家の右下に重なる。重なりが分かるよう、白で一度縁取ってから深緑を描く。 -->
+  <rect x="52" y="48" width="32" height="32" rx="6" fill="#ffffff" stroke="#ffffff" stroke-width="10" />
+  <rect x="52" y="48" width="32" height="32" rx="6" fill="#ffffff" stroke="#2e7d52" stroke-width="5" />
+  <rect x="58" y="53" width="20" height="8" rx="2" fill="#2e7d52" />
+  <g fill="#2e7d52">
+    <circle cx="60" cy="67.5" r="2.6" />
+    <circle cx="68" cy="67.5" r="2.6" />
+    <circle cx="76" cy="67.5" r="2.6" />
+    <circle cx="60" cy="75" r="2.6" />
+    <circle cx="68" cy="75" r="2.6" />
+    <circle cx="76" cy="75" r="2.6" />
+  </g>
+</svg>

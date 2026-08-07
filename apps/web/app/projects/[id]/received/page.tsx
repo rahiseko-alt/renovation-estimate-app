@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { DemoRestartButton } from "../../../../components/DemoRestartButton";
+import { isDemoOwner } from "../../../../lib/auth/demoOwner";
 import { getCurrentUser } from "../../../../lib/auth/server";
 import { RECEIVED_TEXT } from "../../../../lib/content";
 import { getProjectForOwner } from "../../../../lib/db/projects";
@@ -34,6 +36,9 @@ export default async function ReceivedPage({
       >
         {RECEIVED_TEXT.toQuotes}
       </Link>
+
+      {/* D2〜D10 に1つずつ置く「最初からやり直す」。デモの利用者にだけ出す。 */}
+      {isDemoOwner(ownerId) ? <DemoRestartButton /> : null}
     </main>
   );
 }

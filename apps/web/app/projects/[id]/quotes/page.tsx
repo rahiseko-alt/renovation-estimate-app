@@ -1,39 +1,29 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { DemoRestartButton } from "../../../../components/DemoRestartButton";
 import { DownloadPdfButton } from "../../../../components/DownloadPdfButton";
+import { QuoteDocumentLines } from "../../../../components/QuoteDocumentLines";
+import { isDemoOwner } from "../../../../lib/auth/demoOwner";
 import { getCurrentUser } from "../../../../lib/auth/server";
-import { formatYen } from "../../../../lib/calc";
 import { QUOTE_LIST_TEXT } from "../../../../lib/content";
 import { getProjectForOwner } from "../../../../lib/db/projects";
 import { listAnsweredQuoteDocuments } from "../../../../lib/db/quoteDocuments";
-import type { QuoteDocumentLine } from "../../../../lib/db/quoteDocuments";
-
-/** 明細1行に出す印。採用でも保留でもなければ「未選択」。 */
-function markLabel(line: QuoteDocumentLine): string {
-  if (line.mark === "adopted") return QUOTE_LIST_TEXT.adoptedMark;
-  if (line.mark === "on_hold") return QUOTE_LIST_TEXT.holdMark;
-  return QUOTE_LIST_TEXT.unmarked;
-}
-
-/**
- * その社が単価を返してきた明細だけを並べる。回答の無い明細は D6 でも
- * 採用・保留を押せない（ボタンを出さない）ので、ここに「未選択」で出すと
- * 選べるものと見分けが付かなくなる。
- */
-function isAnswered(
-  line: QuoteDocumentLine,
-): line is QuoteDocumentLine & { costUnitPrice: number } {
-  return line.costUnitPrice !== null;
-}
 
 /**
  * D7 下請け見積もり一覧（案件ごと。docs/flows.md「デモの画面の並び」）。
  *
- * **社ごとに1ブロック**。D6 で押した採用・保留がここに貯まる。
- * 各社から D6 へ戻れる（「見積もりを見る」）。この表に無いボタン・遷移を足さない。
+ * **社ごとに1ブロック**。各社から D8 へ入れる（「見積もりを見る」）。
+ * この表に無いボタン・遷移を足さない。
  *
- * D7 → D9 は「見積書を出す」1つだけ（利用者の指示 2026-08-07）。
+ * **採用／保留は D7 と D8 の両方で押せる**（利用者の指示 2026-08-07。
+ * 実機で「一覧で押せない。詳細でしか押せない」と言われた）。押しても画面は移らず、
+ * どちらで押しても同じところ（`line_adoptions`）に入る。**明細のボタンは D8 と
+ * 同じ部品**（`components/QuoteDocumentLines.tsx`）をそのまま呼ぶ。ここに同じ
+ * ボタンを書くと、押下状態の出し方や失敗時の文言が2箇所に分かれる
+ * （AGENTS.md「結合を増やさない」2：同じ処理を呼ぶ入口は1つにする）。
+ *
+ * D7 → D10 は「見積書を出す」1つだけ（利用者の指示 2026-08-07）。
  * PDF を出す処理は案件詳細・比較表と同じ DownloadPdfButton を通る。
  */
 export default async function QuoteListPage({
@@ -69,30 +59,9 @@ export default async function QuoteListPage({
                 {quote.companyName}
               </h2>
 
-              <ul className="mt-3 flex flex-col gap-2">
-                {quote.lines.filter(isAnswered).map((line) => (
-                  <li
-                    key={line.lineItemId}
-                    className="flex items-center justify-between gap-3 border-t border-gray-300 pt-2"
-                  >
-                    <div>
-                      <div className="font-bold">{line.name}</div>
-                      <div className="tabular text-gray-700">
-                        {`${formatYen(line.costUnitPrice)}円`}
-                      </div>
-                    </div>
-                    <span
-                      className={`shrink-0 rounded px-3 py-1 font-bold ${
-                        line.mark === "adopted"
-                          ? "bg-blue-800 text-white"
-                          : "bg-gray-300 text-gray-900"
-                      }`}
-                    >
-                      {markLabel(line)}
-                    </span>
-                  </li>
-                ))}
-              </ul>
+              {/* その社が回答していない明細にボタンが出ないのは部品側の判定
+                  （costUnitPrice が null なら出さない）。D8 と同じ扱いになる。 */}
+              <QuoteDocumentLines projectId={id} quote={quote} />
 
               <Link
                 href={`/projects/${id}/quotes/${quote.requestId}`}
@@ -108,6 +77,9 @@ export default async function QuoteListPage({
           <DownloadPdfButton projectId={id} label={QUOTE_LIST_TEXT.toPdf} />
         </div>
       )}
+
+      {/* D2〜D10 に1つずつ置く「最初からやり直す」。デモの利用者にだけ出す。 */}
+      {isDemoOwner(ownerId) ? <DemoRestartButton /> : null}
     </main>
   );
 }

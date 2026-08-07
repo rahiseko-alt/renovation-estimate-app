@@ -43,8 +43,15 @@ export type DocData = {
   lines: DocLine[];
   /** 明細の集計。①（単価が空の依頼書）では null。 */
   totals: EstimateTotals | null;
-  /** 明細行のIDごとの写真URL。写真枠に流し込む。 */
-  photoUrlByLineId: Record<string, string | null>;
+  /**
+   * 明細行のIDごとの写真URL。写真枠に流し込む。
+   *
+   * **1つの枠に複数枚入る。** 1つの明細につき撮れる枚数の上限は
+   * `lib/flowText.ts` の `PHOTO_MAX_PER_LINE` が持つ（書類の層は保存や画面の層に
+   * 依存しないので、ここでは枚数を決めない。渡された順に並べるだけ）。
+   * 写真が無い明細は、キーが無いか空配列。そのとき枠は空の点線のまま出る。
+   */
+  photoUrlByLineId: Record<string, string[]>;
   /** 法定項目の定型文。見出しと本文の対で、決まった順に並べる。 */
   legalItems: { label: string; body: string }[];
 };
@@ -97,7 +104,8 @@ export type LineColumnKey =
 
 /**
  * 写真枠付きの明細ブロック。①見積依頼書で使う。
- * 1箇所につき写真枠は1つ（docs/design.md 5章「1箇所あたり何枚撮るか」）。
+ * **1明細（＝1箇所）につき枠は1つ**（docs/design.md 5章「1箇所あたり何枚撮るか」）で、
+ * その枠の中に撮った写真を並べる（枚数の上限は撮る側が持つ。DocData の説明）。
  */
 export type PhotoLineBlock = {
   kind: "photoLine";

@@ -26,7 +26,7 @@ const KOUMUTEN = "dummy-koumuten@example.com";
  * 数量が常に1になり、その主張がデモ自身の反例になる。数量が実数で成立する項目に寄せる。
  * 単位は `lib/content.ts` の `UNITS` にあるものだけを使う。
  *
- * `adoptedBy` は、比較表で**どの社を採った状態で見せるか**。3タップの経路に
+ * `adoptedBy` は、比較表で**どの社を採った状態で見せるか**。デモの経路に
  * 「採用」のタップが無いので、投入の時点で採ってある状態にする。
  * 最安を計算で選ばない（「安い順に自動で採らない」は製品の姿勢で、
  * `lib/db/comparison.ts` の `cheapestRequestIdByLineId` にも同じ注記がある）。
@@ -140,3 +140,101 @@ export const COMPANIES = [
 
 /** デモに登場する下請の社数。画面の案内文が数字を持たないようにここから取る。 */
 export const DEMO_SUBCONTRACTOR_COUNT = COMPANIES.length;
+
+/**
+ * 見積書の鑑（表紙）に要る欄のうち、**いまDBに持っていないもの**のデモ用の値。
+ *
+ * 鑑に出す欄は国交省の見積書様式例と、経路の異なる6団体の実物で一致した項目
+ * （`docs/design.md` 3章「下請の見積書の鑑（表紙）に出す欄」）。そのうち
+ * 工事名・工事場所・金額・作業日数・5経費は既にDBにあるが、**下請の住所・TEL・
+ * 担当・工期・見積有効期限・支払条件・受渡場所・見積番号は持っていない**
+ * （下請台帳は社名とメールしか持たない）。**入力欄は増やさない**という
+ * 利用者の決定（2026-08-07 の回答A）に従い、デモの間はここで決め打ちにする。
+ *
+ * **社ごとに違う値にしてある。** 3社を並べたときに、見た目で見分けが付かないと
+ * 「1社ぶんの書類を3回見せている」ようにしか読めない。
+ *
+ * 会社名・人名・住所・電話番号はすべて明らかなダミー
+ * （AGENTS.md 公開前提2：実在する第三者を特定できる情報を書かない）。
+ * 電話番号は 0 が並ぶ形にして、実在の番号に当たらないようにしてある。
+ */
+export type QuoteCoverFixture = {
+  /** 見積番号。 */
+  quoteNumber: string;
+  address: string;
+  tel: string;
+  /** 担当者名。 */
+  contactName: string;
+  /**
+   * 工期（自・至）。**固定の日付では持たない。**
+   * 見積依頼の提示日からの日数で持つ。固定日にすると、デモを見せるたびに
+   * 工期だけが過去になり、作り物だと分かる。
+   */
+  workPeriodStartOffsetDays: number;
+  workPeriodEndOffsetDays: number;
+  /** 見積有効期限。作成日（下請が回答した日）からの日数。 */
+  validityDays: number;
+  paymentTerms: string;
+  deliveryPlace: string;
+};
+
+/**
+ * 下請台帳に登録が無い社（＝デモのデータではない社）に使う既定値。
+ * デモの3社と同じく、明らかなダミーであることが見て分かる値にする。
+ */
+export const DEFAULT_QUOTE_COVER: QuoteCoverFixture = {
+  quoteNumber: "0000-0000",
+  address: "東京都〇〇区0-0-0",
+  tel: "03-0000-0000",
+  contactName: "〇〇 〇〇",
+  workPeriodStartOffsetDays: 14,
+  workPeriodEndOffsetDays: 28,
+  validityDays: 30,
+  paymentTerms: "毎月末日締切／翌月末日支払",
+  deliveryPlace: "工事施工場所",
+};
+
+/**
+ * デモの3社ぶん。社の識別はメールアドレス（COMPANIES と同じ定数）で結ぶ。
+ *
+ * **引き当ての関数はここに置かない。** このファイルの export 全部から
+ * デモの版を算出しており（`lib/demoVersion.ts`）、材料は `JSON.stringify` を通る。
+ * 関数はそこで消えるので、関数を export するとその中身が版に効かなくなる
+ * （`tests/demoVersion.test.ts` が落ちる）。**ここが持つのは値だけ**にして、
+ * 引き当ては読み取りの側（`lib/db/quoteDocuments.ts`）で行う。
+ */
+export const QUOTE_COVER_BY_EMAIL: Readonly<Record<string, QuoteCoverFixture>> = {
+  [NAISO]: {
+    quoteNumber: "A-2026-0071",
+    address: "東京都〇〇区0-0-0 サンプル第1ビル2階",
+    tel: "03-0000-0001",
+    contactName: "見本 次郎",
+    workPeriodStartOffsetDays: 14,
+    workPeriodEndOffsetDays: 28,
+    validityDays: 30,
+    paymentTerms: "毎月末日締切／翌月末日支払（現金100%）",
+    deliveryPlace: "工事施工場所",
+  },
+  [SETSUBI]: {
+    quoteNumber: "B-2026-0158",
+    address: "東京都〇〇市0-0-0 サンプルハイツ203",
+    tel: "03-0000-0002",
+    contactName: "見本 三郎",
+    workPeriodStartOffsetDays: 10,
+    workPeriodEndOffsetDays: 31,
+    validityDays: 60,
+    paymentTerms: "毎月20日締切／翌月20日支払（現金70% 手形30%）",
+    deliveryPlace: "工事施工場所（元請倉庫渡しの材料を除く）",
+  },
+  [KOUMUTEN]: {
+    quoteNumber: "C-2026-0233",
+    address: "東京都〇〇区0-0-0 サンプル荘1階",
+    tel: "03-0000-0003",
+    contactName: "見本 四郎",
+    workPeriodStartOffsetDays: 21,
+    workPeriodEndOffsetDays: 35,
+    validityDays: 14,
+    paymentTerms: "工事完了・検査合格の翌月末日支払（現金100%）",
+    deliveryPlace: "工事施工場所",
+  },
+};

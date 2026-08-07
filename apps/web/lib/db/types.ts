@@ -362,6 +362,13 @@ export type NewQuoteGroupRequestInput = {
   subcontractorId: string;
   plannedPriceBand: PlannedPriceBand;
   lineItemIds: string[];
+  /**
+   * 元請が打ち直した見積回答期限（docs/flows.md の D4）。
+   * **省略すると、これまでどおり提示日時＋法定日数で自動計算する**
+   * （/projects/[id]/send の通常経路は渡さない）。渡した場合も法定の最短見積期間を
+   * 下回っていないかを保存の直前に確かめる。
+   */
+  responseDueAt?: Date;
 };
 
 /**

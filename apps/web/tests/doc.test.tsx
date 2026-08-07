@@ -110,6 +110,26 @@ describe("①見積依頼書", () => {
     expect(frames).toHaveLength(data.lines.length);
   });
 
+  it("1つの枠に、その明細の写真が渡した順に並ぶ（枠は増えない）", () => {
+    // 1箇所につき複数枚撮れる（docs/flows.md の表 D3）。枠の数は明細の数のままで、
+    // 写真は枠の中に並ぶ。写真の無い明細は空の点線枠のまま残る。
+    const urls = ["https://example.test/1.jpg", "https://example.test/2.jpg"];
+    const data = docData({
+      lines: [line({ id: "a" }), line({ id: "b", name: "浴室工事" })],
+      photoUrlByLineId: { a: urls },
+    });
+    const html = renderToStaticMarkup(
+      <DocumentView
+        template={QUOTE_REQUEST_TEMPLATE}
+        data={data}
+        audience="subcontractor"
+      />,
+    );
+    expect(html.match(/doc-photo-frame/g) ?? []).toHaveLength(data.lines.length);
+    expect(html.match(/<img/g) ?? []).toHaveLength(urls.length);
+    expect(html.indexOf(urls[0]!)).toBeLessThan(html.indexOf(urls[1]!));
+  });
+
   it("法定項目の定型文が、渡した順に書類へ出る", () => {
     const legalItems = [
       { label: "責任施工範囲", body: "本書に記載の工事範囲一式とします。" },

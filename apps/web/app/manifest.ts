@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 
-import { SITE } from "../lib/content";
+import { SITE, THEME_COLOR } from "../lib/content";
 
 /**
  * PWA のマニフェスト。ホーム画面に置いたアイコンから単独ウィンドウで起動させる。
@@ -16,7 +16,7 @@ export default function manifest(): MetadataRoute.Manifest {
     scope: "/",
     display: "standalone",
     background_color: "#ffffff",
-    theme_color: "#1e40af",
+    theme_color: THEME_COLOR,
     icons: [
       { src: "/icon-192.png", sizes: "192x192", type: "image/png" },
       { src: "/icon-512.png", sizes: "512x512", type: "image/png" },

@@ -104,6 +104,39 @@ export async function createProject(
 }
 
 /**
+ * 案件の施主名と現場住所を書き換える。`ownerId` の持ち物のときだけ書き換わり、
+ * 書き換えた案件を返す。他人のIDを渡したときと、存在しないIDのときは null
+ * （何も書き換えない）。
+ *
+ * **工事名（`work_name`）は変えない。** 現場住所から組み立てた初期値だが、
+ * デモの案件では `lib/demoFixture.ts` の `DEMO_WORK_NAME` が
+ * 「同じ内容に作り直すための目印」になっている（`lib/db/demoSeed.ts` の
+ * `removeExistingDemoData` がこの値で既存のデモ案件を探す）。ここで住所に合わせて
+ * 付け直すと、その目印が外れてデモの作り直しが効かなくなる。工事名を直す画面は
+ * 別に要る（`Project.workName` は画面上で直せる前提の項目）。
+ */
+export async function updateProjectForOwner(
+  id: string,
+  input: NewProjectInput,
+  ownerId: string,
+): Promise<Project | null> {
+  if (!isUuid(id)) return null;
+
+  const { data, error } = await getSupabaseClient()
+    .from("projects")
+    .update({
+      customer_name: input.customerName,
+      site_address: input.siteAddress,
+    })
+    .eq("id", id)
+    .eq("owner_id", ownerId)
+    .select(COLUMNS)
+    .maybeSingle();
+  if (error) throw error;
+  return data ? toProject(data as ProjectRow) : null;
+}
+
+/**
  * 案件を消す。`ownerId` の持ち物のときだけ消える（他人のIDを渡しても何も起きない）。
  *
  * 用途は**作りかけの後始末**。案件を作った直後の処理が失敗したとき、中途半端な案件を
