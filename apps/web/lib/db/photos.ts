@@ -9,16 +9,19 @@
 // lib/db/photoStorage.ts に分ける（このファイルは行のCRUDだけを扱う）。
 
 import { getSupabaseClient } from "./client";
+import { getOrCreateEstimate } from "./estimates";
 import type { NewPhotoInput, Photo } from "./types";
 import { isUuid } from "./uuid";
 
-const COLUMNS = "id, project_id, owner_id, area, storage_path, created_at";
+const COLUMNS =
+  "id, project_id, owner_id, area, line_id, storage_path, created_at";
 
 type PhotoRow = {
   id: string;
   project_id: string;
   owner_id: string;
   area: string;
+  line_id: string | null;
   storage_path: string;
   created_at: string;
 };
@@ -29,6 +32,7 @@ function toPhoto(row: PhotoRow): Photo {
     projectId: row.project_id,
     ownerId: row.owner_id,
     area: row.area,
+    lineId: row.line_id,
     storagePath: row.storage_path,
     createdAt: row.created_at,
   };
@@ -68,16 +72,44 @@ export async function getPhotoForOwner(
   return data ? toPhoto(data as PhotoRow) : null;
 }
 
+/**
+ * 明細行IDが、その案件の見積に実在することを確かめる。
+ *
+ * **photos.line_id には外部キーを張れない。** 明細行は estimates.lines（jsonb 配列）の
+ * 要素であって行ではないため、DBに参照先が無い。
+ * マイグレーション 20260807010000_photo_line_id.sql は
+ * 「その明細がこの案件のものかはアプリ側（lib/db/photos.ts）で確かめる」と書いている。
+ * その約束をここで果たす。確かめないと、存在しない明細IDや**別の案件の明細ID**を
+ * そのまま保存でき、書類は明細行IDをキーに写真を引く（lib/doc/schema.ts の
+ * DocData.photoUrlByLineId）ので、その写真はどの枠にも入らないまま残る。
+ */
+async function assertLineBelongsToProject(
+  projectId: string,
+  lineId: string,
+): Promise<void> {
+  const estimate = await getOrCreateEstimate(projectId);
+  if (!estimate.lines.some((line) => line.id === lineId)) {
+    throw new Error("その明細は、この案件の見積にありません。");
+  }
+}
+
 export async function createPhoto(
   input: NewPhotoInput,
   ownerId: string,
 ): Promise<Photo> {
+  // null は「まだどの行にも結びついていない写真」（撮ってから数量を入れる順序）。
+  // そのときは見積を読みに行かない（確かめるものが無い往復を増やさない）。
+  if (input.lineId != null) {
+    await assertLineBelongsToProject(input.projectId, input.lineId);
+  }
+
   const { data, error } = await getSupabaseClient()
     .from("photos")
     .insert({
       project_id: input.projectId,
       owner_id: ownerId,
       area: input.area,
+      line_id: input.lineId ?? null,
       storage_path: input.storagePath,
     })
     .select(COLUMNS)

@@ -1,65 +1,17 @@
 import { describe, expect, it } from "vitest";
 
-import { appendEstimateLine, getOrCreateEstimate } from "../lib/db/estimates";
+import { getOrCreateEstimate } from "../lib/db/estimates";
 import {
   adoptLine,
   cancelLineAdoption,
   listLineAdoptionsForProject,
 } from "../lib/db/lineAdoptions";
-import { createProject } from "../lib/db/projects";
 import {
-  createQuoteGroupRequest,
-  createQuoteRequestGroup,
-} from "../lib/db/quoteRequestGroups";
-import { createSubcontractor } from "../lib/db/subcontractors";
-
-const OWNER_A = "owner-a@example.com";
-const OWNER_B = "owner-b@example.com";
-
-/** 明細2行（既定行＋追加1行）と依頼グループを持つ案件を作る。 */
-async function setupProject(customerName: string) {
-  const project = await createProject(
-    { customerName, siteAddress: `${customerName}の現場` },
-    OWNER_A,
-  );
-  const group = await createQuoteRequestGroup({ projectId: project.id }, OWNER_A);
-  // 既定行（解体・廃棄物処理費）に1行足して、明細ごとに違う社を採れるかを試せるようにする。
-  const estimate = await appendEstimateLine(project.id, {
-    kind: "item",
-    name: "クロス張替え",
-    spec: "量産品",
-    quantity: 10,
-    unit: "㎡",
-    unitPrice: 0,
-    taxCategory: "standard",
-  });
-  // 非nullアサーションは既存の db テストの作法（tests/quoteRequestGroups.test.ts）に合わせる。
-  return {
-    project,
-    group,
-    lineOne: estimate.lines[0]!.id,
-    lineTwo: estimate.lines[1]!.id,
-  };
-}
-
-/** 下請を1社作り、その社への依頼を1件出す。 */
-async function requestTo(
-  groupId: string,
-  companyName: string,
-  email: string,
-  lineItemIds: string[],
-) {
-  const subcontractor = await createSubcontractor({ companyName, email }, OWNER_A);
-  return createQuoteGroupRequest(
-    {
-      groupId,
-      subcontractorId: subcontractor.id,
-      plannedPriceBand: "under_500man",
-      lineItemIds,
-    },
-    OWNER_A,
-  );
-}
+  OWNER_A,
+  OWNER_B,
+  requestTo,
+  setupProject,
+} from "./support/lineMarkSetup";
 
 describe("lineAdoptions", () => {
   it("同じ明細を3社に依頼して3社ぶん採用しても、採用は1件だけで見積の明細行が増えない（C8）", async () => {

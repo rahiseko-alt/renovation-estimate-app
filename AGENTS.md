@@ -84,7 +84,8 @@
   （`lib/db/` のテストはローカル Supabase が要る。下記「データの保存先」参照）
 - lint / 型チェック: `pnpm --filter web lint` / `pnpm --filter web typecheck`
 - **本番のデモ経路を外から踏む**: `bash scripts/prod-demo-check.sh`
-  （3タップの経路と待ち時間を機械判定する。**「本番で動いています」と言う前にこれを通す。**
+  （`docs/flows.md`「デモの画面の並び」の D1〜D9 の経路と、待ち時間を機械判定する。
+  **「本番で動いています」と言う前にこれを通す。**
   一度も踏まずにそう言って、実際には1タップ目が10秒かかって落ちていたことがある。
   `docs/failures.md` 2026-08-06 参照）
 - 起動スモーク（受け入れ条件を HTTP で機械判定）: `bash scripts/smoke.sh`（先に `pnpm -r build`）
@@ -126,9 +127,12 @@
 `.github/workflows/prod-smoke.yml` の3箇所を同時に直す。
 
 同じ理由で、デモの入口の文言 `DEMO_ENTRY_TEXT.start`（`apps/web/lib/demoText.ts`）は
-`scripts/smoke.sh` と `apps/web/e2e/demo-three-taps.spec.ts` の `TAPS` が探す文字列でもある。
-**この3タップは商談で見せる経路そのものなので、ボタンを1つ増やしたら E2E が落ちる**
-（落ちたら実装を直す。検査のほうを緩めない）。
+`scripts/smoke.sh` と `apps/web/e2e/demo-flow.spec.ts` が探す文字列でもある。
+**デモの画面の並びは `docs/flows.md`「デモの画面の並び」（D1〜D9）が正で、
+そこに無いボタン・画面・遷移を作らないことが利用者との約束**（2026-08-07）。
+`apps/web/e2e/demo-flow.spec.ts` はその並びをそのまま検査していて、
+**画面やボタンを1つ足したら落ちる**（落ちたら実装を直す。検査のほうを緩めない。
+表を変えたいときは、実装より先に利用者に表を直してもらう）。
 
 **`apps/web/vercel.json` の `regions` は、Supabase のリージョンと対になっている。**
 アプリとDBが離れていると往復1回に0.45〜0.85秒かかり、デモの1タップ目が3秒台になる

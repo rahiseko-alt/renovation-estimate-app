@@ -6,6 +6,7 @@ import {
   newPhotoStoragePath,
   uploadPhotoObject,
 } from "../lib/db/photoStorage";
+import { getOrCreateEstimate } from "../lib/db/estimates";
 import {
   createPhoto,
   deletePhotoRowForOwner,
@@ -81,6 +82,77 @@ describe("photos（行のCRUD）", () => {
     );
     expect(await deletePhotoRowForOwner(photo.id, OWNER_B)).toBe(false);
     expect(await getPhotoForOwner(photo.id, OWNER_A)).not.toBeNull();
+  });
+});
+
+// photos.line_id には外部キーを張れない（明細行は estimates.lines（jsonb 配列）の
+// 要素であって行ではない）。マイグレーション 20260807010000_photo_line_id.sql が
+// 「アプリ側で確かめる」と書いた約束を、ここで機械的に見る。
+describe("photos の明細行との結びつけ（line_id）", () => {
+  it("その案件の明細IDなら、結びつけて保存できる", async () => {
+    const project = await newProject(OWNER_A);
+    const estimate = await getOrCreateEstimate(project.id);
+    const lineId = estimate.lines[0]!.id;
+
+    const photo = await createPhoto(
+      {
+        projectId: project.id,
+        area: "内装",
+        lineId,
+        storagePath: `${project.id}/line-ok.jpg`,
+      },
+      OWNER_A,
+    );
+    expect(photo.lineId).toBe(lineId);
+  });
+
+  it("別の案件の明細IDは弾く（保存すると、その写真はどの枠にも入らない）", async () => {
+    const project = await newProject(OWNER_A);
+    const other = await newProject(OWNER_A);
+    const otherEstimate = await getOrCreateEstimate(other.id);
+
+    await expect(
+      createPhoto(
+        {
+          projectId: project.id,
+          area: "内装",
+          lineId: otherEstimate.lines[0]!.id,
+          storagePath: `${project.id}/line-other.jpg`,
+        },
+        OWNER_A,
+      ),
+    ).rejects.toThrow("その明細は、この案件の見積にありません。");
+  });
+
+  it("実在しない明細IDも弾く", async () => {
+    const project = await newProject(OWNER_A);
+
+    await expect(
+      createPhoto(
+        {
+          projectId: project.id,
+          area: "内装",
+          lineId: "00000000-0000-4000-8000-000000000000",
+          storagePath: `${project.id}/line-missing.jpg`,
+        },
+        OWNER_A,
+      ),
+    ).rejects.toThrow("その明細は、この案件の見積にありません。");
+  });
+
+  it("明細IDが null なら、これまでどおり保存できる（見積を読みに行かない）", async () => {
+    const project = await newProject(OWNER_A);
+
+    const photo = await createPhoto(
+      {
+        projectId: project.id,
+        area: "内装",
+        lineId: null,
+        storagePath: `${project.id}/line-null.jpg`,
+      },
+      OWNER_A,
+    );
+    expect(photo.lineId).toBeNull();
   });
 });
 

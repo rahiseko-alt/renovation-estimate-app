@@ -9,6 +9,7 @@ import { buildContentSecurityPolicy, createNonce } from "./lib/security/csp";
  * 相手にログインさせないので、ここには入れない。
  */
 const PROTECTED_PREFIXES = [
+  "/drafts",
   "/projects",
   "/estimates",
   "/masters",

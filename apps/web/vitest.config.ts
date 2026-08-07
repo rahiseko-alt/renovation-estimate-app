@@ -18,6 +18,8 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["tests/**/*.test.{ts,tsx}"],
+    // 前回までのテスト用の行を、始める前に消す（理由は tests/globalSetup.ts）。
+    globalSetup: ["tests/globalSetup.ts"],
     // **ファイルを並行に走らせない。** デモの掃除（purgeExpiredDemoData）は
     // owner_id が `demo:` で始まるものを**横断して**消す。並行に走らせると、
     // 別のファイルが投入している最中のデモデータを消してしまい、

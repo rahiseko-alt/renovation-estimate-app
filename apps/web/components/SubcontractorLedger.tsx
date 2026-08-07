@@ -7,14 +7,18 @@ import type { Subcontractor } from "../lib/db/types";
 
 type Props = {
   subcontractors: Subcontractor[];
-  failed: boolean;
+  /**
+   * 登録できなかった理由の文言。無ければ null。
+   * どの理由の文言を出すかは呼び出し側（app/subcontractors/page.tsx）が決める。
+   */
+  errorMessage: string | null;
 };
 
 /**
  * 下請台帳の一覧と登録フォーム（docs/design.md 7章「画面は5つ」）。
  * 項目は社名とメールの2つしかないので、一覧と登録を別画面に割らず1画面に置く。
  */
-export function SubcontractorLedger({ subcontractors, failed }: Props) {
+export function SubcontractorLedger({ subcontractors, errorMessage }: Props) {
   const errorId = "new-subcontractor-error";
 
   return (
@@ -54,13 +58,13 @@ export function SubcontractorLedger({ subcontractors, failed }: Props) {
         {SUBCONTRACTORS_TEXT.newHeading}
       </h2>
 
-      {failed ? (
+      {errorMessage ? (
         <p
           id={errorId}
           role="alert"
           className="mt-4 rounded border-2 border-red-700 bg-red-50 px-4 py-3 text-red-900"
         >
-          {SUBCONTRACTORS_TEXT.failed}
+          {errorMessage}
         </p>
       ) : null}
 
@@ -77,7 +81,7 @@ export function SubcontractorLedger({ subcontractors, failed }: Props) {
             name="companyName"
             type="text"
             required
-            aria-describedby={failed ? errorId : undefined}
+            aria-describedby={errorMessage ? errorId : undefined}
             className="rounded border-2 border-gray-500 px-4 py-3"
           />
         </div>
@@ -91,7 +95,7 @@ export function SubcontractorLedger({ subcontractors, failed }: Props) {
             name="email"
             type="email"
             required
-            aria-describedby={failed ? errorId : undefined}
+            aria-describedby={errorMessage ? errorId : undefined}
             className="rounded border-2 border-gray-500 px-4 py-3"
           />
         </div>

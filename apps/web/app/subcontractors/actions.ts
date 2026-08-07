@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 
 import { getCurrentUser } from "../../lib/auth/server";
+import { FAILED_LIMIT, SUBCONTRACTORS_TEXT } from "../../lib/content";
 import {
   createSubcontractor,
   deleteSubcontractorForOwner,
@@ -27,6 +28,13 @@ const MAX_EMAIL_LENGTH = 320;
  */
 const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+$/;
 
+/** 件数の上限で断られた例外かどうか。文面は文言の置き場所が1つだけ持つ。 */
+function isLimitError(error: unknown): boolean {
+  return (
+    error instanceof Error && error.message === SUBCONTRACTORS_TEXT.failedLimit
+  );
+}
+
 export async function createSubcontractorAction(
   formData: FormData,
 ): Promise<void> {
@@ -48,7 +56,16 @@ export async function createSubcontractorAction(
     redirect("/subcontractors?failed=1");
   }
 
-  await createSubcontractor({ companyName, email }, ownerId);
+  try {
+    await createSubcontractor({ companyName, email }, ownerId);
+  } catch (error) {
+    // 上限に達したときだけ、入力内容の不備（failed=1）と別の理由として画面に伝える。
+    // それ以外の失敗はここで握りつぶさず、そのまま投げ直す。
+    if (isLimitError(error)) {
+      redirect(`/subcontractors?failed=${FAILED_LIMIT}`);
+    }
+    throw error;
+  }
   redirect("/subcontractors");
 }
 
