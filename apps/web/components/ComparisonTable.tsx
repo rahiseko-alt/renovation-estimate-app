@@ -64,8 +64,16 @@ export function ComparisonTable({
             key={row.line.id}
             className="rounded border-2 border-gray-400 p-4"
           >
-            <h2 className="font-bold">{row.line.name}</h2>
-            <p className="text-gray-700">
+            {/*
+              **工事名を帯にする。** 工事名と会社名がどちらも太字で縦に並んでいて、
+              どちらがどちらか分からないと言われた（利用者の指摘）。
+              色（濃い地に白抜き）と、上に置く小さな見出しの両方で分ける。
+            */}
+            <h2 className="-mx-4 -mt-4 rounded-t bg-gray-800 px-4 py-3 text-white">
+              <span className="block text-xs">{COMPARISON_TEXT.lineColumn}</span>
+              <span className="block text-lg font-bold">{row.line.name}</span>
+            </h2>
+            <p className="mt-3 text-gray-700">
               {`${COMPARISON_TEXT.quantityColumn} ${row.line.quantity} ${row.line.unit}`}
             </p>
 
@@ -93,33 +101,28 @@ export function ComparisonTable({
                       </div>
                     </div>
 
-                    {price === undefined ? null : isAdopted ? (
+                    {price === undefined ? null : (
                       <button
                         type="button"
+                        // 色だけで状態を伝えない（読み上げにも「押されている」が届く）。
+                        aria-pressed={isAdopted}
                         disabled={isPending}
                         onClick={() =>
                           run(() =>
-                            cancelLineAdoptionAction(projectId, row.line.id),
+                            isAdopted
+                              ? cancelLineAdoptionAction(projectId, row.line.id)
+                              : adoptLineAction(
+                                  projectId,
+                                  row.line.id,
+                                  column.requestId,
+                                ),
                           )
                         }
-                        className="tap shrink-0 rounded border-2 border-blue-700 px-4 font-bold text-blue-700"
-                      >
-                        {COMPARISON_TEXT.cancelAdoption}
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        disabled={isPending}
-                        onClick={() =>
-                          run(() =>
-                            adoptLineAction(
-                              projectId,
-                              row.line.id,
-                              column.requestId,
-                            ),
-                          )
-                        }
-                        className="tap shrink-0 rounded bg-blue-700 px-4 font-bold text-white disabled:bg-gray-500"
+                        className={`tap shrink-0 rounded px-5 font-bold ${
+                          isAdopted
+                            ? "bg-blue-800 text-white"
+                            : "bg-gray-300 text-gray-900"
+                        }`}
                       >
                         {COMPARISON_TEXT.adopt}
                       </button>
@@ -129,16 +132,6 @@ export function ComparisonTable({
               })}
             </ul>
 
-            {row.adoptedRequestId ? (
-              <p className="mt-3 font-bold text-blue-800">
-                {COMPARISON_TEXT.adopted}:{" "}
-                {
-                  comparison.columns.find(
-                    (column) => column.requestId === row.adoptedRequestId,
-                  )?.companyName
-                }
-              </p>
-            ) : null}
           </section>
         ))}
       </div>

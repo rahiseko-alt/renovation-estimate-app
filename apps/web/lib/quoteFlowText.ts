@@ -55,9 +55,14 @@ export const COMPARISON_TEXT = {
   noResponses: "まだ回答がありません。",
   lineColumn: "工事項目",
   quantityColumn: "数量",
-  adopt: "採用する",
-  adopted: "採用中",
-  cancelAdoption: "採用をやめる",
+  /**
+   * 採用のボタン。**3社とも同じ文字にする。**
+   * 「採用する／採用中／採用をやめる」と出し分けていたが、
+   * 3つ並んだときに何が起きるか読み取れないと言われた（利用者の指摘）。
+   * 採用中だけ色を変えれば分かる。押せば入れ替わる（採用中を押すと外れる）。
+   * 色だけに頼らないよう、ボタンには aria-pressed を付ける。
+   */
+  adopt: "採用",
   waiting: "回答待ち",
   cheapestMark: "最安",
   /** 自動で選ばない理由を画面にも書く。 */
