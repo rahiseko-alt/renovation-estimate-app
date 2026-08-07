@@ -49,9 +49,9 @@ const DEMO_LINE_NAME = "内装工事";
  * （どの社を採用済みにするかは lib/demoFixture.ts の LINE_SOURCE[].adoptedBy）。
  */
 const DEMO_QUOTES = [
-  { companyName: "サンプル内装工業", unitPrice: 3_200, displayed: "3,200" },
-  { companyName: "テスト住宅設備", unitPrice: 3_500, displayed: "3,500" },
-  { companyName: "ダミー工務店", unitPrice: 2_980, displayed: "2,980" },
+  { companyName: "業者A", unitPrice: 3_200, displayed: "3,200" },
+  { companyName: "業者B", unitPrice: 3_500, displayed: "3,500" },
+  { companyName: "業者C", unitPrice: 2_980, displayed: "2,980" },
 ] as const;
 
 /**
@@ -103,7 +103,8 @@ async function login(page: Page): Promise<void> {
   await page.getByLabel("メールアドレス").fill(DEMO_USER_EMAIL!);
   await page.getByLabel("パスワード").fill(DEMO_USER_PASSWORD!);
   await page.getByRole("button", { name: "ログインする" }).click();
-  await expect(page.getByRole("button", { name: "ログアウト" })).toBeVisible();
+  // ログアウトはトップの引き出しの中にあるので、ここでは行き先で判定する。
+  await expect(page).toHaveURL("/");
 }
 
 /** 案件一覧から seed のデモ案件を開き、その案件IDを返す。 */

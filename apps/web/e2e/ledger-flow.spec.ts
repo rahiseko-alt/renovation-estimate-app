@@ -65,7 +65,8 @@ async function login(page: Page): Promise<void> {
   await page.getByLabel("メールアドレス").fill(DEMO_USER_EMAIL!);
   await page.getByLabel("パスワード").fill(DEMO_USER_PASSWORD!);
   await page.getByRole("button", { name: "ログインする" }).click();
-  await expect(page.getByRole("button", { name: "ログアウト" })).toBeVisible();
+  // ログアウトはトップの引き出しの中にあるので、ここでは行き先で判定する。
+  await expect(page).toHaveURL("/");
 }
 
 /** 案件を新しく作り、その案件IDを返す。 */
