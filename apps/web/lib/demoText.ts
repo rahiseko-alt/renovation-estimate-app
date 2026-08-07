@@ -37,7 +37,7 @@ export const DEMO_ENTRY_TEXT = {
   loginNote: "アカウントをお持ちの方",
 } as const;
 
-/** 写真の画面（1タップ目の着地／2タップ目を押す場所）。 */
+/** 写真の画面（D3。D2「案件をつくる」の「次へ」で来て、D4 の確認画面へ進む）。 */
 export const DEMO_PHOTO_TEXT = {
   heading: "現場の写真を撮る",
   // **枠を押すと撮影になる**（docs/flows.md の D3）。押せる場所であることは

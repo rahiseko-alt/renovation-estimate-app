@@ -23,6 +23,7 @@ import type { QuoteResponseCostBreakdown } from "../lib/db/types";
 import { formatDateJst } from "../lib/doc/date";
 import {
   SUBCONTRACTOR_QUOTE_LEGAL_NOTICE,
+  SUBCONTRACTOR_QUOTE_LEGAL_NOTICE_SOURCE,
   SUBCONTRACTOR_QUOTE_TEXT as TEXT,
 } from "../lib/doc/templates/subcontractor-quote";
 
@@ -34,6 +35,19 @@ function Field({ label, value }: { label: string; value: string }) {
       <dd className="grow font-bold">{value}</dd>
     </div>
   );
+}
+
+/**
+ * DBに持っていない欄。**埋めない。**（2026-08-07 のレビュー指摘。デモ用の
+ * 決め打ちを全社に当てていて、実在の社の書類に架空の住所や電話が出ていた。）
+ * 日付も同じ扱いで、無ければ「未入力」と出す。
+ */
+function fieldText(value: string | null): string {
+  return value ?? QUOTE_DOCUMENT_TEXT.notEntered;
+}
+
+function dateText(value: Date | null): string {
+  return value === null ? QUOTE_DOCUMENT_TEXT.notEntered : formatDateJst(value);
 }
 
 /**
@@ -64,7 +78,7 @@ export function QuoteCoverSheet({
   return (
     <section className="mt-6 rounded border-2 border-gray-400 p-4">
       <p className="tabular text-right text-gray-700">
-        {`${TEXT.quoteNumberLabel} ${cover.quoteNumber}`}
+        {`${TEXT.quoteNumberLabel} ${fieldText(cover.quoteNumber)}`}
       </p>
       <p className="tabular text-right text-gray-700">
         {`${TEXT.issuedAtLabel} ${formatDateJst(cover.issuedAt)}`}
@@ -84,11 +98,14 @@ export function QuoteCoverSheet({
         <h3 className="font-bold">{TEXT.issuerHeading}</h3>
         <p className="mt-1 text-lg font-bold">{cover.issuer.companyName}</p>
         <dl className="mt-1">
-          <Field label={TEXT.issuerAddressLabel} value={cover.issuer.address} />
-          <Field label={TEXT.issuerTelLabel} value={cover.issuer.tel} />
+          <Field
+            label={TEXT.issuerAddressLabel}
+            value={fieldText(cover.issuer.address)}
+          />
+          <Field label={TEXT.issuerTelLabel} value={fieldText(cover.issuer.tel)} />
           <Field
             label={TEXT.issuerContactLabel}
-            value={cover.issuer.contactName}
+            value={fieldText(cover.issuer.contactName)}
           />
           <Field label={TEXT.issuerEmailLabel} value={cover.issuer.email} />
         </dl>
@@ -99,17 +116,27 @@ export function QuoteCoverSheet({
         <Field label={TEXT.workPlaceLabel} value={cover.workPlace} />
         <Field
           label={TEXT.workPeriodLabel}
-          value={TEXT.workPeriodValue(
-            formatDateJst(cover.workPeriodStart),
-            formatDateJst(cover.workPeriodEnd),
-          )}
+          value={
+            cover.workPeriodStart && cover.workPeriodEnd
+              ? TEXT.workPeriodValue(
+                  formatDateJst(cover.workPeriodStart),
+                  formatDateJst(cover.workPeriodEnd),
+                )
+              : QUOTE_DOCUMENT_TEXT.notEntered
+          }
         />
         <Field
           label={TEXT.validUntilLabel}
-          value={formatDateJst(cover.validUntil)}
+          value={dateText(cover.validUntil)}
         />
-        <Field label={TEXT.paymentTermsLabel} value={cover.paymentTerms} />
-        <Field label={TEXT.deliveryPlaceLabel} value={cover.deliveryPlace} />
+        <Field
+          label={TEXT.paymentTermsLabel}
+          value={fieldText(cover.paymentTerms)}
+        />
+        <Field
+          label={TEXT.deliveryPlaceLabel}
+          value={fieldText(cover.deliveryPlace)}
+        />
       </dl>
 
       <dl className="tabular mt-4">
@@ -190,6 +217,10 @@ export function QuoteBreakdownSheet({
           {line}
         </p>
       ))}
+      {/* 原文のまま載せている以上、出典を同じ場所に出す（利用の条件）。 */}
+      <p className="mt-3 text-xs text-gray-700">
+        {SUBCONTRACTOR_QUOTE_LEGAL_NOTICE_SOURCE}
+      </p>
     </section>
   );
 }

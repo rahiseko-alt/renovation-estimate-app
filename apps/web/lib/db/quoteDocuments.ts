@@ -10,7 +10,7 @@
 
 import { calcEstimate } from "../calc";
 import type { EstimateLine, EstimateTotals } from "../calc";
-import { DEFAULT_QUOTE_COVER, QUOTE_COVER_BY_EMAIL } from "../demoFixture";
+import { QUOTE_COVER_BY_EMAIL } from "../demoFixture";
 import { getSupabaseClient } from "./client";
 import { getCompanyProfile } from "./companyProfiles";
 import { getComparisonForProject } from "./comparison";
@@ -120,26 +120,32 @@ export async function getQuoteDocumentForRequest(
  * 一致した項目）が持つ。ここは値の組み立てだけを行う。
  */
 export type QuoteDocumentCover = {
-  quoteNumber: string;
+  quoteNumber: string | null;
   /** 作成日（下請が回答した日）。 */
   issuedAt: Date;
   /** 宛先（元請の請負者名）。「御中」はテンプレート側が付ける。 */
   recipientName: string;
-  /** 見積を出した側（下請）。社名とメールはDB、住所・TEL・担当はデモの決め打ち。 */
+  /**
+   * 見積を出した側（下請）。**社名とメールだけがDBにある。**
+   * 住所・TEL・担当は、いまDBに欄が無く、デモの3社にだけ決め打ちの値がある
+   * （`lib/demoFixture.ts`）。**デモ以外の社には当てない**——実在の社の見積書に
+   * 架空の住所や電話が載る（2026-08-07 のレビュー指摘）。値が無ければ null。
+   */
   issuer: {
     companyName: string;
     email: string;
-    address: string;
-    tel: string;
-    contactName: string;
+    address: string | null;
+    tel: string | null;
+    contactName: string | null;
   };
   workName: string;
   workPlace: string;
-  workPeriodStart: Date;
-  workPeriodEnd: Date;
-  validUntil: Date;
-  paymentTerms: string;
-  deliveryPlace: string;
+  /** 工期・有効期限・支払条件・受渡場所も、上と同じ理由で無ければ null。 */
+  workPeriodStart: Date | null;
+  workPeriodEnd: Date | null;
+  validUntil: Date | null;
+  paymentTerms: string | null;
+  deliveryPlace: string | null;
 };
 
 /** D8 の1画面ぶん（鑑・内訳・集計・明細）。 */
@@ -222,6 +228,10 @@ function totalsOf(quote: QuoteDocument): EstimateTotals {
       quantity: line.quantity,
       unit: line.unit,
       unitPrice: line.costUnitPrice,
+      // **明細の税区分は、いまどこにも保存していない。** 見積の明細を組み立てる
+      // `lib/db/estimates.ts` も同じく "standard" 決め打ちで、軽減税率・非課税の
+      // 行を作る経路が無い。ここを行ごとの値にするときは、先に estimates.ts 側を
+      // 直す（片方だけ直すと、画面の税額と書類の税額が食い違う）。
       taxCategory: "standard",
     });
   }
@@ -241,22 +251,23 @@ export async function getQuoteDocumentSheetForRequest(
   requestId: string,
   ownerId: string,
 ): Promise<QuoteDocumentSheet | null> {
-  const [quote, detail, project, profile] = await Promise.all([
+  const [quote, detail, project, profile, response] = await Promise.all([
     getQuoteDocumentForRequest(projectId, requestId, ownerId),
     findRequestDetail(projectId, requestId, ownerId),
     getProjectForOwner(projectId, ownerId),
     getCompanyProfile(ownerId),
+    // 回答は token ではなく依頼IDで引く。**他の4つを待たずに同時に投げる**
+    // （引数が requestId だけで、他の結果に依らない）。所有者でなかったときは
+    // 下の return null で捨てるので、余分に引いた回答は外に出ない。
+    getQuoteGroupResponseForRequest(requestId),
   ]);
   if (!quote || !detail || !project) return null;
 
-  // 回答は token ではなく依頼IDで引く（下請の画面と違い、ここは所有者確認を
-  // 済ませた後でしか呼ばない）。
-  const response = await getQuoteGroupResponseForRequest(requestId);
-
   // 鑑の欄のうち、DBに持っていないものはデモの決め打ちから引く（lib/demoFixture.ts）。
-  // 台帳に無い社（デモのデータではない社）には既定値を使う。
-  const fixture =
-    QUOTE_COVER_BY_EMAIL[detail.subcontractors.email] ?? DEFAULT_QUOTE_COVER;
+  // **デモの3社に無いメールなら、既定値で埋めずに null を返す。** 埋めると、
+  // 実在の下請の見積書に架空の住所・電話・担当・支払条件・見積番号が印字される
+  // （2026-08-07 のレビュー指摘）。画面は null を「未入力」として出す。
+  const fixture = QUOTE_COVER_BY_EMAIL[detail.subcontractors.email] ?? null;
   const issuedAt = new Date(
     response?.respondedAt ?? detail.responded_at ?? detail.created_at,
   );
@@ -265,23 +276,27 @@ export async function getQuoteDocumentSheetForRequest(
   return {
     quote,
     cover: {
-      quoteNumber: fixture.quoteNumber,
+      quoteNumber: fixture?.quoteNumber ?? null,
       issuedAt,
       recipientName: profile.contractorName,
       issuer: {
         companyName: quote.companyName,
         email: detail.subcontractors.email,
-        address: fixture.address,
-        tel: fixture.tel,
-        contactName: fixture.contactName,
+        address: fixture?.address ?? null,
+        tel: fixture?.tel ?? null,
+        contactName: fixture?.contactName ?? null,
       },
       workName: project.workName,
       workPlace: project.siteAddress,
-      workPeriodStart: addDays(presentedAt, fixture.workPeriodStartOffsetDays),
-      workPeriodEnd: addDays(presentedAt, fixture.workPeriodEndOffsetDays),
-      validUntil: addDays(issuedAt, fixture.validityDays),
-      paymentTerms: fixture.paymentTerms,
-      deliveryPlace: fixture.deliveryPlace,
+      workPeriodStart: fixture
+        ? addDays(presentedAt, fixture.workPeriodStartOffsetDays)
+        : null,
+      workPeriodEnd: fixture
+        ? addDays(presentedAt, fixture.workPeriodEndOffsetDays)
+        : null,
+      validUntil: fixture ? addDays(issuedAt, fixture.validityDays) : null,
+      paymentTerms: fixture?.paymentTerms ?? null,
+      deliveryPlace: fixture?.deliveryPlace ?? null,
     },
     breakdown: response?.breakdown ?? null,
     totals: totalsOf(quote),
