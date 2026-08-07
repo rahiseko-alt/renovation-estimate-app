@@ -17,9 +17,9 @@
 #   D3 /projects/<id>/document           保存 / 送信 / 修正
 #   D4 /projects/<id>/sent               ロード中を流して自動で D5 へ
 #   D5 /projects/<id>/received           「見積もりを見る」
-#   D7 /projects/<id>/quotes             社ごとの一覧
+#   D7 /projects/<id>/quotes             社ごとの一覧＋「見積書を出す」
 #   D6 /projects/<id>/quotes/<requestId> 1社ずつ。明細ごとに採用/保留
-#   D9 見積書PDF                         /projects/<id>/comparison の合計で代用（下記）
+#   D9 見積書PDF                         D7 の「見積書を出す」から降りてくる
 #
 # 使い方:
 #   bash scripts/prod-demo-check.sh
@@ -272,6 +272,14 @@ if grep -qF "まだ見積もりが届いていません。" "${WORK}/quotes.html
 else
   ok "D7 「まだ見積もりが届いていません。」が出ていない"
 fi
+# 文言は apps/web/lib/flowText.ts の QUOTE_LIST_TEXT.toPdf と同じ値。
+# **D7 → D9 の経路はこのボタン**（利用者の指示 2026-08-07）。ここが消えると
+# 表のとおりに D9 へ行けなくなるので、経路の検査としてボタンの有無を見る。
+if has_label "${WORK}/quotes.html" "見積書を出す"; then
+  ok "D7 「見積書を出す」のボタンがある（D9 の入口）"
+else
+  fail "D7 「見積書を出す」のボタンが無い（D9 へ行けない）"
+fi
 
 # ── D6 見積もり書類（1社ずつ）──────────────────────────────
 # 依頼IDはデモを始めるたびに変わるので、**D7 の HTML に出ているリンクから拾う**
@@ -299,7 +307,11 @@ else
   done
 fi
 
-# ── D9 見積書PDF（合計で代用）─────────────────────────────
+# ── 金額の確認（検査専用。ここは利用者の経路ではない）────
+# **経路の検査は D7 の「見積書を出す」で済んでいる**（上でボタンの有無を見た）。
+# ここで比較表を開くのは**金額の確認だけ**のため。比較表は表（D1〜D9）に無い画面で、
+# 利用者はここを通らない。
+#
 # **PDFそのものは押していない。** 出力は Server Action で、呼び出し先IDがHTMLに載らない
 # （クライアント部品から呼ぶのでIDはJSチャンク側にある）ため bash から素直に叩けない。
 # かわりに **/projects/<id>/comparison に出ている採用済みの合計**を見る。この合計と
@@ -307,21 +319,21 @@ fi
 # 書類も0円ではない。**0円のまま書類が出る事故を外から捕まえられる唯一の場所**
 # （PDFのバイト列から金額は読めない。docs/failures.md 2026-08-06）。
 #
-# 比較表そのものはデモの画面の並び（D1〜D9）に入っていないので、**この画面で見るのは
-# 金額だけ**にしてある。以前ここで見ていた3社の並びと回答済みの判定は、消したのではなく
-# D7 に移した（上の「D7 一覧に 業者A/B/C」と「まだ見積もりが届いていません。が出ていない」）。
+# **D7 に合計を出す指示は表に無い**ので、D7 側に合計を足して済ませることはしない。
+# 以前ここで見ていた3社の並びと回答済みの判定は、消したのではなく D7 に移した
+# （上の「D7 一覧に 業者A/B/C」と「まだ見積もりが届いていません。が出ていない」）。
 RESULT=$(fetch "${WORK}/cmp.html" "${BASE}/projects/${PROJECT_ID}/comparison")
 CODE="${RESULT% *}"
 if [ "${CODE}" != "200" ]; then
-  fail "D9 合計を読む画面が ${CODE}"
+  fail "金額の確認: 合計を読む画面が ${CODE}"
 else
-  ok "D9 合計を読む画面 (200, ${RESULT#* }s)"
+  ok "金額の確認: 合計を読む画面 (200, ${RESULT#* }s)"
 fi
 
 # ラベルは apps/web/lib/quoteFlowText.ts の COMPARISON_TEXT.adoptedTotalLabel と同じ値。
 TOTAL_LABEL="採用中の合計（税込）"
 if ! grep -qF "${TOTAL_LABEL}" "${WORK}/cmp.html"; then
-  fail "D9 「${TOTAL_LABEL}」が無い（画面の作りが変わった可能性）"
+  fail "金額の確認: 「${TOTAL_LABEL}」が無い（画面の作りが変わった可能性）"
 else
   # ラベルの直後に出る「1,234,567円」から数字だけを取り出す。
   # HTMLコメントを先に落とす。React は隣り合う描画の間にコメントノードを挟むことがあり、
@@ -331,11 +343,11 @@ else
     | sed -n "/${TOTAL_LABEL}/,\$p" \
     | grep -o '[0-9][0-9,]*円' | head -1 | tr -d ',円')
   if [ -z "${TOTAL_YEN}" ]; then
-    fail "D9 「${TOTAL_LABEL}」の金額を読めない"
+    fail "金額の確認: 「${TOTAL_LABEL}」の金額を読めない"
   elif [ "${TOTAL_YEN}" -gt 0 ]; then
-    ok "D9 採用済みの合計が ${TOTAL_YEN}円（0円ではない）"
+    ok "金額の確認: 採用済みの合計が ${TOTAL_YEN}円（0円ではない）"
   else
-    fail "D9 採用済みの合計が 0円（見積書も0円で出る）"
+    fail "金額の確認: 採用済みの合計が 0円（見積書も0円で出る）"
   fi
 fi
 
@@ -386,7 +398,7 @@ fi
 
 echo
 if [ "${FAILED}" -eq 0 ]; then
-  echo "PROD DEMO CHECK OK: D1〜D7 の経路は本番で通り、待ち時間も上限内（D9 は合計で代用）"
+  echo "PROD DEMO CHECK OK: D1〜D9 の経路は本番で通り、待ち時間も上限内（PDFの中身は合計で確認）"
 else
   echo "PROD DEMO CHECK FAILED"
   exit 1

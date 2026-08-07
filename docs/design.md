@@ -373,7 +373,7 @@ https://www.mlit.go.jp/tec/content/001880549.pdf （確認日：2026-08-05）
 | | 内容 |
 |---|---|
 | 経路 | トップ →（写真）→ 比較表 → 見積書PDF |
-| タップ数 | **3**（`apps/web/e2e/demo-three-taps.spec.ts` の `TAPS` がそのまま検査になる） |
+| タップ数 | **3**（`apps/web/e2e/demo-flow.spec.ts` の `TAPS` がそのまま検査になる） |
 | ログイン | **要らない**。`demo:<uuid>` の使い捨て識別子を通常のセッションCookieに載せる |
 | データの分離 | 訪問ごとに `owner_id` が違う。商談が同時に2件走っても互いに見えない |
 

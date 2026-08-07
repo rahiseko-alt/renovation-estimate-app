@@ -64,6 +64,8 @@ export const QUOTE_LIST_TEXT = {
   unmarked: "未選択",
   empty: "まだ見積もりが届いていません。",
   open: "見積もりを見る",
+  /** D7 → D9。押すと見積書PDFが降りてくる（利用者の指示 2026-08-07）。 */
+  toPdf: "見積書を出す",
 } as const;
 
 /** D8 下書き保存フォルダ。 */

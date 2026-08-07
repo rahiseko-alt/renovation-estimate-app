@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { DownloadPdfButton } from "../../../../components/DownloadPdfButton";
 import { getCurrentUser } from "../../../../lib/auth/server";
 import { formatYen } from "../../../../lib/calc";
 import { QUOTE_LIST_TEXT } from "../../../../lib/content";
@@ -31,6 +32,9 @@ function isAnswered(
  *
  * **社ごとに1ブロック**。D6 で押した採用・保留がここに貯まる。
  * 各社から D6 へ戻れる（「見積もりを見る」）。この表に無いボタン・遷移を足さない。
+ *
+ * D7 → D9 は「見積書を出す」1つだけ（利用者の指示 2026-08-07）。
+ * PDF を出す処理は案件詳細・比較表と同じ DownloadPdfButton を通る。
  */
 export default async function QuoteListPage({
   params,
@@ -98,6 +102,10 @@ export default async function QuoteListPage({
               </Link>
             </section>
           ))}
+
+          {/* 回答が1件も無いとき（上の empty）はこのボタンを出さない。採用できる単価が
+              1つも無く、押しても中身の無い書類が出るだけになるため。 */}
+          <DownloadPdfButton projectId={id} label={QUOTE_LIST_TEXT.toPdf} />
         </div>
       )}
     </main>

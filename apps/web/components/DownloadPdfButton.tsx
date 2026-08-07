@@ -5,7 +5,13 @@ import { useState, useTransition } from "react";
 import { generateEstimatePdfAction } from "../app/projects/[id]/pdf-actions";
 import { PROJECT_DETAIL_TEXT } from "../lib/content";
 
-type Props = { projectId: string };
+/**
+ * `label` は押す前に出す文字だけを差し替える。**PDFを出す処理は1つのまま**
+ * （AGENTS.md「同じ処理を呼ぶ入口は1つにする」）。D7 だけ「見積書を出す」と呼ぶ
+ * ため（docs/flows.md「デモの画面の並び」）に足したもので、省くとこれまでどおり
+ * PROJECT_DETAIL_TEXT.pdfLink になる。作成中の文字は経路によらず同じ。
+ */
+type Props = { projectId: string; label?: string };
 
 function downloadBase64Pdf(base64: string, filename: string): void {
   const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
@@ -19,7 +25,10 @@ function downloadBase64Pdf(base64: string, filename: string): void {
 }
 
 /** 見積書PDFのダウンロードボタン。生成はサーバー側、保存はブラウザ側で行う。 */
-export function DownloadPdfButton({ projectId }: Props) {
+export function DownloadPdfButton({
+  projectId,
+  label = PROJECT_DETAIL_TEXT.pdfLink,
+}: Props) {
   const [isPending, startTransition] = useTransition();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -43,7 +52,7 @@ export function DownloadPdfButton({ projectId }: Props) {
         disabled={isPending}
         className="tap flex items-center justify-center rounded border-2 border-gray-500 px-5 py-3 font-bold disabled:opacity-50"
       >
-        {isPending ? PROJECT_DETAIL_TEXT.pdfGenerating : PROJECT_DETAIL_TEXT.pdfLink}
+        {isPending ? PROJECT_DETAIL_TEXT.pdfGenerating : label}
       </button>
       {errorMessage ? (
         <p

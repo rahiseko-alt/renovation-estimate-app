@@ -5,7 +5,7 @@
 //
 // 同時に、**外から「0円のまま書類が出る」状態を見つけられる唯一の場所**でもある
 // （PDFのバイト列から金額は読めない。docs/failures.md 2026-08-06）。
-// scripts/prod-demo-check.sh と e2e/demo-three-taps.spec.ts が
+// scripts/prod-demo-check.sh と e2e/demo-flow.spec.ts が
 // COMPARISON_TEXT.adoptedTotalLabel を目印にこの区画を探す。
 
 import type { EstimateTotals } from "../lib/calc";

@@ -18,7 +18,6 @@ import { expect, test } from "@playwright/test";
 import {
   COMPARISON_TEXT,
   DOCUMENT_CONFIRM_TEXT,
-  PROJECT_DETAIL_TEXT,
   QUOTE_DOCUMENT_TEXT,
   QUOTE_LIST_TEXT,
   RECEIVED_TEXT,
@@ -110,27 +109,11 @@ test("デモは D1 から D9 まで、表のとおりに進む", async ({ page }
   await expect(page.getByText(QUOTE_LIST_TEXT.adoptedMark).first()).toBeVisible();
 
   // ── D9 見積書PDF ──────────────────────────────────────
-  // **表は D7 → D9 の操作を決めていない**（利用者に確かめる。docs/flows.md）。
-  // いま押せるのは案件の画面なので、そこから出す。ここを表に足すまでは、
-  // 「採用が書類に効いている」ことだけを見る。
-  const projectId = urlBeforeMark.match(/\/projects\/([0-9a-f-]{36})\//)?.[1];
-  expect(projectId, `案件IDを取れない: ${urlBeforeMark}`).toBeTruthy();
-  await page.goto(`/projects/${projectId}/comparison`);
-
-  // **見積書を押す前に金額が出ていること。** 書類が全行0円だったことがある
-  // （docs/failures.md 2026-08-06）。PDFのバイト列から金額は読めないので、
-  // 0円のまま書類が出る状態は、この画面の合計でしか外から捕まえられない。
-  const totalRegion = page.getByRole("region", {
-    name: COMPARISON_TEXT.adoptedTotalLabel,
-  });
-  await expect(totalRegion).toBeVisible();
-  const totalText = await totalRegion.innerText();
-  const totalYen = totalText.match(/([\d,]+)円/)?.[1];
-  expect(totalYen, `合計を読めない: ${totalText}`).toBeTruthy();
-  expect(Number(totalYen?.replace(/,/g, ""))).toBeGreaterThan(0);
-
+  // **D7 の「見積書を出す」を押す。** これが表のとおりの経路（2026-08-07 に利用者が
+  // 表へ足した）。以前はここで比較表へ page.goto していたが、比較表は表に無い画面で、
+  // 利用者の経路を検査が勝手に作り替えていた。
   const downloadPromise = page.waitForEvent("download");
-  await page.getByRole("button", { name: PROJECT_DETAIL_TEXT.pdfLink }).click();
+  await page.getByRole("button", { name: QUOTE_LIST_TEXT.toPdf }).click();
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toMatch(/^estimate-.+\.pdf$/);
 
@@ -139,6 +122,25 @@ test("デモは D1 から D9 まで、表のとおりに進む", async ({ page }
   const bytes = readFileSync(filePath);
   expect(bytes.byteLength).toBeGreaterThan(1_000);
   expect(bytes.subarray(0, 5).toString("latin1")).toBe("%PDF-");
+
+  // ── ここから先は検査専用。利用者の経路ではない ──────────
+  // **比較表は表（D1〜D9）に無い画面**で、利用者はここを通らない。それでも開くのは、
+  // **書類が全行0円で出る事故を外から捕まえる場所が他に無い**ため
+  // （docs/failures.md 2026-08-06）。PDFのバイト列から金額は読めないので、
+  // 同じ計算（lib/db/pricedEstimate.ts）を通る比較表の合計で金額だけを確かめる。
+  // **D7 に合計を出す指示は表に無い**ので、D7 側に合計を足して済ませることはしない。
+  const projectId = urlBeforeMark.match(/\/projects\/([0-9a-f-]{36})\//)?.[1];
+  expect(projectId, `案件IDを取れない: ${urlBeforeMark}`).toBeTruthy();
+  await page.goto(`/projects/${projectId}/comparison`);
+
+  const totalRegion = page.getByRole("region", {
+    name: COMPARISON_TEXT.adoptedTotalLabel,
+  });
+  await expect(totalRegion).toBeVisible();
+  const totalText = await totalRegion.innerText();
+  const totalYen = totalText.match(/([\d,]+)円/)?.[1];
+  expect(totalYen, `合計を読めない: ${totalText}`).toBeTruthy();
+  expect(Number(totalYen?.replace(/,/g, ""))).toBeGreaterThan(0);
 
   expect(consoleErrors).toEqual([]);
 });
