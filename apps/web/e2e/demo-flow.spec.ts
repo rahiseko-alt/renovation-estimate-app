@@ -219,9 +219,13 @@ test("デモは D1 から D10 まで、表のとおりに進む", async ({ page 
   await expect(listAdopt).toHaveAttribute("aria-pressed", "false");
   expect(page.url()).toBe(urlBeforeListMark);
 
-  // **保留は一覧に無い**（D8 だけが持つ。利用者の指示 2026-08-08）。
+  // **保留のボタンは一覧に無い**（D8 だけが持つ。利用者の指示 2026-08-08）。
   // 1マスに採用と保留を両方入れる作りに戻ったらここで落ちる。
-  await expect(page.getByRole("button", { name: QUOTE_DOCUMENT_TEXT.hold })).toHaveCount(0);
+  // 名前は**完全一致**で見る。既定の部分一致だと、マスの読み上げ名に
+  // 「保留」を含めた実装に変えたときに、この検査が黙って通ってしまう。
+  await expect(
+    page.getByRole("button", { name: QUOTE_DOCUMENT_TEXT.hold, exact: true }),
+  ).toHaveCount(0);
 
   await page.getByRole("link", { name: QUOTE_LIST_TEXT.detail }).first().click();
 
@@ -247,6 +251,13 @@ test("デモは D1 から D10 まで、表のとおりに進む", async ({ page 
   await expect(holdButtons.first()).toHaveAttribute("aria-pressed", "false");
   expect(page.url()).toBe(urlBeforeMark);
 
+  // **D8 で付けた保留が、一覧のマスに出る**（表示だけ。一覧では変えられない）。
+  // ここで保留を残さずに戻ると、一覧に保留が出なくなる退行を見逃す
+  // （上の1件目は採用に変えてしまったので、2件目に付けて残す）。
+  const secondHold = holdButtons.nth(1);
+  await secondHold.click();
+  await expect(secondHold).toHaveAttribute("aria-pressed", "true");
+
   // 画面が移るのは「一覧へ」を押したときだけ。
   await page.getByRole("link", { name: QUOTE_DOCUMENT_TEXT.toList }).click();
   await expect(page).toHaveURL(new RegExp(`${PROJECT_ID.source}/quotes$`));
@@ -257,6 +268,8 @@ test("デモは D1 から D10 まで、表のとおりに進む", async ({ page 
       .getByRole("button", { name: QUOTE_LIST_TEXT.adoptedMark, pressed: true })
       .first(),
   ).toBeVisible();
+  // D8 で残した保留も、一覧のマスに印として出ている。
+  await expect(page.getByText(QUOTE_DOCUMENT_TEXT.hold).first()).toBeVisible();
 
   // ── D10 見積書PDF ─────────────────────────────────────
   // **D7 の「見積書を出す」を押す。** これが表のとおりの経路（2026-08-07 に利用者が
