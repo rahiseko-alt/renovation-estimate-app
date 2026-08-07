@@ -24,11 +24,13 @@ describe("restartDemoData", () => {
 
     const after = await restartDemoData(ownerId);
 
-    expect(after).not.toBe(before);
+    expect(after.projectId).not.toBe(before);
+    // 写真の実体を消せたときは、同じ識別子で続く（識別子が変わるのは消せなかったときだけ）。
+    expect(after.ownerId).toBe(ownerId);
     // 前の案件は残らない（残ると、期限が来るまで前の相手のデータが居座る）。
     expect(await getProjectForOwner(before, ownerId)).toBeNull();
     // 新しい案件は、そのまま次の商談で見せられる状態になっている。
-    expect(await getProjectForOwner(after, ownerId)).not.toBeNull();
+    expect(await getProjectForOwner(after.projectId, ownerId)).not.toBeNull();
   });
 
   it("前の相手が打ち直した施主名を持ち越さない", async () => {
@@ -43,7 +45,7 @@ describe("restartDemoData", () => {
 
     const after = await restartDemoData(ownerId);
 
-    const project = await getProjectForOwner(after, ownerId);
+    const project = await getProjectForOwner(after.projectId, after.ownerId);
     expect(project?.customerName).toBe(CUSTOMER_NAME);
   });
 });

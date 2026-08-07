@@ -179,20 +179,14 @@ export type QuoteCoverFixture = {
 };
 
 /**
- * 下請台帳に登録が無い社（＝デモのデータではない社）に使う既定値。
- * デモの3社と同じく、明らかなダミーであることが見て分かる値にする。
+ * **デモ以外の社に使う既定値は置かない**（2026-08-07 に削除した）。
+ *
+ * 以前はここに `DEFAULT_QUOTE_COVER` があり、デモの3社以外の下請にもその値を
+ * 当てていた。結果、**実在の下請の見積書に、架空の住所・電話・担当・支払条件・
+ * 見積番号が印字される**状態だった。デモの値をデモ以外に流用しない。
+ * DBに持っていない欄は、埋めずに「未入力」として出す
+ * （`lib/db/quoteDocuments.ts` と `components/QuoteDocumentSheet.tsx`）。
  */
-export const DEFAULT_QUOTE_COVER: QuoteCoverFixture = {
-  quoteNumber: "0000-0000",
-  address: "東京都〇〇区0-0-0",
-  tel: "03-0000-0000",
-  contactName: "〇〇 〇〇",
-  workPeriodStartOffsetDays: 14,
-  workPeriodEndOffsetDays: 28,
-  validityDays: 30,
-  paymentTerms: "毎月末日締切／翌月末日支払",
-  deliveryPlace: "工事施工場所",
-};
 
 /**
  * デモの3社ぶん。社の識別はメールアドレス（COMPANIES と同じ定数）で結ぶ。

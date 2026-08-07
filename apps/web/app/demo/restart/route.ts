@@ -32,14 +32,17 @@ import {
  */
 async function restartDemo(): Promise<string> {
   const demoOwner = await currentDemoOwnerId();
-  const ownerId = demoOwner ?? newDemoOwnerId();
+
+  // **作り直してからセッションを出す。** 写真の実体を消せなかったときだけ、
+  // 作り直しは新しい識別子に移る（lib/db/demoRestart.ts）。先にセッションを
+  // 出すと、移った先とCookieがずれて、次の画面が自分の案件を開けなくなる。
+  const { projectId, ownerId } = await restartDemoData(
+    demoOwner ?? newDemoOwnerId(),
+    { ownerIsNew: demoOwner === null },
+  );
 
   // 有効期間を取り直し、中身の版も今のものにする（古い版のまま作り直さない）。
   await issueDemoSession(ownerId);
-
-  const projectId = await restartDemoData(ownerId, {
-    ownerIsNew: demoOwner === null,
-  });
 
   purgeExpiredDemoAfterResponse();
 

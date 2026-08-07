@@ -10,7 +10,6 @@ import {
 import { isDemoOwner } from "../../../../../lib/auth/demoOwner";
 import { getCurrentUser } from "../../../../../lib/auth/server";
 import { QUOTE_DOCUMENT_TEXT } from "../../../../../lib/content";
-import { getProjectForOwner } from "../../../../../lib/db/projects";
 import { getQuoteDocumentSheetForRequest } from "../../../../../lib/db/quoteDocuments";
 import { SUBCONTRACTOR_QUOTE_TEXT } from "../../../../../lib/doc/templates/subcontractor-quote";
 
@@ -38,10 +37,10 @@ export default async function QuoteDocumentPage({
   const ownerId = await getCurrentUser();
   if (!ownerId) notFound();
 
-  const project = await getProjectForOwner(id, ownerId);
-  if (!project) notFound();
-
-  // 他人の依頼・別案件の依頼・存在しない依頼はここで null になる。
+  // 他人の依頼・別案件の依頼・存在しない依頼・**他人の案件**は、ここで null になる
+  // （`getQuoteDocumentSheetForRequest` が中で `getProjectForOwner` を通す）。
+  // **この手前で案件を引き直さない。** 同じ引数で2回引くことになり、本番では
+  // 1往復0.5秒前後がそのまま表示時間に乗る（`docs/failures.md` 2026-08-06）。
   const sheet = await getQuoteDocumentSheetForRequest(id, requestId, ownerId);
   if (!sheet) notFound();
 

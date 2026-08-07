@@ -56,12 +56,32 @@ export async function createQuoteRequestGroup(
     .insert({
       project_id: input.projectId,
       owner_id: ownerId,
-      presented_at: new Date().toISOString(),
+      presented_at: (input.presentedAt ?? new Date()).toISOString(),
     })
     .select(GROUP_COLUMNS)
     .single();
   if (error) throw error;
   return toQuoteRequestGroup(data as QuoteRequestGroupRow);
+}
+
+/**
+ * 依頼グループを消す。**依頼を1件も作れなかったときの巻き戻しにだけ使う。**
+ * 依頼の付かないグループが残ると、確認画面（D4）の「もう送ったか」の判定
+ * （`hasQuoteRequestGroup`）がそれを見つけて、以後の送信を素通りさせる。
+ * 所有者の一致を条件に入れる（他人のグループは消さない）。
+ */
+export async function deleteQuoteRequestGroupForOwner(
+  id: string,
+  ownerId: string,
+): Promise<void> {
+  if (!isUuid(id)) return;
+
+  const { error } = await getSupabaseClient()
+    .from("quote_request_groups")
+    .delete()
+    .eq("id", id)
+    .eq("owner_id", ownerId);
+  if (error) throw error;
 }
 
 /** 依頼グループが存在し、かつ ownerId の持ち物であるときだけ返す。それ以外は null。 */

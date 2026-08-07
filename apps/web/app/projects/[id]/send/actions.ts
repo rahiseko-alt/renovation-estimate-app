@@ -15,6 +15,7 @@ import { getProjectForOwner } from "../../../../lib/db/projects";
 import {
   createQuoteGroupRequest,
   createQuoteRequestGroup,
+  deleteQuoteRequestGroupForOwner,
 } from "../../../../lib/db/quoteRequestGroups";
 import { checkSubmissionGate } from "../../../../lib/db/submissionGate";
 import { PLANNED_PRICE_BANDS, type PlannedPriceBand } from "../../../../lib/db/types";
@@ -66,12 +67,18 @@ export async function sendQuoteRequestGroup(
   }
   const band = plannedPriceBand as PlannedPriceBand;
 
+  // **提示日時はここで1回だけ取り、判定にも保存にも同じ瞬間を使う。**
+  // 判定・グループの挿入・保存直前の再判定でそれぞれ現在時刻を取ると、
+  // 日本時間の日付境界をまたいだときに、画面と Server Action を通った日付が
+  // 保存の直前で弾かれる（2026-08-07 のレビュー指摘）。
+  const presentedAt = new Date();
+
   // 期限を渡されたときだけ確かめる。**画面が弾いていても、ここでも弾く**
   // （この関数は Server Action なので直接叩ける）。グループを作る前に判定して、
   // 依頼の付かない空のグループが残らないようにする。
   let responseDueAt: Date | undefined;
   if (responseDueDate !== undefined) {
-    const now = new Date();
+    const now = presentedAt;
     const parsed = responseDueAtFromDateInput(responseDueDate);
     if (!parsed) {
       throw new Error(DOCUMENT_CONFIRM_TEXT.responseDueMissing);
@@ -95,18 +102,35 @@ export async function sendQuoteRequestGroup(
   const estimate = await getOrCreateEstimate(projectId);
   const lineItemIds = estimate.lines.map((line) => line.id);
 
-  const group = await createQuoteRequestGroup({ projectId }, ownerId);
-  for (const subcontractorId of uniqueSubcontractorIds) {
-    await createQuoteGroupRequest(
-      {
-        groupId: group.id,
-        subcontractorId,
-        plannedPriceBand: band,
-        lineItemIds,
-        responseDueAt,
-      },
-      ownerId,
-    );
+  const group = await createQuoteRequestGroup(
+    { projectId, presentedAt },
+    ownerId,
+  );
+  try {
+    for (const subcontractorId of uniqueSubcontractorIds) {
+      await createQuoteGroupRequest(
+        {
+          groupId: group.id,
+          subcontractorId,
+          plannedPriceBand: band,
+          lineItemIds,
+          responseDueAt,
+        },
+        ownerId,
+      );
+    }
+  } catch (error) {
+    // **依頼を作れなかったら、グループを消してから投げ直す。** 残すと
+    // `hasQuoteRequestGroup` が「もう送った」と判定し、押し直しても
+    // 1件も届かないまま送信済みの画面へ進む（2026-08-07 のレビュー指摘）。
+    // 巻き戻しに失敗しても、元の失敗のほうを伝える（そちらが原因）。
+    try {
+      await deleteQuoteRequestGroupForOwner(group.id, ownerId);
+    } catch (rollbackError) {
+      // 第一引数は固定の文字列にする（lib/db/photoStorage.ts と同じ理由）。
+      console.error("依頼グループの巻き戻しに失敗した:", { rollbackError });
+    }
+    throw error;
   }
 }
 

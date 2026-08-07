@@ -11,17 +11,31 @@
 
 import { expect, test } from "@playwright/test";
 
-import { COMPARISON_TEXT } from "../lib/content";
+import {
+  AUTH_TEXT,
+  COMPARISON_TEXT,
+  DEVELOPER_PANEL_TEXT,
+  HOME_DESTINATIONS,
+} from "../lib/content";
 import { DEMO_ENTRY_TEXT } from "../lib/demoText";
 import { COMPANIES } from "../lib/demoFixture";
-import { DEMO_PROJECT_URL, projectIdFromUrl } from "./demoScreens";
+import {
+  DEMO_PROJECT_URL,
+  demoPhotoPath,
+  demoProjectPath,
+  projectIdFromUrl,
+} from "./demoScreens";
+
+/** 引き出しの中にしまってある行き先（商談の相手に出さないもの）。 */
+const HIDDEN_DESTINATION = HOME_DESTINATIONS[0]!.label;
 
 test("デモを始めていない訪問者は、デモの画面を開けない", async ({ page }) => {
   // 案件IDの形が合っているだけでは開かない。商談が同時に2件走っても、
   // URLを知っただけでは相手のデモを覗けない。
+  const strangerId = "00000000-0000-4000-8000-000000000000";
   for (const path of [
-    "/demo/00000000-0000-4000-8000-000000000000/project",
-    "/demo/00000000-0000-4000-8000-000000000000/photo",
+    demoProjectPath(strangerId),
+    demoPhotoPath(strangerId),
   ]) {
     const response = await page.goto(path);
     expect(response?.status(), `${path} は 404 でなければならない`).toBe(404);
@@ -35,7 +49,7 @@ test("ログインしていてもいなくても、トップは同じ画面か�
   await page.goto("/");
   await expect(page.getByRole("button", { name: DEMO_ENTRY_TEXT.start })).toBeVisible();
   // 商談で見せる相手に要らないものは、右上の引き出しの中（閉じている）。
-  await expect(page.getByRole("link", { name: "案件" })).toBeHidden();
+  await expect(page.getByRole("link", { name: HIDDEN_DESTINATION })).toBeHidden();
 
   await page.getByRole("button", { name: DEMO_ENTRY_TEXT.start }).click();
   await expect(page).toHaveURL(DEMO_PROJECT_URL);
@@ -44,17 +58,17 @@ test("ログインしていてもいなくても、トップは同じ画面か�
   // デモ中（＝セッションを持っている状態）でも、トップは同じ。
   await page.goto("/");
   await expect(page.getByRole("button", { name: DEMO_ENTRY_TEXT.start })).toBeVisible();
-  await expect(page.getByRole("link", { name: "案件" })).toBeHidden();
+  await expect(page.getByRole("link", { name: HIDDEN_DESTINATION })).toBeHidden();
 
   // もう一度押せば自分のデモへ戻る（商談で見せ直せる）。
   await page.getByRole("button", { name: DEMO_ENTRY_TEXT.start }).click();
-  await expect(page).toHaveURL(`/demo/${projectId}/project`);
+  await expect(page).toHaveURL(demoProjectPath(projectId));
 });
 
 test("右上の丸を押すと、作る側の行き先が出る", async ({ page }) => {
   await page.goto("/");
-  await page.getByLabel("開発者向け").click();
-  await expect(page.getByRole("link", { name: "ログインする" })).toBeVisible();
+  await page.getByLabel(DEVELOPER_PANEL_TEXT.open).click();
+  await expect(page.getByRole("link", { name: AUTH_TEXT.submit })).toBeVisible();
 });
 
 test("デモの利用者に、実データの画面は空で見える", async ({ page }) => {
@@ -97,8 +111,8 @@ test("同時に走る2つのデモは、互いの案件を開けない", async (
     for (const path of [
       `/projects/${projectB}/comparison`,
       `/projects/${projectB}`,
-      `/demo/${projectB}/project`,
-      `/demo/${projectB}/photo`,
+      demoProjectPath(projectB),
+      demoPhotoPath(projectB),
     ]) {
       const response = await pageA.goto(path);
       expect(response?.status(), `${path} は 404 でなければならない`).toBe(404);

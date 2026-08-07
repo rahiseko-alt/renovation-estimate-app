@@ -35,6 +35,7 @@ import type { QuoteDocumentSheet } from "../lib/db/quoteDocuments";
 import { createSubcontractor } from "../lib/db/subcontractors";
 import type { QuoteResponseCostBreakdown } from "../lib/db/types";
 import { SUBCONTRACTOR_QUOTE_TEXT as TEXT } from "../lib/doc/templates/subcontractor-quote";
+import { COMPANIES, QUOTE_COVER_BY_EMAIL } from "../lib/demoFixture";
 
 // 案件・下請の登録件数には所有者ごとの上限（lib/limits.ts）がある。共用の
 // owner-a@example.com を使い切らないよう、この検査専用の所有者を使う
@@ -46,6 +47,8 @@ const CONTRACTOR_NAME = "検査元請株式会社";
 async function setupSheet(
   name: string,
   breakdown: QuoteResponseCostBreakdown,
+  /** 下請のメール。デモの3社のものを渡すと、鑑の決め打ちの欄が埋まる。 */
+  email?: string,
 ): Promise<QuoteDocumentSheet> {
   await upsertCompanyProfile(OWNER, {
     contractorName: CONTRACTOR_NAME,
@@ -72,7 +75,10 @@ async function setupSheet(
 
   const group = await createQuoteRequestGroup({ projectId: project.id }, OWNER);
   const subcontractor = await createSubcontractor(
-    { companyName: `${name}甲社`, email: `${encodeURIComponent(name)}@example.com` },
+    {
+      companyName: `${name}甲社`,
+      email: email ?? `${encodeURIComponent(name)}@example.com`,
+    },
     OWNER,
   );
   const request = await createQuoteGroupRequest(
@@ -203,10 +209,48 @@ describe("D8 見積もり書類の中身", () => {
     // 宛先は元請の会社設定＋「御中」（②の「様」と取り違えていないこと）。
     expect(html).toContain(`${CONTRACTOR_NAME} ${TEXT.recipientSuffix}`);
     expect(html).toContain(sheet.cover.issuer.companyName);
-    expect(html).toContain(sheet.cover.issuer.tel);
-    expect(html).toContain(sheet.cover.issuer.contactName);
     expect(html).toContain(sheet.cover.workName);
     expect(html).toContain(TEXT.closing);
+  });
+
+  it("デモの3社でない下請の鑑は、埋められない欄を「未入力」で出す（架空の値を作らない）", async () => {
+    // 住所・TEL・担当・支払条件・受渡場所・見積番号・工期・有効期限は、
+    // いまDBに欄が無く、デモの3社にだけ決め打ちの値がある。**それ以外の社に当てない**
+    // （実在の下請の見積書に架空の住所や電話が載る。2026-08-07 のレビュー指摘）。
+    const sheet = await setupSheet("D8鑑デモ外", FILLED_BREAKDOWN);
+
+    expect(sheet.cover.quoteNumber).toBeNull();
+    expect(sheet.cover.issuer.address).toBeNull();
+    expect(sheet.cover.issuer.tel).toBeNull();
+    expect(sheet.cover.issuer.contactName).toBeNull();
+    expect(sheet.cover.workPeriodStart).toBeNull();
+    expect(sheet.cover.workPeriodEnd).toBeNull();
+    expect(sheet.cover.validUntil).toBeNull();
+    expect(sheet.cover.paymentTerms).toBeNull();
+    expect(sheet.cover.deliveryPlace).toBeNull();
+
+    const html = renderToStaticMarkup(
+      <QuoteCoverSheet cover={sheet.cover} totals={sheet.totals} />,
+    );
+    // ラベルは残す（欄が消えると様式が崩れる）。値は「未入力」。
+    expect(html).toContain(TEXT.issuerTelLabel);
+    expect(html).toContain(QUOTE_DOCUMENT_TEXT.notEntered);
+    // DBにある社名とメールは、そのまま出る。
+    expect(html).toContain(sheet.cover.issuer.companyName);
+    expect(html).toContain(sheet.cover.issuer.email);
+  });
+
+  it("デモの3社の鑑には、決め打ちの住所・TEL・担当が出る", async () => {
+    const demoEmail = COMPANIES[0]!.email;
+    const sheet = await setupSheet("D8鑑デモ社", FILLED_BREAKDOWN, demoEmail);
+    const html = renderToStaticMarkup(
+      <QuoteCoverSheet cover={sheet.cover} totals={sheet.totals} />,
+    );
+
+    const fixture = QUOTE_COVER_BY_EMAIL[demoEmail]!;
+    expect(html).toContain(fixture.tel);
+    expect(html).toContain(fixture.contactName);
+    expect(html).toContain(fixture.address);
   });
 
   it("内訳の6項目と、様式に印字される法令の注意文が出る", async () => {

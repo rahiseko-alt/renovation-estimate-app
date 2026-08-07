@@ -334,6 +334,13 @@ export type QuoteRequestGroup = {
 
 export type NewQuoteRequestGroupInput = {
   projectId: string;
+  /**
+   * 提示日時。**送信の入口で1回だけ取った瞬間を渡す。**
+   * 省略すると挿入時の時刻になるが、そのときは「期限を判定した瞬間」と
+   * 「保存する瞬間」がずれる。日本時間の日付境界をまたぐと、画面と Server Action を
+   * 通った日付が保存の直前で弾かれる（2026-08-07 のレビュー指摘）。
+   */
+  presentedAt?: Date;
 };
 
 export type QuoteGroupRequestStatus = "pending" | "responded" | "imported";

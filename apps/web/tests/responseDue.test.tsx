@@ -203,18 +203,31 @@ describe("D4 の見積回答期限（保存と法定の最短見積期間）", (
   it("確認画面（D4）の送信は、弾いた理由を throw ではなく返り値で返す", async () => {
     const { project } = await projectReadyToSend("弾いた理由の返し方");
     currentUser.value = OWNER;
-    const today = toJstDateInput(new Date());
 
-    const result = await sendFromDocumentAction(project.id, today);
+    // **時計を止める。** Server Action は自分で `new Date()` を取り、この検査も
+    // 期待値のために取る。2つの瞬間が日本時間の日付境界をまたぐと暦日が1日ずれ、
+    // 再現しない失敗になる。止めるのは Date だけにする——Supabase への往復に使う
+    // タイマーまで止めると、この検査が固まる。
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      vi.setSystemTime(new Date("2026-08-07T12:00:00+09:00"));
+      const today = toJstDateInput(new Date());
 
-    // 本番ビルドで Server Action の例外は伏せられるため、返り値で受け取る。
-    expect(result.ok).toBe(false);
-    if (result.ok) throw new Error("弾かれていない");
-    // 「不正な値です」で終わらせない。理由（法令）と、いつ以降なら選べるかを出す。
-    expect(result.message).toContain("建設業法施行令第6条");
-    expect(result.message).toContain(
-      formatDateJst(computeResponseDueAt(new Date(), DOCUMENT_PLANNED_PRICE_BAND)),
-    );
+      const result = await sendFromDocumentAction(project.id, today);
+
+      // 本番ビルドで Server Action の例外は伏せられるため、返り値で受け取る。
+      expect(result.ok).toBe(false);
+      if (result.ok) throw new Error("弾かれていない");
+      // 「不正な値です」で終わらせない。理由（法令）と、いつ以降なら選べるかを出す。
+      expect(result.message).toContain("建設業法施行令第6条");
+      expect(result.message).toContain(
+        formatDateJst(
+          computeResponseDueAt(new Date(), DOCUMENT_PLANNED_PRICE_BAND),
+        ),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
     expect(await savedRequestTimes(project.id)).toHaveLength(0);
   });
 

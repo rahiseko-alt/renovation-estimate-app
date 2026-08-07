@@ -55,6 +55,10 @@ function WorkLineFrame({
   onPick: (line: PhotoLine) => void;
 }) {
   const isFull = photos.length >= PHOTO_MAX_PER_LINE;
+  // **書類に載る写真と同じものを見せる。** 書類（lib/db/quoteRequestDoc.ts）は
+  // 上限を超えた行では**新しいほうから**上限枚を採る。ここで古いほうから採ると、
+  // 撮り直したのに枠の中身が変わらず、書類だけが変わる。
+  const shown = photos.slice(-PHOTO_MAX_PER_LINE);
 
   return (
     <button
@@ -89,7 +93,7 @@ function WorkLineFrame({
       {/* 上限ぶんの枠を最初から出す。何枚撮れるかが、押す前に見えている必要がある。 */}
       <span className="grid grid-cols-3 gap-2">
         {Array.from({ length: PHOTO_MAX_PER_LINE }, (_, index) => {
-          const photo = photos[index];
+          const photo = shown[index];
           if (photo?.url) {
             return (
               // eslint-disable-next-line @next/next/no-img-element -- 署名付きURLは短命で都度発行するため next/image の最適化キャッシュと相性が悪い
