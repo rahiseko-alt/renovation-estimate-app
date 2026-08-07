@@ -15,8 +15,14 @@ import type { Project } from "./types";
 import { isUuid } from "./uuid";
 
 /**
- * 渡した案件のうち、依頼グループを持つもの（＝下請けに出したもの）のIDを返す。
+ * 渡した案件のうち、**下請けに出したもの**のIDを返す。
  * 案件の件数によらず往復1回で済ませる（1件ずつ問い合わせると案件数だけ待つ）。
+ *
+ * 数えるのは「依頼グループがある」ではなく **「依頼が1件以上あるグループがある」**。
+ * グループを作った直後に依頼の作成が落ちると、**1社にも届いていないのに
+ * グループだけが残る**。それを「出した」と数えると、押し直しても送信済みの
+ * 画面へ進むだけで、下請には永久に届かない。`quote_group_requests` との
+ * 内部結合（`!inner`）が、依頼を持たないグループをここで落とす。
  */
 async function selectSentProjectIds(
   projectIds: readonly string[],
@@ -26,7 +32,7 @@ async function selectSentProjectIds(
 
   const { data, error } = await getSupabaseClient()
     .from("quote_request_groups")
-    .select("project_id")
+    .select("project_id, quote_group_requests!inner(id)")
     .eq("owner_id", ownerId)
     .in("project_id", [...projectIds]);
   if (error) throw error;

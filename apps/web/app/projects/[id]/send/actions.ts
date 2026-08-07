@@ -69,8 +69,8 @@ export async function sendQuoteRequestGroup(
 
   // **提示日時はここで1回だけ取り、判定にも保存にも同じ瞬間を使う。**
   // 判定・グループの挿入・保存直前の再判定でそれぞれ現在時刻を取ると、
-  // 日本時間の日付境界をまたいだときに、画面と Server Action を通った日付が
-  // 保存の直前で弾かれる（2026-08-07 のレビュー指摘）。
+  // 日本時間の日付境界をまたいだときに、画面と Server Action の判定を通った
+  // 日付が保存の直前で弾かれる。
   const presentedAt = new Date();
 
   // 期限を渡されたときだけ確かめる。**画面が弾いていても、ここでも弾く**
@@ -120,10 +120,12 @@ export async function sendQuoteRequestGroup(
       );
     }
   } catch (error) {
-    // **依頼を作れなかったら、グループを消してから投げ直す。** 残すと
-    // `hasQuoteRequestGroup` が「もう送った」と判定し、押し直しても
-    // 1件も届かないまま送信済みの画面へ進む（2026-08-07 のレビュー指摘）。
+    // **依頼を作れなかったら、グループを消してから投げ直す。**
     // 巻き戻しに失敗しても、元の失敗のほうを伝える（そちらが原因）。
+    //
+    // **巻き戻せなくても、押し直しは通る。** 「出したかどうか」は
+    // `lib/db/drafts.ts` が**依頼を1件以上持つグループ**だけを数えるので、
+    // ここで残った空のグループは「出した」と数えられない。
     try {
       await deleteQuoteRequestGroupForOwner(group.id, ownerId);
     } catch (rollbackError) {
