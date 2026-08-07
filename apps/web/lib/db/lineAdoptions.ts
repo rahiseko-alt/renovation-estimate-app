@@ -112,6 +112,41 @@ export async function markLine(
   return toLineAdoption(data as LineAdoptionRow);
 }
 
+/**
+ * その社のその印だけを外す（採用→無印、保留→無印）。外せたら true。
+ *
+ * **同じボタンをもう一度押したら無印に戻せるようにするための入口**
+ * （利用者の指示 2026-08-08）。押し間違えたときに、別の印を選ばないと
+ * 戻せない状態だった。
+ *
+ * 消すのは**渡した社の、渡した印**の1件だけ。同じ明細に付いている別の社の印や、
+ * 同じ社の別の印には触らない。
+ */
+export async function clearLineMark(
+  input: MarkLineInput,
+  ownerId: string,
+): Promise<boolean> {
+  if (
+    !isUuid(input.projectId) ||
+    !isUuid(input.lineItemId) ||
+    !isUuid(input.quoteGroupRequestId)
+  ) {
+    return false;
+  }
+
+  const { data, error } = await getSupabaseClient()
+    .from("line_adoptions")
+    .delete()
+    .eq("project_id", input.projectId)
+    .eq("line_item_id", input.lineItemId)
+    .eq("quote_group_request_id", input.quoteGroupRequestId)
+    .eq("owner_id", ownerId)
+    .eq("status", input.status)
+    .select("id");
+  if (error) throw error;
+  return (data as { id: string }[]).length > 0;
+}
+
 /** `markLine` の採用側。既存の呼び出し元（比較表・デモの投入）はこちらを使う。 */
 export async function adoptLine(
   input: AdoptLineInput,
