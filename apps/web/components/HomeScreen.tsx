@@ -10,6 +10,8 @@ import {
   DEVELOPER_PANEL_TEXT,
 } from "../lib/content";
 import { DEMO_ENTRY_TEXT, DEMO_START_PATH } from "../lib/demoText";
+import { HOME_BACKGROUND } from "../lib/siteImages";
+import { ScreenBackground } from "./ScreenBackground";
 
 type Props = {
   /**
@@ -55,7 +57,15 @@ export function HomeScreen({ loggedIn, onLogout }: Props) {
   return (
     // スマホ縦で1画面に収める。上の帯（黒丸）以外を残りの高さの中央に置くので、
     // 画面の高さが変わっても、ロゴ・見出し・ボタンの間の余白だけが伸び縮みする。
-    <main className="mx-auto flex min-h-svh w-full max-w-md flex-col px-6 pb-10 pt-3">
+    //
+    // **背景に家の断面の絵を敷く。** 商談で最初に映る画面なので、何のアプリかを
+    // 文字より先に伝える。絵はほぼ白なので、**文字の色はどれも変えない**
+    // （地の色をかぶせて白抜きにすると絵が消える）。
+    // `relative isolate` は、背景の絵と中身の重なりをこの画面の中で完結させるため
+    // （ScreenBackground の説明を見る。どちらか一方でも欠けると絵か文字が消える）。
+    <main className="relative isolate mx-auto flex min-h-svh w-full max-w-md flex-col px-6 pb-10 pt-3">
+      <ScreenBackground src={HOME_BACKGROUND} />
+
       <div className="flex justify-end">
         <details className="shrink-0">
           {/*
