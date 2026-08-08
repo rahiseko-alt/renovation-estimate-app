@@ -353,16 +353,44 @@ if grep -qF "まだ見積もりが届いていません。" "${WORK}/quotes.html
 else
   ok "D7 「まだ見積もりが届いていません。」が出ていない"
 fi
-# 文言は apps/web/lib/flowText.ts の QUOTE_DOCUMENT_TEXT.adopt / hold と同じ値。
-# **採用／保留は D7 でも押せる**（利用者の指示 2026-08-07。実機で「一覧で押せない。
-# 詳細でしか押せない」と言われた）。一覧から消えたらここで落ちる。
-for LABEL in "採用" "保留"; do
-  if has_label "${WORK}/quotes.html" "${LABEL}"; then
-    ok "D7 一覧に「${LABEL}」のボタンがある"
-  else
-    fail "D7 一覧に「${LABEL}」のボタンが無い（一覧で判断を下せない）"
-  fi
-done
+# **D7 は工事が行・社が列の表**（利用者の指示 2026-08-08。それまでは社ごとの縦積みで、
+# 同じ工事の3社を見比べるのに画面を上下していた）。社ごとの縦積みに戻ったら落ちる。
+#
+# 見るのは3つ。文言は apps/web/lib/flowText.ts の QUOTE_LIST_TEXT が持つ。
+#  1. 表の左上の見出し「工事」
+#  2. 社名の横の「詳細」が**社の数だけ**ある（D8 への入口。1社ぶんしか無ければ表でない）
+#  3. 単価のマスが**採用のボタン**になっている
+#
+# 3 は `has_label`（タグの直後の文字）では見えない。マスに出ているのは単価の数字で、
+# 「採用」は読み上げ名（aria-label）の側にあるため。属性ごと grep する。
+if grep -qF ">工事<" "${WORK}/quotes.html"; then
+  ok "D7 表の見出し「工事」がある（工事が行・社が列）"
+else
+  fail "D7 表の見出し「工事」が無い（社ごとの縦積みに戻った可能性）"
+fi
+
+DETAIL_COUNT=$(grep -o '>詳細<' "${WORK}/quotes.html" | wc -l | tr -d ' ')
+if [ "${DETAIL_COUNT}" -ge 3 ]; then
+  ok "D7 社名の横の「詳細」が ${DETAIL_COUNT} 個ある（D8 の入口）"
+else
+  fail "D7 「詳細」が ${DETAIL_COUNT} 個しかない（3社ぶん要る。D8 へ行けない）"
+fi
+
+# 採用のマス。押された状態を持つ（aria-pressed）ボタンで、読み上げ名が「採用 …」。
+ADOPT_CELLS=$(grep -o 'aria-label="採用 ' "${WORK}/quotes.html" | wc -l | tr -d ' ')
+if [ "${ADOPT_CELLS}" -ge 3 ]; then
+  ok "D7 単価のマスが採用のボタンになっている（${ADOPT_CELLS} 個）"
+else
+  fail "D7 採用のマスが ${ADOPT_CELLS} 個しかない（一覧で採用を選べない）"
+fi
+
+# **保留は D7 に無い**（D8 だけが持つ。利用者の指示 2026-08-08）。
+# 1マスに採用と保留を両方入れる作りに戻ったらここで落ちる。
+if has_label "${WORK}/quotes.html" "保留"; then
+  fail "D7 一覧に「保留」のボタンがある（保留は D8 だけで押す）"
+else
+  ok "D7 一覧に「保留」のボタンが無い（保留は D8 だけ）"
+fi
 # 文言は apps/web/lib/flowText.ts の QUOTE_LIST_TEXT.toPdf と同じ値。
 # **D7 → D10 の経路はこのボタン**（利用者の指示 2026-08-07）。ここが消えると
 # 表のとおりに D10 へ行けなくなるので、経路の検査としてボタンの有無を見る。
