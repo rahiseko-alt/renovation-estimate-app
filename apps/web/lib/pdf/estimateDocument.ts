@@ -11,6 +11,7 @@ import { PDFDocument, type PDFFont } from "@cantoo/pdf-lib";
 import * as fontkit from "fontkit";
 
 import { formatYen, lineAmount, type EstimateLine, type EstimateTotals } from "../calc";
+import { formatDateJst } from "../doc/date";
 import {
   ESTIMATE_COLUMN_HEADINGS,
   ESTIMATE_DOCUMENT_TEXT,
@@ -30,7 +31,6 @@ import {
   drawTextCell,
   ensureSpace,
   fitText,
-  formatDate,
   newCursor,
   type Cursor,
 } from "./layout";
@@ -147,7 +147,9 @@ function drawHeaderBlock(cursor: Cursor, fonts: Fonts, input: EstimateDocumentIn
   drawLine(cursor, fonts.bold, ESTIMATE_DOCUMENT_TEXT.title, 20, "center");
   cursor.y -= 30;
 
-  const issuedLabel = `${ESTIMATE_DOCUMENT_TEXT.issuedAtLabel}：${formatDate(input.issuedAt)}`;
+  // 日付は必ず日本時間で確定させる（lib/doc/date.ts）。本番は UTC で動くので、
+  // 素の getFullYear() 等で組むと日本時間 00:00〜09:00 に出した書類が前日付になる。
+  const issuedLabel = `${ESTIMATE_DOCUMENT_TEXT.issuedAtLabel}：${formatDateJst(input.issuedAt)}`;
   drawLine(cursor, fonts.regular, issuedLabel, 10, "right", GRAY);
   cursor.y -= 22;
 

@@ -3,7 +3,8 @@ import { join } from "node:path";
 
 import { expect, test, type Page } from "@playwright/test";
 
-import { DEFAULT_PHOTO_AREA } from "../lib/content";
+import { photoAreaForLineName } from "../lib/content";
+import { DEFAULT_DISPOSAL_ITEM_NAME } from "../lib/doc/templates/estimate";
 
 // scripts/e2e.sh がこの検査の中だけで使い捨てる値を用意する（本物の秘密情報ではない。
 // AGENTS.md「秘密情報」対象外1）。無ければ検査そのものが無意味なので、先に落とす。
@@ -48,13 +49,20 @@ async function createProject(page: Page): Promise<string> {
 }
 
 async function uploadPhoto(page: Page): Promise<void> {
+  // **写真はどの工事のものかを選んで撮る**（箇所を選ばせる形は 2026-08-07 にやめた）。
+  // 新規案件の見積は既定で1行（DEFAULT_DISPOSAL_ITEM_NAME）を持つので、
+  // 明細を足す前でも選択肢はある。既定の選択のまま送る。
+  await expect(page.getByLabel("どの工事の写真か")).toBeVisible();
   await page.getByLabel("写真を撮る・選ぶ").setInputFiles(PHOTO_FIXTURE);
   await page.getByRole("button", { name: "追加する" }).click();
   // クライアント側で圧縮してから送るため、送信完了まで少し待つ必要がある。
-  // 箇所を選ばずに送るので、見出しは初期値の箇所になる。名前を直接書かない
-  // （WORK_AREAS の並び順を変えたときに、ここだけ古い名前が残る）。
+  // 一覧の見出しは箇所で、その値は選んだ明細名から決まる。名前を直接書かない
+  // （WORK_AREAS も既定の明細名も、変えたときにここだけ古い値が残らないように）。
   await expect(
-    page.getByRole("heading", { name: DEFAULT_PHOTO_AREA, level: 3 }),
+    page.getByRole("heading", {
+      name: photoAreaForLineName(DEFAULT_DISPOSAL_ITEM_NAME),
+      level: 3,
+    }),
   ).toBeVisible({ timeout: 20_000 });
 }
 

@@ -1,3 +1,6 @@
+import { readFileSync, readdirSync } from "node:fs";
+import { join, relative } from "node:path";
+
 import { PDFDocument } from "@cantoo/pdf-lib";
 import { describe, expect, it } from "vitest";
 
@@ -7,6 +10,24 @@ import {
   generateEstimatePdf,
   type EstimateDocumentInput,
 } from "../lib/pdf/estimateDocument";
+
+/** コメントを落とす。説明文の中の例示コードを、実際の呼び出しと数えないため。 */
+function stripComments(source: string): string {
+  return source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+}
+
+function sourceFilesIn(dir: string): string[] {
+  const files: string[] = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...sourceFilesIn(path));
+    } else if (entry.name.endsWith(".ts") || entry.name.endsWith(".tsx")) {
+      files.push(path);
+    }
+  }
+  return files;
+}
 
 function line(partial: Partial<EstimateLine> = {}): EstimateLine {
   return {
@@ -33,6 +54,36 @@ function input(partial: Partial<EstimateDocumentInput> = {}): EstimateDocumentIn
     ...partial,
   };
 }
+
+describe("書類の日付の整形", () => {
+  /**
+   * 2026-09-01 に、PDF だけが素の `date.getFullYear()` 等で作成日を組んでいて、
+   * 本番（UTC）で日本時間 00:00〜09:00 に出した見積書の作成日が前日になっていた。
+   * 同じ書類のテンプレート側は formatDateJst に移行済みで、**同じ書類の2つの表現が
+   * 違う日付を出す**状態だった（テンプレート側にしか検査が無く捕まらなかった）。
+   *
+   * 日付の整形は lib/doc/date.ts の1つだけにする。素の日付ゲッタが書類の生成側に
+   * 戻ってきたらここで落とす。
+   */
+  it("書類を組む側に、素のローカル時刻の日付ゲッタが無い", () => {
+    const localTimeGetters = /\.(getFullYear|getMonth|getDate|getDay|getHours)\s*\(/;
+    const offenders: string[] = [];
+
+    for (const dir of ["lib/pdf", "lib/doc"]) {
+      const base = join(import.meta.dirname, "..", dir);
+      for (const file of sourceFilesIn(base)) {
+        if (localTimeGetters.test(stripComments(readFileSync(file, "utf8")))) {
+          offenders.push(relative(join(import.meta.dirname, ".."), file));
+        }
+      }
+    }
+
+    expect(
+      offenders,
+      `素の日付ゲッタは本番（UTC）で前日を印字する。lib/doc/date.ts の formatDateJst を使う: ${offenders.join(", ")}`,
+    ).toEqual([]);
+  });
+});
 
 describe("generateEstimatePdf", () => {
   it("PDFのマジックバイトで始まる", async () => {

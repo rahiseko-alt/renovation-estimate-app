@@ -135,7 +135,3 @@ export function drawHorizontalRule(cursor: Cursor): void {
     color: LINE_GRAY,
   });
 }
-
-export function formatDate(date: Date): string {
-  return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`;
-}
