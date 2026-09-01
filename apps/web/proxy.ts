@@ -7,14 +7,30 @@ import { buildContentSecurityPolicy, createNonce } from "./lib/security/csp";
  * ログインを要求する範囲。ここ1箇所にだけ書く。
  * トップページとログイン画面は誰でも開ける。下請の回答画面 /q/[token] は
  * 相手にログインさせないので、ここには入れない。
+ *
+ * ここに書き忘れた画面は、誰でも開ける。**画面側の確認を当てにしない**
+ * （そのつもりが無くても、次に足す1枚が確認を持たないだけで無認証になる）。
+ * app/ に最上位のセグメントを足したら、ここか PUBLIC_PREFIXES のどちらかに
+ * 必ず入れる。入れ忘れは tests/proxy-protection.test.ts が落として止める。
  */
-const PROTECTED_PREFIXES = [
+export const PROTECTED_PREFIXES = [
   "/drafts",
+  "/price-master",
   "/projects",
-  "/estimates",
-  "/masters",
   "/settings",
   "/subcontractors",
+];
+
+/**
+ * ログイン無しで開けることが意図である範囲。**上と合わせて app/ の全セグメントを覆う。**
+ * 「まだ分類していない」と「公開してよい」を区別するために、公開側も明示して持つ。
+ */
+export const PUBLIC_PREFIXES = [
+  "/api", // 死活確認
+  "/demo", // デモの入口。商談で相手に触ってもらう
+  "/login",
+  "/offline", // 通信が切れたときの案内
+  "/q", // 下請の回答画面。相手にログインさせない
 ];
 
 /**

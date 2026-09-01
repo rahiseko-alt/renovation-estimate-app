@@ -23,6 +23,15 @@ export type ComparisonColumn = {
   status: string;
   /** 明細IDごとの原価単価。回答が無い明細は持たない。 */
   costUnitPriceByLineId: Record<string, number>;
+  /**
+   * 明細IDごとに、**その社が回答で申告した数量**。回答が無い明細は持たない。
+   *
+   * 依頼した数量と違うことがある（現場を見た下請が拾い直す）。建設業法第20条第1項を
+   * 踏まえたガイドラインは、下請の見積書に数量の内訳を求めており（docs/design.md 3章）、
+   * 回答画面はそれに従って数量を入れさせている。**入れさせた以上、その社の書類は
+   * その社の数量で出す。**
+   */
+  quantityByLineId: Record<string, number>;
 };
 
 /** 比較表の1行（＝1明細）。 */
@@ -120,14 +129,17 @@ export async function getComparisonForProject(
 
   const columns: ComparisonColumn[] = requestRows.map((request) => {
     const costUnitPriceByLineId: Record<string, number> = {};
+    const quantityByLineId: Record<string, number> = {};
     for (const line of responseByRequestId.get(request.id)?.lines ?? []) {
       costUnitPriceByLineId[line.lineItemId] = line.costUnitPrice;
+      quantityByLineId[line.lineItemId] = line.quantity;
     }
     return {
       requestId: request.id,
       companyName: request.subcontractors.company_name,
       status: request.status,
       costUnitPriceByLineId,
+      quantityByLineId,
     };
   });
 

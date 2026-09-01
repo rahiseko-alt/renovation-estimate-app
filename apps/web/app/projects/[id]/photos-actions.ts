@@ -7,10 +7,12 @@ import {
   PHOTO_MAX_UPLOAD_MB,
   PHOTO_SIGNED_URL_EXPIRES_SECONDS,
 } from "../../../lib/content";
+import { PHOTO_MAX_PER_LINE } from "../../../lib/flowText";
 import {
   createPhoto,
   deletePhotoRowForOwner,
   getPhotoForOwner,
+  listPhotosForProject,
 } from "../../../lib/db/photos";
 import {
   createPhotoSignedUrl,
@@ -66,6 +68,18 @@ export async function uploadPhotoAction(
     throw new Error("明細行が不正です。");
   }
   const lineId = lineIdValue === null || lineIdValue === "" ? null : lineIdValue;
+
+  // **枚数の上限もここで止める。** 撮る側（components/DemoPhotoStep.tsx）は上限に
+  // 達した枠を押せなくし、書類（lib/db/quoteRequestDoc.ts）は超えた分を捨てるが、
+  // どちらも保存そのものは止めていなかった。Server Action はブラウザを経由しない
+  // 呼び出しからも直接叩けるので、種別・サイズと同じくここでも確かめる。
+  // デモの入口は認証を要求しないため、止めないと匿名の相手がストレージを
+  // 一方的に増やせる（1案件あたり 明細数 × PHOTO_MAX_PER_LINE 枚で頭打ちにする）。
+  const existing = await listPhotosForProject(project.id, user);
+  const takenForLine = existing.filter((photo) => photo.lineId === lineId).length;
+  if (takenForLine >= PHOTO_MAX_PER_LINE) {
+    throw new Error(`写真は1つの工事につき${PHOTO_MAX_PER_LINE}枚までです。`);
+  }
 
   const file = formData.get("photo");
   if (!(file instanceof File) || file.size === 0) {

@@ -2,8 +2,12 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { DownloadPdfButton } from "../../../components/DownloadPdfButton";
-import { PhotosSection } from "../../../components/PhotosSection";
+import {
+  PhotosSection,
+  type PhotoTargetLine,
+} from "../../../components/PhotosSection";
 import { getCurrentUser } from "../../../lib/auth/server";
+import { getOrCreateEstimate } from "../../../lib/db/estimates";
 import { createPhotoSignedUrl } from "../../../lib/db/photoStorage";
 import { listPhotosForProject } from "../../../lib/db/photos";
 import { getProjectForOwner } from "../../../lib/db/projects";
@@ -37,6 +41,14 @@ export default async function ProjectDetailPage({
 
   const photos = await listPhotosForProject(project.id, user);
   const photosWithUrl = await Promise.all(photos.map(withSignedUrl));
+
+  // 写真は明細行に紐づける（photos.line_id）。付けずに撮った写真は見積依頼書の
+  // どの枠にも入らない（lib/db/quoteRequestDoc.ts）。枠にするのは工事の行だけで、
+  // 値引き行は撮る対象ではない。並びは見積のまま。デモの D3 と同じ扱いにする。
+  const estimate = await getOrCreateEstimate(project.id);
+  const photoLines: PhotoTargetLine[] = estimate.lines
+    .filter((line) => line.kind === "item")
+    .map((line) => ({ id: line.id, name: line.name }));
 
   return (
     <main className="mx-auto w-full max-w-md px-5 py-8">
@@ -87,7 +99,11 @@ export default async function ProjectDetailPage({
         {PROJECTS_TEXT.back}
       </Link>
 
-      <PhotosSection projectId={project.id} initialPhotos={photosWithUrl} />
+      <PhotosSection
+        projectId={project.id}
+        initialPhotos={photosWithUrl}
+        lines={photoLines}
+      />
     </main>
   );
 }

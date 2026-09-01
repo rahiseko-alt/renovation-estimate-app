@@ -109,7 +109,10 @@ jobs:
             echo "FAIL: 応答の CSP に img-src が無い"
             exit 1
           fi
-          echo "img-src:${img_src}"
+          # **値そのものを出さない。** ここには本番の SUPABASE_URL が入る。
+          # このログは誰でも読めるので、ホスト名は伏せて、判定に要る形だけを出す
+          # （AGENTS.md「公開前提」: 迷ったら秘密情報として扱う）。
+          echo "img-src: https のオリジンを $(printf '%s' "${img_src}" | grep -o 'https://' | wc -l | tr -d ' ') 件検出"
           if ! printf '%s' "${img_src}" | grep -q 'https://'; then
             echo "FAIL: CSP の img-src に写真ストレージのオリジンが無い"
             echo "  （本番の環境変数 SUPABASE_URL が未設定、または URL として不正）"

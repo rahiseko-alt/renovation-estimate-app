@@ -12,11 +12,18 @@ import {
   InvalidPhotoTypeError,
   PhotoTooLargeError,
 } from "../lib/photo/compress";
-import { DEFAULT_PHOTO_AREA, PHOTO_AREAS, PHOTO_TEXT } from "../lib/content";
+import { PHOTO_AREAS, PHOTO_TEXT, photoAreaForLineName } from "../lib/content";
+
+/** 写真を紐づける先の明細行。工事の行だけを渡す（値引き行は撮る対象ではない）。 */
+export type PhotoTargetLine = {
+  id: string;
+  name: string;
+};
 
 type Props = {
   projectId: string;
   initialPhotos: PhotoWithUrl[];
+  lines: PhotoTargetLine[];
 };
 
 function errorMessageFor(error: unknown): string {
@@ -25,10 +32,22 @@ function errorMessageFor(error: unknown): string {
   return PHOTO_TEXT.uploadFailed;
 }
 
-/** 案件詳細画面の写真セクション。追加フォームと、箇所ごとにグループ化した一覧を持つ。 */
-export function PhotosSection({ projectId, initialPhotos }: Props) {
+/**
+ * 案件詳細画面の写真セクション。追加フォームと、箇所ごとにグループ化した一覧を持つ。
+ *
+ * **どの明細行の写真かを選ばせる。** これを付けずに撮った写真は、書類のどの枠にも
+ * 入らず黙って落ちる（lib/db/quoteRequestDoc.ts は line_id が null の写真を捨てる。
+ * どの工事の現況か決まっていないものを別の行に入れると、写真と工事名が食い違うため）。
+ *
+ * 箇所（area）は選ばせない。2026-08-07 に「箇所を選ばせる形」はやめており
+ * （lib/content.ts の photoAreaForLineName 参照。選択肢が8つしか無く、
+ * 給排水設備工事と解体・廃棄物処理費が永久に撮れなかった）、値は明細名から決まる。
+ * この画面はその移行から漏れていて、2026-09-01 まで箇所だけを選ばせ line_id を
+ * 送っていなかった。結果、**デモの外では撮った写真が1枚も見積依頼書に入らなかった。**
+ */
+export function PhotosSection({ projectId, initialPhotos, lines }: Props) {
   const [photos, setPhotos] = useState<PhotoWithUrl[]>(initialPhotos);
-  const [area, setArea] = useState<string>(DEFAULT_PHOTO_AREA);
+  const [lineId, setLineId] = useState<string>(lines[0]?.id ?? "");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [isUploading, startUpload] = useTransition();
@@ -45,11 +64,20 @@ export function PhotosSection({ projectId, initialPhotos }: Props) {
       return;
     }
 
+    const line = lines.find((candidate) => candidate.id === lineId);
+    if (!line) {
+      setErrorMessage(PHOTO_TEXT.noLineSelected);
+      return;
+    }
+
     startUpload(async () => {
       try {
         const compressed = await compressPhotoForUpload(file);
         const formData = new FormData();
-        formData.set("area", area);
+        // area は photos の必須の列。値は明細名から決まる（lib/content.ts）。
+        formData.set("area", photoAreaForLineName(line.name));
+        // これを付けないと、撮っても書類のどの枠にも入らない（lib/db/quoteRequestDoc.ts）。
+        formData.set("lineId", line.id);
         formData.set("photo", compressed, compressed.name || "photo.jpg");
 
         const photo = await uploadPhotoAction(projectId, formData);
@@ -80,47 +108,55 @@ export function PhotosSection({ projectId, initialPhotos }: Props) {
     <section className="mt-8">
       <h2 className="text-xl font-bold">{PHOTO_TEXT.heading}</h2>
 
-      <form onSubmit={handleUpload} className="mt-4 flex flex-col gap-4">
-        <div className="flex flex-col gap-2">
-          <label htmlFor="photo-area" className="font-bold">
-            {PHOTO_TEXT.areaLabel}
-          </label>
-          <select
-            id="photo-area"
-            value={area}
-            onChange={(event) => setArea(event.target.value)}
-            className="rounded border-2 border-gray-500 px-2 py-3"
+      {lines.length === 0 ? (
+        // 明細が無いと写真の入る枠が決まらない。撮らせてから「入らなかった」と
+        // 言うより、先に見積を作ってもらう。
+        <p className="mt-4 rounded border-2 border-gray-400 bg-gray-50 px-4 py-3 text-gray-800">
+          {PHOTO_TEXT.noLinesYet}
+        </p>
+      ) : (
+        <form onSubmit={handleUpload} className="mt-4 flex flex-col gap-4">
+          <div className="flex flex-col gap-2">
+            <label htmlFor="photo-line" className="font-bold">
+              {PHOTO_TEXT.lineLabel}
+            </label>
+            <select
+              id="photo-line"
+              value={lineId}
+              onChange={(event) => setLineId(event.target.value)}
+              className="rounded border-2 border-gray-500 px-2 py-3"
+            >
+              {lines.map((line) => (
+                <option key={line.id} value={line.id}>
+                  {line.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <label htmlFor="photo-file" className="font-bold">
+              {PHOTO_TEXT.fileLabel}
+            </label>
+            <input
+              id="photo-file"
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="rounded border-2 border-gray-500 px-4 py-3"
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={isUploading}
+            className="tap rounded bg-blue-800 px-6 py-4 text-lg font-bold text-white disabled:opacity-50"
           >
-            {PHOTO_AREAS.map((value) => (
-              <option key={value} value={value}>
-                {value}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="flex flex-col gap-2">
-          <label htmlFor="photo-file" className="font-bold">
-            {PHOTO_TEXT.fileLabel}
-          </label>
-          <input
-            id="photo-file"
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            className="rounded border-2 border-gray-500 px-4 py-3"
-          />
-        </div>
-
-        <button
-          type="submit"
-          disabled={isUploading}
-          className="tap rounded bg-blue-800 px-6 py-4 text-lg font-bold text-white disabled:opacity-50"
-        >
-          {isUploading ? PHOTO_TEXT.uploading : PHOTO_TEXT.uploadButton}
-        </button>
-      </form>
+            {isUploading ? PHOTO_TEXT.uploading : PHOTO_TEXT.uploadButton}
+          </button>
+        </form>
+      )}
 
       {errorMessage ? (
         <p

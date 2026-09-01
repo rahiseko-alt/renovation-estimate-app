@@ -15,9 +15,6 @@
 import { formatDateJst } from "../date";
 import { A4_PORTRAIT, type DocTemplate } from "../schema";
 
-/** 写真枠の1辺（書類の実寸・CSS px）。 */
-const PHOTO_FRAME_PX = 200;
-
 export const QUOTE_REQUEST_TEMPLATE: DocTemplate = {
   id: "quote-request-kensetsugyoho",
   pageWidthPx: A4_PORTRAIT.widthPx,
@@ -44,8 +41,11 @@ export const QUOTE_REQUEST_TEMPLATE: DocTemplate = {
     {
       // 現況写真＋数量で法定③（設計図書）に充てる（docs/design.md 3章の製品仮説）。
       // 1箇所につき写真枠は1つ（5章「1箇所あたり何枚撮るか」で一次情報から確定）。
+      // 枠の寸法はここでは持たない。横3つを等幅・正方形に並べる指定を
+      // app/globals.css の .doc-photo-frames / .doc-photo-frame が持っている。
+      // 2026-09-01 まで frameSizePx: 200 を書いていたが、描画器が一度も読んでおらず、
+      // 値を変えても何も起きなかった（動かない設定を残さない。AGENTS.md 4）。
       kind: "photoLine",
-      frameSizePx: PHOTO_FRAME_PX,
       quantityLabel: "数量",
       emptyQuantityText: "数量未入力",
     },

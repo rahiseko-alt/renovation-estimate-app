@@ -404,7 +404,12 @@ export const QUOTE_RESPONSE_TEXT = {
 export const PHOTO_TEXT = {
   heading: "写真",
   empty: "写真はまだありません。",
-  areaLabel: "箇所",
+  /**
+   * どの工事の写真かを選ばせる。箇所（area）は選ばせず、明細名から決める
+   * （photoAreaForLineName 参照）。値は photos.line_id になり、書類の写真枠は
+   * これで決まる。
+   */
+  lineLabel: "どの工事の写真か",
   fileLabel: "写真を撮る・選ぶ",
   uploadButton: "追加する",
   uploading: "追加中…",
@@ -412,6 +417,10 @@ export const PHOTO_TEXT = {
   deleting: "削除中…",
   /** ファイル未選択で送信しようとしたとき。 */
   noFileSelected: "写真を選んでください。",
+  /** 明細行が選ばれていないとき。付けずに保存すると書類の枠に入らない。 */
+  noLineSelected: "どの工事の写真かを選んでください。",
+  /** 見積の明細がまだ1行も無いとき。写真の入る枠が決まらない。 */
+  noLinesYet: "先に見積の明細を作ってください。写真は工事ごとに追加します。",
   /** compress.ts の InvalidPhotoTypeError、および photos-actions.ts の種類検証。 */
   invalidType: "画像ファイル（JPEG・PNG・WebP）を選んでください。",
   /** compress.ts の PhotoTooLargeError、および photos-actions.ts のサイズ検証。 */

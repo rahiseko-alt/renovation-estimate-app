@@ -109,8 +109,6 @@ export type LineColumnKey =
  */
 export type PhotoLineBlock = {
   kind: "photoLine";
-  /** 写真枠の1辺（CSS px）。書類の実寸で指定する。 */
-  frameSizePx: number;
   quantityLabel: string;
   emptyQuantityText: string;
 };

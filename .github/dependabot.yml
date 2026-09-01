@@ -8,6 +8,21 @@ updates:
     groups:
       dev-dependencies:
         dependency-type: "development"
+    # lint の道具立ては、TypeScript / ESLint 本体だけを上げても動かない。
+    # typescript-eslint と eslint-plugin-react が対応するまで、この2つのメジャーを止める。
+    # 止めていないと、毎週同じ内容で赤いPRが作り直され、他の更新までそこで詰まる
+    # （2026-08-25 の #75 が実際にこれで3週間止まった）。
+    #
+    # 外してよくなる条件（どちらも満たしたら、この ignore ごと消す）:
+    #   - typescript: typescript-eslint が TS 7 に対応する
+    #     （現状 8.67.0 は読み込み時に "does not support TS 7.0" で落ちる）
+    #   - eslint: eslint-config-next が引き込む eslint-plugin-react が ESLint 10 に対応する
+    #     （現状 7.37.5 は ESLint 10 が廃止した context.getFilename() を呼んで落ちる）
+    ignore:
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "eslint"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "github-actions"
     directory: "/"

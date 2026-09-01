@@ -86,6 +86,37 @@ has_label() {
   '
 }
 
+# その文字が**押せるボタンとして**出ていることを見る。has_label と違い、表示だけの
+# span には当たらない。
+#
+# **この区別が要る理由**：D7 の一覧は「D8 で付けた保留」をマスの中に span で表示する
+# （docs/flows.md「デモの画面の並び」D7。一覧に出ないと、保留にしたことが一覧から
+# 消えて見える）。一方このスクリプトは「保留のボタンは D7 に無い」ことを検査する。
+# has_label は `<` で切った断片の末尾しか見ないので、`<span ...>保留` と
+# `<button ...>保留` を区別できず、**仕様どおりに保留を表示しただけで赤になった**。
+# 2026-09-01 に発見。検査を消さず、ボタンだけに当たる形に直した。
+#
+# ボタンの2つの書き方の両方を見る:
+#   - `<button ...>保留`  （D8 の押せる釦。断片が button で始まり >保留 で終わる）
+#   - `aria-label="保留 ` （D7 のマスのように、見えている文字が別で読み上げ名を持つ釦）
+has_button_label() {
+  local file="$1" label="$2"
+  if grep -q "aria-label=\"${label} " "${file}"; then
+    return 0
+  fi
+  tr '<' '\n' < "${file}" | awk -v needle=">${label}" '
+    {
+      n = length(needle)
+      if (substr($0, 1, 6) != "button") next
+      if (length($0) >= n && substr($0, length($0) - n + 1) == needle) {
+        found = 1
+        exit
+      }
+    }
+    END { exit !found }
+  '
+}
+
 echo "== 対象: ${BASE} =="
 
 # ── D1 トップ画面 ─────────────────────────────────────────
@@ -384,9 +415,13 @@ else
   fail "D7 採用のマスが ${ADOPT_CELLS} 個しかない（一覧で採用を選べない）"
 fi
 
-# **保留は D7 に無い**（D8 だけが持つ。利用者の指示 2026-08-08）。
+# **保留の「ボタン」は D7 に無い**（D8 だけが持つ。利用者の指示 2026-08-08）。
 # 1マスに採用と保留を両方入れる作りに戻ったらここで落ちる。
-if has_label "${WORK}/quotes.html" "保留"; then
+#
+# **表示としての保留は D7 に出てよい**（むしろ出す。docs/flows.md D7）。だから
+# has_label ではなく has_button_label で見る。has_label で見ていた頃は、
+# D8 で保留を1つ付けた状態で踏むと仕様どおりでも赤になった。
+if has_button_label "${WORK}/quotes.html" "保留"; then
   fail "D7 一覧に「保留」のボタンがある（保留は D8 だけで押す）"
 else
   ok "D7 一覧に「保留」のボタンが無い（保留は D8 だけ）"
