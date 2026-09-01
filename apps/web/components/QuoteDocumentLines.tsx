@@ -82,6 +82,19 @@ export function QuoteDocumentLines({
                 <span className="text-sm text-gray-700">
                   {`${line.quantity} ${line.unit}`}
                 </span>
+                {/*
+                  下請が数量を拾い直したときだけ出す。合計はこの社の数量で出ているので、
+                  出さないと金額が動いた理由が元請から見えない。
+                  元請の見積の数量はここでは書き換えない（直すかは元請が決める）。
+                */}
+                {line.requestedQuantity === null ? null : (
+                  <span className="ml-2 rounded bg-amber-100 px-1 text-xs font-bold text-amber-900">
+                    {QUOTE_DOCUMENT_TEXT.requestedQuantity(
+                      line.requestedQuantity,
+                      line.unit,
+                    )}
+                  </span>
+                )}
                 {line.costUnitPrice === null ? null : (
                   <span className="ml-2 text-lg font-bold">
                     {`${formatYen(line.costUnitPrice)}円`}

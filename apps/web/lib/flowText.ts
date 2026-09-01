@@ -119,6 +119,15 @@ export const QUOTE_DOCUMENT_TEXT = {
    * 持つ。ここが持つのは**この画面の出し方**だけ。
    */
   notEntered: "未入力",
+  /**
+   * 下請が申告した数量が、元請の依頼した数量と違うときに添える印。
+   *
+   * この画面の数量と合計は**その社が出した数量**で出る（lib/db/quoteDocuments.ts）。
+   * 黙って置き換えると、金額が動いた理由が元請から見えないので、依頼した側の数量を
+   * 並べて出す。元請の見積の数量は書き換えない（直すかは元請が決める）。
+   */
+  requestedQuantity: (quantity: number, unit: string): string =>
+    `依頼 ${quantity} ${unit}`,
 } as const;
 
 /**

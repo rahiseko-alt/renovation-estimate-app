@@ -10,6 +10,7 @@ import {
 } from "../lib/db/quoteRequestGroups";
 import {
   getQuoteDocumentForRequest,
+  getQuoteDocumentSheetForRequest,
   listAnsweredQuoteDocuments,
 } from "../lib/db/quoteDocuments";
 import { createSubcontractor } from "../lib/db/subcontractors";
@@ -231,5 +232,123 @@ describe("D7 下請け見積もり一覧", () => {
 
     // 依頼はあるが回答が無い。まだ見せる見積もりが無い。
     expect(await listAnsweredQuoteDocuments(project.id, OWNER_A)).toEqual([]);
+  });
+});
+
+/**
+ * 下請が現場を見て数量を拾い直したときの扱い。
+ *
+ * 2026-09-01 まで、回答画面は数量を入れさせて保存していたのに、**その値を読む画面も
+ * 計算も1つも無かった**。D8 の表示も合計も、元請が依頼したときの数量で出ていた。
+ * 依頼42㎡に下請が「45㎡・3,000円」と答えても、画面は 42㎡ / 126,000円 と出す。
+ * 入れさせておいて使っていない状態だった。
+ *
+ * 数量を入れさせること自体は docs/design.md 3章で一次情報から決まっている
+ * （建設業法第20条第1項を踏まえたガイドラインが下請の見積書に数量の内訳を求める）。
+ * **欄を消す選択肢は無いので、使う側を直した。**
+ */
+async function setupRequotedQuantity(name: string) {
+  const project = await createProject(
+    { customerName: name, siteAddress: `${name}の現場` },
+    OWNER_A,
+  );
+  const estimate = await appendEstimateLine(project.id, {
+    kind: "item",
+    name: "クロス張替え",
+    spec: "量産品",
+    quantity: 42,
+    unit: "㎡",
+    unitPrice: 0,
+    taxCategory: "standard",
+  });
+  // 既定の1行目（解体・廃棄物処理費）は依頼せず、足した行だけを頼む。
+  const lineId = estimate.lines[1]!.id;
+  const group = await createQuoteRequestGroup({ projectId: project.id }, OWNER_A);
+  const subcontractor = await createSubcontractor(
+    { companyName: `${name}甲社`, email: `${encodeURIComponent(name)}@example.com` },
+    OWNER_A,
+  );
+  const request = await createQuoteGroupRequest(
+    {
+      groupId: group.id,
+      subcontractorId: subcontractor.id,
+      plannedPriceBand: "under_500man",
+      lineItemIds: [lineId],
+    },
+    OWNER_A,
+  );
+
+  currentUser.value = OWNER_A;
+  return { project, lineId, request };
+}
+
+const EMPTY_BREAKDOWN = {
+  materialCost: null,
+  laborCost: null,
+  legalWelfareCost: null,
+  safetyHealthCost: null,
+  retirementMutualAidCost: null,
+  workDays: null,
+  materialSuppliedNote: "",
+} as const;
+
+describe("下請が申告した数量", () => {
+  it("依頼と違う数量で答えたら、その社の書類はその社の数量で出る", async () => {
+    const { project, lineId, request } = await setupRequotedQuantity("数量拾い直し");
+    await createQuoteGroupResponse({
+      token: request.token,
+      breakdown: { ...EMPTY_BREAKDOWN },
+      // 現場を見て 42㎡ → 45㎡ に拾い直した。
+      lines: [{ lineItemId: lineId, quantity: 45, costUnitPrice: 3_000 }],
+    });
+
+    const quote = await getQuoteDocumentForRequest(project.id, request.id, OWNER_A);
+    const line = quote?.lines.find((candidate) => candidate.lineItemId === lineId);
+    expect(line?.quantity).toBe(45);
+    // 依頼した側の数量も持つ。黙って置き換えると、金額が動いた理由が元請から見えない。
+    expect(line?.requestedQuantity).toBe(42);
+  });
+
+  it("その社の合計は、その社が申告した数量で出る", async () => {
+    const { project, lineId, request } = await setupRequotedQuantity("数量と合計");
+    await createQuoteGroupResponse({
+      token: request.token,
+      breakdown: { ...EMPTY_BREAKDOWN },
+      lines: [{ lineItemId: lineId, quantity: 45, costUnitPrice: 3_000 }],
+    });
+
+    const sheet = await getQuoteDocumentSheetForRequest(
+      project.id,
+      request.id,
+      OWNER_A,
+    );
+    // 45 × 3,000 = 135,000。依頼の 42 で出すと 126,000 になる。
+    // 下請の書類は諸経費率 0（内訳明示の5経費で表すため）なので税抜もこの額。
+    expect(sheet?.totals.directCostSubtotal).toBe(135_000);
+    expect(sheet?.totals.netAmount).toBe(135_000);
+  });
+
+  it("依頼と同じ数量なら、依頼した側の数量は持たない（画面に併記しない）", async () => {
+    const { project, lineId, request } = await setupRequotedQuantity("数量そのまま");
+    await createQuoteGroupResponse({
+      token: request.token,
+      breakdown: { ...EMPTY_BREAKDOWN },
+      lines: [{ lineItemId: lineId, quantity: 42, costUnitPrice: 3_000 }],
+    });
+
+    const quote = await getQuoteDocumentForRequest(project.id, request.id, OWNER_A);
+    const line = quote?.lines.find((candidate) => candidate.lineItemId === lineId);
+    expect(line?.quantity).toBe(42);
+    expect(line?.requestedQuantity).toBeNull();
+  });
+
+  it("回答が無い明細は、依頼した数量のまま出す", async () => {
+    const { project, lineId, request } = await setupRequotedQuantity("数量未回答");
+
+    const quote = await getQuoteDocumentForRequest(project.id, request.id, OWNER_A);
+    const line = quote?.lines.find((candidate) => candidate.lineItemId === lineId);
+    expect(line?.quantity).toBe(42);
+    expect(line?.requestedQuantity).toBeNull();
+    expect(line?.costUnitPrice).toBeNull();
   });
 });

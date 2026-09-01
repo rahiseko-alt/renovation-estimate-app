@@ -24,7 +24,23 @@ import { isUuid } from "./uuid";
 export type QuoteDocumentLine = {
   lineItemId: string;
   name: string;
+  /**
+   * **その社が回答で申告した数量。** 回答が無ければ依頼した数量。
+   *
+   * この書類はその社の見積書なので、その社が出した数量で表示し、その社の数量で
+   * 合計を出す（docs/design.md 3章。ガイドラインが下請の見積書に数量の内訳を求め、
+   * 回答画面はそれに従って数量を入れさせている）。
+   */
   quantity: number;
+  /**
+   * 元請が依頼したときの数量。**上の quantity と違うときだけ**値が入る。
+   *
+   * 現場を見た下請が数量を拾い直すことがある。黙って置き換えると、合計が動いた
+   * 理由が元請から見えない（docs/design.md 7章「気付かないうちに何かが決まっていた
+   * を作らない」）。**元請の見積の数量はこちらでは書き換えない。** 差があることを
+   * 見せて、直すかどうかは元請が決める。
+   */
+  requestedQuantity: number | null;
   unit: string;
   /**
    * その社の原価単価。**その社が回答していない明細は null**。
@@ -73,14 +89,22 @@ async function buildQuoteDocuments(
   return comparison.columns.map((column) => ({
     requestId: column.requestId,
     companyName: column.companyName,
-    lines: comparison.rows.map((row) => ({
-      lineItemId: row.line.id,
-      name: row.line.name,
-      quantity: row.line.quantity,
-      unit: row.line.unit,
-      costUnitPrice: column.costUnitPriceByLineId[row.line.id] ?? null,
-      mark: markByKey.get(markKey(row.line.id, column.requestId)) ?? null,
-    })),
+    lines: comparison.rows.map((row) => {
+      // その社が申告した数量。回答が無い明細は依頼した数量のまま出す。
+      const answered = column.quantityByLineId[row.line.id];
+      const quantity = answered ?? row.line.quantity;
+      return {
+        lineItemId: row.line.id,
+        name: row.line.name,
+        quantity,
+        // 依頼と同じなら出さない。違うときだけ、元請に並べて見せる。
+        requestedQuantity:
+          quantity === row.line.quantity ? null : row.line.quantity,
+        unit: row.line.unit,
+        costUnitPrice: column.costUnitPriceByLineId[row.line.id] ?? null,
+        mark: markByKey.get(markKey(row.line.id, column.requestId)) ?? null,
+      };
+    }),
   }));
 }
 
@@ -216,6 +240,9 @@ function addDays(base: Date, days: number): Date {
  * こちらの裁量になる（`docs/design.md` 3章）。下請の見積書は必要経費を
  * 内訳明示の5経費で表すので、その上に率で乗せる欄を作らない。
  * 回答が無い明細（単価が null）は行に含めない。
+ *
+ * **数量はその社が申告したもの**（QuoteDocumentLine.quantity）。依頼した数量ではない。
+ * その社の見積書の合計なので、その社が出した数量と単価から出す。
  */
 function totalsOf(quote: QuoteDocument): EstimateTotals {
   const lines: EstimateLine[] = [];
